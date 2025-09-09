@@ -1,0 +1,81 @@
+{{define "product.html"}}
+{{template "layout_start" .}}
+<article class="product-detail">
+  <div class="pd-media">
+    {{if .Product.Images}}
+      <div class="pd-carousel" id="pdCarousel" data-count="{{len .Product.Images}}">
+        <div class="pd-slides">
+          {{range $i,$img := .Product.Images}}
+            <img class="pd-slide {{if eq $i 0}}active{{end}}" src="{{$img.URL}}" alt="{{$img.Alt}}" data-index="{{$i}}" loading="lazy" />
+          {{end}}
+        </div>
+        <button type="button" class="pd-nav prev" aria-label="Anterior">‹</button>
+        <button type="button" class="pd-nav next" aria-label="Siguiente">›</button>
+        <div class="pd-thumbs">
+          {{range $i,$img := .Product.Images}}
+            <button type="button" class="pd-thumb {{if eq $i 0}}active{{end}}" data-index="{{$i}}">
+              <img src="{{$img.URL}}" alt="{{$img.Alt}} miniatura" loading="lazy" />
+            </button>
+          {{end}}
+        </div>
+      </div>
+    {{else}}
+      <div class="pd-carousel empty" data-count="0"><div class="pd-slides placeholder">SIN IMAGEN</div></div>
+    {{end}}
+  </div>
+  <div class="pd-info">
+    <h1 class="pd-title">{{.Product.Name}}</h1>
+    <div class="pd-price">${{printf "%.2f" .Product.BasePrice}}</div>
+    <p class="pd-desc">{{.Product.ShortDesc}}</p>
+    <form method="post" action="/cart" class="pd-form">
+      <input type="hidden" name="slug" value="{{.Product.Slug}}" />
+      <div class="color-picker">
+        <div class="cp-label">Color</div>
+        <div class="cp-swatches" id="cpSwatches">
+          {{range $i,$c := .Colors}}
+            <button type="button" class="swatch {{if eq $i 0}}active{{end}}" data-color="{{$c}}" style="--c: {{$c}}"></button>
+          {{end}}
+        </div>
+        <input type="hidden" name="color" id="colorInput" value="{{.DefaultColor}}" />
+      </div>
+      <div class="pd-actions">
+        <button class="btn-primary" type="submit">Agregar al carrito</button>
+        <a href="/cart" class="btn-secondary">Ver carrito</a>
+      </div>
+      {{if eq .Added 1}}<span class="added-msg">Agregado!</span>{{end}}
+    </form>
+    <div class="pd-meta">
+      <div><strong>Categoría:</strong> {{.Product.Category}}</div>
+    </div>
+  </div>
+</article>
+<script>
+(function(){
+  const sw=document.querySelectorAll('.swatch');
+  const inp=document.getElementById('colorInput');
+  sw.forEach(b=>b.addEventListener('click',()=>{sw.forEach(x=>x.classList.remove('active'));b.classList.add('active');inp.value=b.dataset.color;}));
+  const root=document.getElementById('pdCarousel');
+  if(!root) return;
+  const slides=[...root.querySelectorAll('.pd-slide')];
+  const thumbs=[...root.querySelectorAll('.pd-thumb')];
+  const total=slides.length; if(total===0) return;
+  let idx=0; let auto=null; const AUTOPLAY=5000;
+  const prevBtn=root.querySelector('.pd-nav.prev');
+  const nextBtn=root.querySelector('.pd-nav.next');
+  if(total===1){ // ocultar controles
+    prevBtn.style.display='none';
+    nextBtn.style.display='none';
+    const tb=root.querySelector('.pd-thumbs'); if(tb) tb.style.display='none';
+    return; // no autoplay necesario
+  }
+  function show(n){slides[idx].classList.remove('active');thumbs[idx].classList.remove('active');idx=(n+total)%total;slides[idx].classList.add('active');thumbs[idx].classList.add('active');}
+  function next(){show(idx+1);}function prev(){show(idx-1);}function start(){auto=setInterval(next,AUTOPLAY);}function restart(){clearInterval(auto);start();}
+  thumbs.forEach(t=>t.addEventListener('click',()=>{show(parseInt(t.dataset.index));restart();}));
+  prevBtn.addEventListener('click',()=>{prev();restart();});
+  nextBtn.addEventListener('click',()=>{next();restart();});
+  let sx=null;root.addEventListener('pointerdown',e=>{sx=e.clientX;});root.addEventListener('pointerup',e=>{if(sx==null) return;const dx=e.clientX-sx;if(Math.abs(dx)>40){dx<0?next():prev();restart();}sx=null;});
+  root.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){next();restart();}else if(e.key==='ArrowLeft'){prev();restart();}});root.tabIndex=0;start();
+})();
+</script>
+{{template "layout_end" .}}
+{{end}}

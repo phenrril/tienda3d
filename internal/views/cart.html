@@ -1,0 +1,128 @@
+{{define "cart.html"}}
+{{template "layout_start" .}}
+<div class="cart-header" style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:10px">
+  <a href="/products" class="btn-secondary" style="text-decoration:none">‹ Volver</a>
+  <h1 style="margin:0">Carrito</h1>
+  <div style="width:90px"></div>
+</div>
+{{if not .Lines}}
+<p>No hay productos en el carrito.</p>
+<p><a class="btn-primary" href="/products">Ir a productos</a></p>
+{{else}}
+<table class="cart-table">
+  <thead>
+    <tr>
+      <th>Producto</th>
+      <th>Color</th>
+      <th style="width:140px">Cant.</th>
+      <th>Unitario</th>
+      <th>Subtotal</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Lines}}
+    <tr>
+      <td class="cart-prod">
+        {{if .Image}}<img src="{{.Image}}" alt="{{.Name}}" class="thumb" />{{end}}
+        <span>{{.Name}}</span>
+      </td>
+      <td><div class="color-dot" style="background: {{.Color}}"></div></td>
+      <td>
+        <form method="post" action="/cart/update" class="qty-form">
+          <input type="hidden" name="slug" value="{{.Slug}}" />
+          <input type="hidden" name="color" value="{{.Color}}" />
+            <button name="op" value="dec" class="qbtn" type="submit">-</button>
+            <span class="qval">{{.Qty}}</span>
+            <button name="op" value="inc" class="qbtn" type="submit">+</button>
+        </form>
+      </td>
+      <td>${{printf "%.2f" .UnitPrice}}</td>
+      <td>${{printf "%.2f" .Subtotal}}</td>
+      <td>
+        <form method="post" action="/cart/remove">
+          <input type="hidden" name="slug" value="{{.Slug}}" />
+          <input type="hidden" name="color" value="{{.Color}}" />
+          <button class="link danger" type="submit">✕</button>
+        </form>
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+<div class="cart-summary">
+  <div class="total">Subtotal productos: <strong>${{printf "%.2f" .Total}}</strong></div>
+  <form class="checkout-form" method="post" action="/cart/checkout" id="checkoutForm" novalidate>
+    <div class="form-group">
+      <label class="form-label" for="name">Nombre completo</label>
+      <input class="form-input" id="name" type="text" name="name" placeholder="Tu nombre" required />
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="email">Email</label>
+      <input class="form-input" id="email" type="email" name="email" placeholder="Tu email" required />
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="phone">Teléfono</label>
+      <input class="form-input" id="phone" type="text" name="phone" placeholder="Celular" />
+    </div>
+    <fieldset class="shipping-box">
+      <legend>Entrega</legend>
+      <div class="shipping-options">
+        <label class="radio-option">
+          <input type="radio" name="shipping" value="retiro" checked />
+          <span>Retiro en local <small>(sin costo)</small></span>
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="shipping" value="envio" />
+          <span>Envío a domicilio <small>(según provincia)</small></span>
+        </label>
+      </div>
+      <div id="provinceGroup" class="province-group">
+        <select name="province" id="provinceSelect" class="form-input">
+          <option value="">Seleccioná provincia</option>
+          {{range .Provinces}}<option value="{{.}}">{{.}}</option>{{end}}
+        </select>
+        <input type="text" name="address" placeholder="Dirección completa" class="form-input" />
+        <input type="text" name="postal_code" placeholder="Código postal" class="form-input" />
+        <input type="text" name="dni" placeholder="DNI" class="form-input" />
+      </div>
+      <div class="cost-row">Costo envío: <span id="shipCost" class="mono">$0.00</span></div>
+      <div class="grand-row">Total final: <span id="grandTotal" class="grand-val">${{printf "%.2f" .Total}}</span></div>
+    </fieldset>
+    <button type="submit" class="btn-primary pay-btn">Pagar con MercadoPago</button>
+  </form>
+</div>
+<script>
+(function(){
+  const form=document.getElementById('checkoutForm');
+  const shipRadios=form.querySelectorAll('input[name="shipping"]');
+  const provinceGroup=document.getElementById('provinceGroup');
+  const provinceSelect=document.getElementById('provinceSelect');
+  const shipCostEl=document.getElementById('shipCost');
+  const grandEl=document.getElementById('grandTotal');
+  const base={{printf "%.2f" .Total}};
+  const COSTS={
+    {{range $k,$v := .ProvinceCosts}}"{{$k}}":{{$v}},{{end}}
+  };
+  function calcCost(){
+    let method='retiro';
+    shipRadios.forEach(r=>{if(r.checked) method=r.value});
+    if(method==='envio'){
+      provinceGroup.style.display='flex';
+      const prov=provinceSelect.value; let c=0; if(prov && COSTS[prov]!=null){c=COSTS[prov];}
+      shipCostEl.textContent='$'+c.toFixed(2);
+      grandEl.textContent='$'+(base+c).toFixed(2);
+    } else {
+      provinceGroup.style.display='none';
+      shipCostEl.textContent='$0.00';
+      grandEl.textContent='$'+base.toFixed(2);
+    }
+  }
+  shipRadios.forEach(r=>r.addEventListener('change',calcCost));
+  provinceSelect && provinceSelect.addEventListener('change',calcCost);
+  calcCost();
+})();
+</script>
+{{end}}
+{{template "layout_end" .}}
+{{end}}
