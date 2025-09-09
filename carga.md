@@ -2,6 +2,47 @@
 
 Este documento resume cómo crear, listar y eliminar productos con las últimas features.
 
+## 0. Autenticación Admin (nuevo)
+Los endpoints de gestión (crear / listar / obtener / borrar / upload) ahora requieren un JWT de admin.
+
+Flujo:
+1. Configurar en `.env`:
+   - `ADMIN_API_KEY` (clave larga secreta)
+   - `ADMIN_ALLOWED_EMAILS` (ej: `mati.orset@gmail.com` o varias separadas por coma)
+   - `JWT_ADMIN_SECRET` (opcional; si se omite usa `SECRET_KEY`)
+2. Obtener token: `POST /admin/login` con header `X-Admin-Key` y (opcional) body JSON con el email permitido.
+3. Usar el token devuelto en `Authorization: Bearer <token>` para todos los endpoints protegidos:
+   - `POST /api/products`
+   - `POST /api/products/upload`
+   - `GET /api/products`
+   - `GET /api/products/{slug}`
+   - `DELETE /api/products/{slug}`
+   - `POST /api/products/delete`
+
+Ejemplo login (curl):
+```
+curl -X POST http://localhost:8080/admin/login \
+  -H "X-Admin-Key: $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"mati.orset@gmail.com"}'
+```
+Respuesta:
+```
+{ "token": "<JWT>", "exp": 1712345678, "email": "mati.orset@gmail.com" }
+```
+Luego:
+```
+export ADMIN_JWT=<JWT>
+```
+
+Ejemplo petición protegida:
+```
+curl -H "Authorization: Bearer $ADMIN_JWT" http://localhost:8080/api/products
+```
+Si el token expira (30 min por defecto) repetir login.
+
+---
+
 ## 1. Preparar entorno
 Arrancar servidor:
 ```
@@ -12,14 +53,17 @@ docker compose up -d --build
 Asegurate de tener `.env` basado en `.env.example`.
 
 Variables mínimas: `DB_DSN` (o POSTGRES_*) , `MP_ACCESS_TOKEN` (TEST-...), `SESSION_KEY`.
-Opcionales: `PUBLIC_BASE_URL`, `APP_ENV`, `PROD_ACCESS_TOKEN`, `STORAGE_DIR`, `GOOGLE_CLIENT_ID/SECRET`, `TELEGRAM_BOT_TOKEN/CHAT_ID`, SMTP_*.
+Opcionales: `PUBLIC_BASE_URL`, `APP_ENV`, `PROD_ACCESS_TOKEN`, `STORAGE_DIR`, `GOOGLE_CLIENT_ID/SECRET`, `TELEGRAM_BOT_TOKEN/CHAT_ID`, SMTP_*, `ADMIN_API_KEY`, `ADMIN_ALLOWED_EMAILS`, `JWT_ADMIN_SECRET`.
 
 ## 2. Carga de imágenes / productos
-Recomendado: endpoint multipart único.
+(Requiere header `Authorization: Bearer <token>` obtenido en sección 0.)
 
 ### 2.1 Endpoint multipart (crear producto + imágenes)
 `POST /api/products/upload`
-Content-Type: multipart/form-data
+Headers:
+- `Authorization: Bearer <token>`
+- `Content-Type: multipart/form-data`
+
 Campos:
 - `name` (req)
 - `base_price` (req, número)
@@ -28,18 +72,12 @@ Campos:
 - `ready_to_ship` (`true|false|1|0`)
 - `image` (1 archivo) y/o `images` (múltiples). Puedes incluir varias filas `images`.
 
-Ejemplo Postman (form-data):
-- name: Maceta Hexa
-- base_price: 3500
-- category: jardin
-- short_desc: Maceta decorativa impresa en 3D
-- ready_to_ship: true
-- images: img1.webp
-- images: img2.webp
+Ejemplo Postman (form-data) agregar también Auth Bearer.
 
 Curl:
 ```
 curl -X POST http://localhost:8080/api/products/upload \
+  -H "Authorization: Bearer $ADMIN_JWT" \
   -F name="Maceta Hexa" \
   -F base_price=3500 \
   -F category=jardin \
@@ -52,6 +90,7 @@ Respuesta 201 incluye `Images` con URLs `/uploads/images/...`.
 
 ### 2.2 JSON simple (sin subir archivos)
 `POST /api/products`
+Headers: `Authorization: Bearer <token>`
 Body JSON:
 ```
 {
@@ -65,13 +104,14 @@ Body JSON:
 (No genera imágenes.)
 
 ## 3. Listar productos
-`GET /api/products`
+`GET /api/products` (requiere token admin)
 Devuelve `items` y `total`.
 
 ## 4. Obtener detalle por slug
-`GET /api/products/{slug}`
+`GET /api/products/{slug}` (requiere token admin)
 
 ## 5. Eliminación
+(Endpoints protegidos por token)
 ### 5.1 Borrado completo (con archivos)
 `DELETE /api/products/{slug}` elimina:
 - Producto, variantes, imágenes (DB)
@@ -108,7 +148,7 @@ Devuelve arrays `deleted` y `errors`. (No borra archivos físicos).
 - Retiro: costo 0.
 
 ## 9. Pagos
-- `POST /api/checkout` genera preferencia MP desde una cotización (flujo futuro de modelos subidos).
+- `POST /api/checkout` genera preferencia MP (público, no requiere token admin).
 - Carrito normal: checkout crea orden y llama a MercadoPago; redirección a `/pay/{id}`.
 - Webhook: `/webhooks/mp` (configurar en MP apuntando a `PUBLIC_BASE_URL/webhooks/mp`).
 
@@ -122,26 +162,42 @@ Configurar `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BASE_URL` para habilitar
 
 ## 12. Rutas claves
 Web: `/`, `/products`, `/product/{slug}`, `/cart`, `/checkout`, `/pay/{id}`
-API: upload, products CRUD, delete masivo, quote, checkout, webhooks.
+API protegida: `/api/products`, `/api/products/upload`, `/api/products/{slug}`, `/api/products/delete`
+API pública: `/api/quote`, `/api/checkout`, `/webhooks/mp`
 
 ## 13. Errores comunes
 | Código | Causa | Solución |
 |--------|-------|----------|
 | 400 | Campos faltantes / multipart | Revisar nombres y tipos en form-data |
+| 401 | Falta token o inválido | Rehacer login `/admin/login` y usar Bearer |
+| 403 | Email no permitido | Agregar email a `ADMIN_ALLOWED_EMAILS` |
 | 404 | Producto no encontrado | Verificar slug |
 | 405 | Método incorrecto | Usar método soportado |
 | 500 | Error interno DB / storage | Revisar logs |
 
 ## 14. Buenas prácticas
 - No subir `.env` (usar `.env.example`).
-- Regenerar `SESSION_KEY` en producción.
+- Regenerar `SESSION_KEY` / `JWT_ADMIN_SECRET` si se filtran.
+- Rotar `ADMIN_API_KEY` periódicamente.
 - Usar token TEST de MP en desarrollo (empieza con `TEST-`).
 - Ajustar costos de envío modificando `provinceCosts` y recompilando.
 
 ## 15. Ejemplos rápidos
+Login admin:
+```
+curl -X POST http://localhost:8080/admin/login \
+  -H "X-Admin-Key: $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"mati.orset@gmail.com"}'
+```
+Listar productos:
+```
+curl -H "Authorization: Bearer $ADMIN_JWT" http://localhost:8080/api/products
+```
 Carga multipart:
 ```
 curl -X POST http://localhost:8080/api/products/upload \
+  -H "Authorization: Bearer $ADMIN_JWT" \
   -F name="Clip Bolsa" \
   -F base_price=600 \
   -F ready_to_ship=true \
@@ -149,11 +205,13 @@ curl -X POST http://localhost:8080/api/products/upload \
 ```
 Delete completo:
 ```
-curl -X DELETE http://localhost:8080/api/products/clip-bolsa
+curl -X DELETE http://localhost:8080/api/products/clip-bolsa \
+  -H "Authorization: Bearer $ADMIN_JWT"
 ```
 Borrado masivo:
 ```
 curl -X POST http://localhost:8080/api/products/delete \
+  -H "Authorization: Bearer $ADMIN_JWT" \
   -H "Content-Type: application/json" \
   -d '{"slugs":["clip-bolsa","otro-prod"]}'
 ```

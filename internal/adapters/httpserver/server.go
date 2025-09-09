@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"mime/multipart" // añadido para upload
+	"mime/multipart"
 	"net/http"
 	"net/smtp"
 	"net/url"
@@ -38,12 +38,35 @@ type Server struct {
 	payments  *usecase.PaymentUC
 	models    domain.UploadedModelRepo
 	storage   domain.FileStorage
-	customers domain.CustomerRepo // nuevo
-	oauthCfg  *oauth2.Config      // nuevo
+	customers domain.CustomerRepo
+	oauthCfg  *oauth2.Config
+	// admin auth
+	adminAllowed map[string]struct{}
+	adminSecret  []byte
 }
 
 func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config) http.Handler {
 	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, models: m, storage: fs, customers: customers, oauthCfg: oauthCfg, mux: http.NewServeMux()}
+	// admin auth init
+	allowed := map[string]struct{}{}
+	if raw := os.Getenv("ADMIN_ALLOWED_EMAILS"); raw != "" {
+		for _, e := range strings.Split(raw, ",") {
+			e = strings.ToLower(strings.TrimSpace(e))
+			if e != "" {
+				allowed[e] = struct{}{}
+			}
+		}
+	}
+	s.adminAllowed = allowed
+	sec := os.Getenv("JWT_ADMIN_SECRET")
+	if sec == "" {
+		sec = os.Getenv("SECRET_KEY")
+	}
+	if sec == "" {
+		sec = "dev-admin-secret"
+	}
+	s.adminSecret = []byte(sec)
+
 	s.routes()
 	return Chain(s.mux, RateLimit(60), Gzip, RequestID, Recovery, Logging)
 }
@@ -78,6 +101,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/auth/google/login", s.handleGoogleLogin)
 	s.mux.HandleFunc("/auth/google/callback", s.handleGoogleCallback)
 	s.mux.HandleFunc("/logout", s.handleLogout)
+	// Admin auth
+	s.mux.HandleFunc("/admin/login", s.handleAdminLogin)
 	// Admin
 	s.mux.HandleFunc("/admin/orders", s.handleAdminOrders)
 }
@@ -200,6 +225,9 @@ func (s *Server) handleCheckout(w http.ResponseWriter, r *http.Request) {
 
 // ---------- API ----------
 func (s *Server) apiProducts(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
 	if r.Method == http.MethodGet {
 		list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 100})
 		writeJSON(w, 200, map[string]any{"items": list, "total": total})
@@ -233,6 +261,9 @@ func (s *Server) apiProducts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
 	if r.Method == http.MethodGet {
 		idStr := strings.TrimPrefix(r.URL.Path, "/api/products/")
 		p, err := s.products.GetBySlug(r.Context(), idStr)
@@ -286,6 +317,9 @@ func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) apiProductsBulkDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "method", 405)
 		return
@@ -374,12 +408,12 @@ func (s *Server) apiCheckout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "order", 500)
 		return
 	}
-	url, err := s.payments.CreatePreference(r.Context(), order)
+	payURL, err := s.payments.CreatePreference(r.Context(), order)
 	if err != nil {
 		http.Error(w, "payment", 500)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"init_point": url, "order_id": order.ID})
+	writeJSON(w, 200, map[string]any{"init_point": payURL, "order_id": order.ID})
 }
 
 func (s *Server) webhookMP(w http.ResponseWriter, r *http.Request) {
@@ -757,14 +791,14 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/cart?err=orden", 302)
 		return
 	}
-	url, err := s.payments.CreatePreference(r.Context(), o)
+	redirURL, err := s.payments.CreatePreference(r.Context(), o)
 	if err != nil {
-		url = "/pay/" + o.ID.String()
+		redirURL = "/pay/" + o.ID.String()
 	} else {
 		_ = s.orders.Orders.Save(r.Context(), o)
 	}
 	writeCart(w, cartPayload{})
-	http.Redirect(w, r, url, 302)
+	http.Redirect(w, r, redirURL, 302)
 }
 
 func (s *Server) handlePaySimulated(w http.ResponseWriter, r *http.Request) {
@@ -890,6 +924,9 @@ func writeCart(w http.ResponseWriter, cp cartPayload) {
 
 // apiProductUpload maneja creación de producto + imágenes (multipart/form-data)
 func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "method", 405)
 		return
@@ -1024,8 +1061,8 @@ func (s *Server) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	state := uuid.New().String()
 	http.SetCookie(w, &http.Cookie{Name: "oauth_state", Value: state, Path: "/", MaxAge: 300, HttpOnly: true, Secure: false})
-	url := s.oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOnline)
-	http.Redirect(w, r, url, 302)
+	loginURL := s.oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOnline)
+	http.Redirect(w, r, loginURL, 302)
 }
 
 func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
@@ -1105,23 +1142,23 @@ func sendOrderEmail(o *domain.Order, success bool) error {
 		statusTxt = "PAGO APROBADO"
 	}
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "Subject: Nueva orden %s #%s\r\n", statusTxt, o.ID.String())
-	fmt.Fprintf(&buf, "From: %s\r\n", user)
-	fmt.Fprintf(&buf, "To: %s\r\n", to)
+	_, _ = fmt.Fprintf(&buf, "Subject: Nueva orden %s #%s\r\n", statusTxt, o.ID.String())
+	_, _ = fmt.Fprintf(&buf, "From: %s\r\n", user)
+	_, _ = fmt.Fprintf(&buf, "To: %s\r\n", to)
 	buf.WriteString("MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n")
-	fmt.Fprintf(&buf, "Estado: %s\n", statusTxt)
-	fmt.Fprintf(&buf, "Orden: %s\n", o.ID)
-	fmt.Fprintf(&buf, "Nombre: %s\nEmail: %s\nTel: %s\nDNI: %s\n", o.Name, o.Email, o.Phone, o.DNI)
+	_, _ = fmt.Fprintf(&buf, "Estado: %s\n", statusTxt)
+	_, _ = fmt.Fprintf(&buf, "Orden: %s\n", o.ID)
+	_, _ = fmt.Fprintf(&buf, "Nombre: %s\nEmail: %s\nTel: %s\nDNI: %s\n", o.Name, o.Email, o.Phone, o.DNI)
 	if o.ShippingMethod == "envio" {
-		fmt.Fprintf(&buf, "Envío a: %s (%s, %s) CP:%s\n", o.Address, o.Province, o.ShippingMethod, o.PostalCode)
+		_, _ = fmt.Fprintf(&buf, "Envío a: %s (%s, %s) CP:%s\n", o.Address, o.Province, o.ShippingMethod, o.PostalCode)
 	} else {
 		buf.WriteString("Retiro en local\n")
 	}
 	buf.WriteString("Items:\n")
 	for _, it := range o.Items {
-		fmt.Fprintf(&buf, "- %s x%d $%.2f Color:%s\n", it.Title, it.Qty, it.UnitPrice, it.Color)
+		_, _ = fmt.Fprintf(&buf, "- %s x%d $%.2f Color:%s\n", it.Title, it.Qty, it.UnitPrice, it.Color)
 	}
-	fmt.Fprintf(&buf, "Total: $%.2f (Envío: $%.2f)\n", o.Total, o.ShippingCost)
+	_, _ = fmt.Fprintf(&buf, "Total: $%.2f (Envío: $%.2f)\n", o.Total, o.ShippingCost)
 	auth := smtp.PlainAuth("", user, pass, host)
 	if err := smtp.SendMail(addr, auth, user, []string{to}, buf.Bytes()); err != nil {
 		log.Error().Err(err).Msg("email send")
@@ -1199,4 +1236,119 @@ func (s *Server) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
 	pages := (int(total) + 19) / 20
 	data := map[string]any{"Orders": list, "Page": page, "Pages": pages}
 	s.render(w, "admin_orders.html", data)
+}
+
+// --- Admin Auth ---
+func (s *Server) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method", 405)
+		return
+	}
+	cfgKey := os.Getenv("ADMIN_API_KEY")
+	if cfgKey == "" {
+		log.Error().Msg("ADMIN_API_KEY faltante")
+		http.Error(w, "config", 500)
+		return
+	}
+	apiKey := r.Header.Get("X-Admin-Key")
+	if apiKey == "" || !secureCompare(apiKey, cfgKey) {
+		http.Error(w, "unauthorized", 401)
+		return
+	}
+	var req struct {
+		Email string `json:"email"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if email == "" && len(s.adminAllowed) == 1 {
+		for k := range s.adminAllowed {
+			email = k
+		}
+	}
+	if _, ok := s.adminAllowed[email]; !ok {
+		http.Error(w, "forbidden", 403)
+		return
+	}
+	tok, exp, err := s.issueAdminToken(email, 30*time.Minute)
+	if err != nil {
+		http.Error(w, "token", 500)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"token": tok, "exp": exp.Unix(), "email": email})
+}
+
+func (s *Server) issueAdminToken(email string, dur time.Duration) (string, time.Time, error) {
+	head := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	exp := time.Now().Add(dur)
+	claims := map[string]any{"sub": email, "email": email, "role": "admin", "exp": exp.Unix(), "iat": time.Now().Unix(), "iss": "tienda3d"}
+	b, _ := json.Marshal(claims)
+	pay := base64.RawURLEncoding.EncodeToString(b)
+	unsigned := head + "." + pay
+	h := hmac.New(sha256.New, s.adminSecret)
+	h.Write([]byte(unsigned))
+	sig := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+	return unsigned + "." + sig, exp, nil
+}
+
+func (s *Server) verifyAdminToken(tok string) (string, error) {
+	parts := strings.Split(tok, ".")
+	if len(parts) != 3 {
+		return "", fmt.Errorf("formato")
+	}
+	unsigned := parts[0] + "." + parts[1]
+	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return "", fmt.Errorf("sig")
+	}
+	h := hmac.New(sha256.New, s.adminSecret)
+	h.Write([]byte(unsigned))
+	if !hmac.Equal(sig, h.Sum(nil)) {
+		return "", fmt.Errorf("firma")
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", fmt.Errorf("payload")
+	}
+	var m map[string]any
+	if err := json.Unmarshal(payload, &m); err != nil {
+		return "", fmt.Errorf("json")
+	}
+	role, _ := m["role"].(string)
+	email, _ := m["email"].(string)
+	expF, _ := m["exp"].(float64)
+	if role != "admin" || email == "" {
+		return "", fmt.Errorf("claims")
+	}
+	if time.Now().Unix() > int64(expF) {
+		return "", fmt.Errorf("exp")
+	}
+	if _, ok := s.adminAllowed[strings.ToLower(email)]; !ok {
+		return "", fmt.Errorf("not allowed")
+	}
+	return email, nil
+}
+
+func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
+	auth := r.Header.Get("Authorization")
+	if !strings.HasPrefix(strings.ToLower(auth), "bearer ") {
+		http.Error(w, "unauthorized", 401)
+		return false
+	}
+	tok := strings.TrimSpace(auth[7:])
+	if _, err := s.verifyAdminToken(tok); err != nil {
+		http.Error(w, "unauthorized", 401)
+		return false
+	}
+	return true
+}
+
+func secureCompare(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	var v byte
+	for i := 0; i < len(a); i++ {
+		v |= a[i] ^ b[i]
+	}
+	return v == 0
 }

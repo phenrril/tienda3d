@@ -1,19 +1,22 @@
-# Multi-stage build
-FROM golang:1.22 AS builder
-WORKDIR /app
+# ------ build ------
+FROM golang:1.25-alpine AS build
+WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-s -w" -o tienda3d ./cmd/tienda3d
+COPY ../.. .
+# si tu main está en ./cmd/tienda3d, perfecto:
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/tienda3d ./cmd/tienda3d
 
-FROM alpine:3.20 AS runtime
+# ------ runtime ------
+FROM alpine:3.20
+# certificados TLS y herramientas mínimas para healthcheck
+RUN apk add --no-cache ca-certificates tzdata wget
 WORKDIR /app
-RUN adduser -D appuser
-COPY --from=builder /app/tienda3d /app/
-COPY --from=builder /app/internal/views /app/internal/views
-COPY --from=builder /app/public /app/public
-ENV PORT=8080
-EXPOSE 8080
+# usuario no-root
+RUN adduser -D -H -s /sbin/nologin appuser
+COPY --from=build /out/tienda3d /app/tienda3d
+COPY --from=build /src/internal/views /app/internal/views
+COPY --from=build /src/public /app/public
 USER appuser
+EXPOSE 8080
 ENTRYPOINT ["/app/tienda3d"]
-

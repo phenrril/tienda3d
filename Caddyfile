@@ -1,0 +1,9 @@
+chroma3d.com.ar {
+  redir https://www.chroma3d.com.ar{uri} 308
+  log
+}
+www.chroma3d.com.ar {
+  encode gzip
+  reverse_proxy app:8080
+  log
+}
