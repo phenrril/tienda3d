@@ -1,0 +1,76 @@
+{{define "products.html"}}
+{{template "layout_start" .}}
+<h1 class="section-title">Productos</h1>
+<form class="filters" method="get" action="/products">
+  <div class="filters-row">
+    <div class="field grow">
+      <input type="text" name="q" value="{{.Query}}" placeholder="Buscar por nombre..." />
+    </div>
+    <div class="field">
+      <select name="category">
+        <option value="">Todas las categorías</option>
+        {{if .Category}}<option value="{{.Category}}" selected>{{.Category}}</option>{{end}}
+      </select>
+    </div>
+    <div class="field">
+      <select name="sort">
+        <option value="newest" {{if eq .Sort "newest"}}selected{{end}}>Novedades</option>
+        <option value="price_asc" {{if eq .Sort "price_asc"}}selected{{end}}>Precio: menor a mayor</option>
+        <option value="price_desc" {{if eq .Sort "price_desc"}}selected{{end}}>Precio: mayor a menor</option>
+        <option value="name" {{if eq .Sort "name"}}selected{{end}}>Nombre A–Z</option>
+      </select>
+    </div>
+    <div class="toggle-group">
+      <label class="toggle {{if ne .StockFilter "available"}}active{{end}}">
+        <input type="radio" name="stock" value="" {{if ne .StockFilter "available"}}checked{{end}} />
+        <span>Todos</span>
+      </label>
+      <label class="toggle {{if eq .StockFilter "available"}}active{{end}}">
+        <input type="radio" name="stock" value="available" {{if eq .StockFilter "available"}}checked{{end}} />
+        <span>Disponibles</span>
+      </label>
+    </div>
+    <div>
+      <button type="submit" class="btn-primary">Aplicar</button>
+      <a href="/products" class="link-reset">Limpiar</a>
+    </div>
+  </div>
+</form>
+
+<div class="cards">
+  {{range .Products}}
+  <div class="card">
+    <div class="card-media">
+      {{if .Images}}
+        <img src="{{(index .Images 0).URL}}" alt="{{(index .Images 0).Alt}}" />
+      {{else}}
+        <div class="placeholder">IMG</div>
+      {{end}}
+      <div class="badges">
+        {{if .ReadyToShip}}<span class="badge green">En stock</span>{{end}}
+      </div>
+    </div>
+    <div class="card-body">
+      <h3 class="card-title"><a href="/product/{{.Slug}}">{{.Name}}</a></h3>
+      <div class="card-meta">{{.Category}}</div>
+      <div class="price-row"><span class="price">${{printf "%.0f" .BasePrice}}</span></div>
+      <div class="actions">
+        <a href="/product/{{.Slug}}" class="btn-secondary">Ver detalles ›</a>
+      </div>
+    </div>
+  </div>
+  {{end}}
+  {{if not .Products}}
+    <p class="empty">No se encontraron productos.</p>
+  {{end}}
+</div>
+
+{{if and .Page .Pages}}
+<div class="pagination">
+  {{if gt .Page 1}}<a href="?page={{sub .Page 1}}&q={{.Query}}&category={{.Category}}&sort={{.Sort}}&stock={{.StockFilter}}" class="page-btn">‹ Anterior</a>{{end}}
+  <span>Página {{.Page}} / {{.Pages}}</span>
+  {{if lt .Page .Pages}}<a href="?page={{add .Page 1}}&q={{.Query}}&category={{.Category}}&sort={{.Sort}}&stock={{.StockFilter}}" class="page-btn">Siguiente ›</a>{{end}}
+</div>
+{{end}}
+{{template "layout_end" .}}
+{{end}}

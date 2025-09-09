@@ -1,0 +1,1202 @@
+package httpserver
+
+import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"html/template"
+	"io"
+	"mime/multipart" // añadido para upload
+	"net/http"
+	"net/smtp"
+	"net/url"
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
+	"golang.org/x/oauth2"
+
+	"github.com/phenrril/tienda3d/internal/adapters/payments/mercadopago"
+	"github.com/phenrril/tienda3d/internal/domain"
+	"github.com/phenrril/tienda3d/internal/usecase"
+)
+
+type Server struct {
+	mux       *http.ServeMux
+	tmpl      *template.Template
+	products  *usecase.ProductUC
+	quotes    *usecase.QuoteUC
+	orders    *usecase.OrderUC
+	payments  *usecase.PaymentUC
+	models    domain.UploadedModelRepo
+	storage   domain.FileStorage
+	customers domain.CustomerRepo // nuevo
+	oauthCfg  *oauth2.Config      // nuevo
+}
+
+func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config) http.Handler {
+	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, models: m, storage: fs, customers: customers, oauthCfg: oauthCfg, mux: http.NewServeMux()}
+	s.routes()
+	return Chain(s.mux, RateLimit(60), Gzip, RequestID, Recovery, Logging)
+}
+
+func (s *Server) routes() {
+	// estáticos
+	s.mux.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("public"))))
+	// exponer uploads (imágenes guardadas vía API)
+	s.mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
+	// SSR
+	s.mux.HandleFunc("/", s.handleHome)
+	s.mux.HandleFunc("/products", s.handleProducts)
+	s.mux.HandleFunc("/product/", s.handleProduct)
+	s.mux.HandleFunc("/quote/", s.handleQuoteView)
+	s.mux.HandleFunc("/checkout", s.handleCheckout)
+	s.mux.HandleFunc("/pay/", s.handlePaySimulated)
+	// Cart
+	s.mux.HandleFunc("/cart", s.handleCart) // GET ver / POST agregar
+	s.mux.HandleFunc("/cart/update", s.handleCartUpdate)
+	s.mux.HandleFunc("/cart/remove", s.handleCartRemove)
+	s.mux.HandleFunc("/cart/checkout", s.handleCartCheckout)
+	// API JSON
+	s.mux.HandleFunc("/api/products", s.apiProducts)
+	s.mux.HandleFunc("/api/products/", s.apiProductByID)
+	// nuevo endpoint multipart
+	s.mux.HandleFunc("/api/products/upload", s.apiProductUpload)
+	s.mux.HandleFunc("/api/quote", s.apiQuote)
+	s.mux.HandleFunc("/api/checkout", s.apiCheckout)
+	s.mux.HandleFunc("/webhooks/mp", s.webhookMP)
+	s.mux.HandleFunc("/api/products/delete", s.apiProductsBulkDelete)
+	// Auth Google
+	s.mux.HandleFunc("/auth/google/login", s.handleGoogleLogin)
+	s.mux.HandleFunc("/auth/google/callback", s.handleGoogleCallback)
+	s.mux.HandleFunc("/logout", s.handleLogout)
+	// Admin
+	s.mux.HandleFunc("/admin/orders", s.handleAdminOrders)
+}
+
+// ---------- SSR Handlers ----------
+func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	list, _, err := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 8})
+	if err != nil {
+		http.Error(w, "err", 500)
+		return
+	}
+	data := map[string]any{"Products": list}
+	if u := readUserSession(w, r); u != nil {
+		data["User"] = u
+	}
+	s.render(w, "home.html", data)
+}
+
+func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
+	qv := r.URL.Query()
+	page, _ := strconv.Atoi(qv.Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	sort := qv.Get("sort")
+	query := qv.Get("q")
+	category := qv.Get("category")
+	stock := qv.Get("stock") // values: available, all
+	var readyPtr *bool
+	if stock == "available" {
+		b := true
+		readyPtr = &b
+	}
+	list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: page, PageSize: 12, Sort: sort, Query: query, Category: category, ReadyToShip: readyPtr})
+	pages := (int(total) + 11) / 12
+	if pages == 0 {
+		pages = 1
+	}
+	data := map[string]any{
+		"Products":    list,
+		"Total":       total,
+		"Page":        page,
+		"Pages":       pages,
+		"Query":       query,
+		"Sort":        sort,
+		"Category":    category,
+		"StockFilter": stock,
+	}
+	if u := readUserSession(w, r); u != nil {
+		data["User"] = u
+	}
+	s.render(w, "products.html", data)
+}
+
+func (s *Server) handleProduct(w http.ResponseWriter, r *http.Request) {
+	slug := strings.TrimPrefix(r.URL.Path, "/product/")
+	if slug == "" {
+		http.NotFound(w, r)
+		return
+	}
+	p, err := s.products.GetBySlug(r.Context(), slug)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	colorsMap := map[string]struct{}{}
+	for _, v := range p.Variants {
+		if v.Color != "" {
+			colorsMap[v.Color] = struct{}{}
+		}
+	}
+	colors := []string{}
+	for c := range colorsMap {
+		colors = append(colors, c)
+	}
+	if len(colors) == 0 {
+		colors = []string{"#111827", "#6366f1", "#16a34a", "#f59e0b", "#ff3d00"}
+	}
+	added := 0
+	if r.URL.Query().Get("added") == "1" {
+		added = 1
+	}
+	data := map[string]any{"Product": p, "Colors": colors, "DefaultColor": colors[0], "Added": added}
+	if u := readUserSession(w, r); u != nil {
+		data["User"] = u
+	}
+	s.render(w, "product.html", data)
+}
+
+func (s *Server) handleQuoteView(w http.ResponseWriter, r *http.Request) {
+	idStr := strings.TrimPrefix(r.URL.Path, "/quote/")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	q, err := s.quotes.Quotes.FindByID(r.Context(), id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	data := map[string]any{"Quote": q}
+	if u := readUserSession(w, r); u != nil {
+		data["User"] = u
+	}
+	s.render(w, "quote.html", data)
+}
+
+func (s *Server) handleCheckout(w http.ResponseWriter, r *http.Request) {
+	data := map[string]any{}
+	if u := readUserSession(w, r); u != nil {
+		data["User"] = u
+	}
+	s.render(w, "checkout.html", data)
+}
+
+// ---------- API ----------
+func (s *Server) apiProducts(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 100})
+		writeJSON(w, 200, map[string]any{"items": list, "total": total})
+		return
+	}
+	if r.Method == http.MethodPost {
+		var req struct {
+			Name        string  `json:"name"`
+			Category    string  `json:"category"`
+			ShortDesc   string  `json:"short_desc"`
+			BasePrice   float64 `json:"base_price"`
+			ReadyToShip bool    `json:"ready_to_ship"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "json", 400)
+			return
+		}
+		if req.Name == "" || req.BasePrice < 0 {
+			http.Error(w, "datos", 400)
+			return
+		}
+		p := &domain.Product{Name: req.Name, Category: req.Category, ShortDesc: req.ShortDesc, BasePrice: req.BasePrice, ReadyToShip: req.ReadyToShip}
+		if err := s.products.Create(r.Context(), p); err != nil {
+			http.Error(w, "crear", 500)
+			return
+		}
+		writeJSON(w, 201, p)
+		return
+	}
+	http.Error(w, "method", 405)
+}
+
+func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		idStr := strings.TrimPrefix(r.URL.Path, "/api/products/")
+		p, err := s.products.GetBySlug(r.Context(), idStr)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, 200, p)
+		return
+	}
+	if r.Method == http.MethodDelete {
+		idStr := strings.TrimPrefix(r.URL.Path, "/api/products/")
+		if idStr == "" {
+			http.Error(w, "slug", 400)
+			return
+		}
+		// eliminación completa (producto + imágenes + variantes + archivos)
+		imgPaths, err := s.products.DeleteFullBySlug(r.Context(), idStr)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				http.Error(w, "not found", 404)
+				return
+			}
+			http.Error(w, "delete", 500)
+			return
+		}
+		removedFiles := []string{}
+		for _, pth := range imgPaths {
+			sp := strings.TrimSpace(pth)
+			if sp == "" {
+				continue
+			}
+			// normalizar ruta local: quitar prefijo '/'
+			if strings.HasPrefix(sp, "/") {
+				sp = sp[1:]
+			}
+			// sólo intentar si apunta dentro de uploads
+			if !strings.Contains(sp, "uploads") {
+				continue
+			}
+			if _, err := os.Stat(sp); err == nil {
+				if err2 := os.Remove(sp); err2 == nil {
+					removedFiles = append(removedFiles, sp)
+				}
+			}
+		}
+		writeJSON(w, 200, map[string]any{"status": "ok", "slug": idStr, "removed_files": removedFiles})
+		return
+	}
+	http.Error(w, "method", 405)
+}
+
+func (s *Server) apiProductsBulkDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method", 405)
+		return
+	}
+	var req struct {
+		Slugs []string `json:"slugs"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Slugs) == 0 {
+		http.Error(w, "json", 400)
+		return
+	}
+	deleted := []string{}
+	errorsMap := map[string]string{}
+	for _, sl := range req.Slugs {
+		if sl == "" {
+			continue
+		}
+		if err := s.products.DeleteBySlug(r.Context(), sl); err != nil {
+			errorsMap[sl] = err.Error()
+		} else {
+			deleted = append(deleted, sl)
+		}
+	}
+	writeJSON(w, 200, map[string]any{"deleted": deleted, "errors": errorsMap})
+}
+
+func (s *Server) apiQuote(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method", 405)
+		return
+	}
+	var req struct {
+		UploadedModelID string  `json:"uploaded_model_id"`
+		Material        string  `json:"material"`
+		Layer           float64 `json:"layer_height_mm"`
+		Infill          int     `json:"infill_pct"`
+		Quality         string  `json:"quality"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "json", 400)
+		return
+	}
+	id, err := uuid.Parse(req.UploadedModelID)
+	if err != nil {
+		http.Error(w, "model", 400)
+		return
+	}
+	model, err := s.models.FindByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "model", 404)
+		return
+	}
+	q, err := s.quotes.CreateFromModel(r.Context(), model, domain.QuoteConfig{Material: domain.Material(req.Material), LayerHeightMM: req.Layer, InfillPct: req.Infill, Quality: domain.PrintQuality(req.Quality)})
+	if err != nil {
+		http.Error(w, "quote", 500)
+		return
+	}
+	writeJSON(w, 200, q)
+}
+
+func (s *Server) apiCheckout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method", 405)
+		return
+	}
+	var req struct {
+		QuoteID string `json:"quote_id"`
+		Email   string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "json", 400)
+		return
+	}
+	qid, err := uuid.Parse(req.QuoteID)
+	if err != nil {
+		http.Error(w, "quote", 400)
+		return
+	}
+	q, err := s.quotes.Quotes.FindByID(r.Context(), qid)
+	if err != nil {
+		http.Error(w, "quote", 404)
+		return
+	}
+	order, err := s.orders.CreateFromQuote(r.Context(), q, req.Email)
+	if err != nil {
+		http.Error(w, "order", 500)
+		return
+	}
+	url, err := s.payments.CreatePreference(r.Context(), order)
+	if err != nil {
+		http.Error(w, "payment", 500)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"init_point": url, "order_id": order.ID})
+}
+
+func (s *Server) webhookMP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method", 405)
+		return
+	}
+	body, _ := io.ReadAll(r.Body)
+	var evt struct {
+		Type   string `json:"type"`
+		Action string `json:"action"`
+		Data   struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(body, &evt)
+	payID := evt.Data.ID
+	if payID == "" {
+		payID = r.URL.Query().Get("id")
+	}
+	if payID == "" {
+		log.Warn().Msg("webhook sin payment id")
+		w.WriteHeader(200)
+		return
+	}
+	status, extRef, err := s.payments.Gateway.PaymentInfo(r.Context(), payID)
+	if err != nil {
+		log.Error().Err(err).Str("payment_id", payID).Msg("payment info")
+		w.WriteHeader(200)
+		return
+	}
+	orderID, ok := mercadopago.VerifyExternalRef(extRef)
+	if !ok {
+		log.Warn().Str("ext", extRef).Msg("external ref inválido")
+		w.WriteHeader(200)
+		return
+	}
+	uid, err := uuid.Parse(orderID)
+	if err != nil {
+		w.WriteHeader(200)
+		return
+	}
+	o, err := s.orders.Orders.FindByID(r.Context(), uid)
+	if err != nil || o == nil {
+		log.Error().Err(err).Str("order_id", orderID).Msg("orden no encontrada para webhook")
+		w.WriteHeader(200)
+		return
+	}
+	approved := false
+	switch status {
+	case "approved":
+		approved = true
+		o.MPStatus = "approved"
+		o.Status = domain.OrderStatusFinished
+	case "pending", "in_process", "in_mediation":
+		o.MPStatus = status
+		if o.Status != domain.OrderStatusFinished {
+			o.Status = domain.OrderStatusAwaitingPay
+		}
+	default:
+		o.MPStatus = status
+		if status == "rejected" {
+			o.Status = domain.OrderStatusCancelled
+		}
+	}
+	notify := false
+	if approved && !o.Notified {
+		o.Notified = true
+		notify = true
+	}
+	if err := s.orders.Orders.Save(r.Context(), o); err != nil {
+		log.Error().Err(err).Msg("guardar orden webhook")
+	}
+	if notify {
+		go sendOrderNotify(o, true)
+	}
+	w.WriteHeader(200)
+}
+
+// --- Cart ---
+// cartItem define items crudos en cookie
+type cartItem struct {
+	Slug  string  `json:"slug"`
+	Color string  `json:"color"`
+	Qty   int     `json:"qty"`
+	Price float64 `json:"price"`
+}
+
+type cartPayload struct {
+	Items []cartItem `json:"items"`
+}
+
+type cartLine struct {
+	Slug      string
+	Color     string
+	Qty       int
+	UnitPrice float64
+	Subtotal  float64
+	Name      string
+	Image     string
+}
+
+func aggregateCart(cp cartPayload, lookup func(slug string) (*domain.Product, error)) []cartLine {
+	m := map[string]*cartLine{}
+	for _, it := range cp.Items {
+		if it.Qty <= 0 {
+			continue
+		}
+		key := it.Slug + "|" + it.Color
+		line, ok := m[key]
+		if !ok {
+			line = &cartLine{Slug: it.Slug, Color: it.Color, Qty: 0, UnitPrice: it.Price}
+			m[key] = line
+		}
+		line.Qty += it.Qty
+	}
+	res := []cartLine{}
+	for _, l := range m {
+		p, err := lookup(l.Slug)
+		if err == nil && p != nil {
+			l.Name = p.Name
+			if len(p.Images) > 0 {
+				l.Image = p.Images[0].URL
+			}
+			// usar precio actual base en vez del guardado si difiere
+			if p.BasePrice != 0 {
+				l.UnitPrice = p.BasePrice
+			}
+		}
+		l.Subtotal = l.UnitPrice * float64(l.Qty)
+		res = append(res, *l)
+	}
+	return res
+}
+
+var provinceCosts = map[string]float64{
+	"Santa Fe":            9000,
+	"Buenos Aires":        9000,
+	"CABA":                9000,
+	"Cordoba":             9000,
+	"Entre Rios":          9000,
+	"Corrientes":          9000,
+	"Chaco":               9000,
+	"Misiones":            9000,
+	"Formosa":             9000,
+	"Santiago del Estero": 9000,
+	"Tucuman":             9000,
+	"Salta":               9000,
+	"Jujuy":               9000,
+	"Catamarca":           9000,
+	"La Rioja":            9000,
+	"San Juan":            9000,
+	"San Luis":            9000,
+	"Mendoza":             9000,
+	"La Pampa":            9000,
+	"Neuquen":             9000,
+	"Rio Negro":           9000,
+	"Chubut":              9000,
+	"Santa Cruz":          9000,
+	"Tierra del Fuego":    9000,
+}
+
+func shippingCostFor(province string) float64 {
+	if v, ok := provinceCosts[province]; ok {
+		return v
+	}
+	if province == "" {
+		return 0
+	}
+	return 9000
+}
+
+func (s *Server) handleCart(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		cp := readCart(r)
+		lines := aggregateCart(cp, func(slug string) (*domain.Product, error) { return s.products.GetBySlug(r.Context(), slug) })
+		total := 0.0
+		for _, l := range lines {
+			total += l.Subtotal
+		}
+		provs := []string{}
+		for p := range provinceCosts {
+			provs = append(provs, p)
+		}
+		data := map[string]any{"Lines": lines, "Total": total, "Provinces": provs, "ProvinceCosts": provinceCosts}
+		if u := readUserSession(w, r); u != nil {
+			data["User"] = u
+		}
+		s.render(w, "cart.html", data)
+		return
+	}
+	if r.Method == http.MethodPost { // agregar
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "form", 400)
+			return
+		}
+		slug := r.FormValue("slug")
+		color := r.FormValue("color")
+		if slug == "" {
+			http.Error(w, "slug", 400)
+			return
+		}
+		p, err := s.products.GetBySlug(r.Context(), slug)
+		if err != nil {
+			http.Error(w, "prod", 404)
+			return
+		}
+		cart := readCart(r)
+		cart.Items = append(cart.Items, cartItem{Slug: slug, Color: color, Qty: 1, Price: p.BasePrice})
+		writeCart(w, cart)
+		http.Redirect(w, r, "/product/"+slug+"?added=1", 302)
+		return
+	}
+	http.Error(w, "method", 405)
+}
+
+func (s *Server) handleCartUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method", 405)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "form", 400)
+		return
+	}
+	slug := r.FormValue("slug")
+	color := r.FormValue("color")
+	op := r.FormValue("op") // inc / dec / set
+	qtyStr := r.FormValue("qty")
+	cart := readCart(r)
+	// expand aggregated modifications re-creando lista
+	agg := map[string]int{}
+	for _, it := range cart.Items {
+		if it.Qty > 0 {
+			agg[it.Slug+"|"+it.Color] += it.Qty
+		}
+	}
+	key := slug + "|" + color
+	cur := agg[key]
+	switch op {
+	case "inc":
+		cur++
+	case "dec":
+		if cur > 1 {
+			cur--
+		} else {
+			cur = 0
+		}
+	case "set":
+		if q, err := strconv.Atoi(qtyStr); err == nil {
+			cur = q
+		}
+	}
+	if cur < 0 {
+		cur = 0
+	}
+	agg[key] = cur
+	// rebuild
+	newCart := cartPayload{}
+	for k, q := range agg {
+		if q <= 0 {
+			continue
+		}
+		parts := strings.SplitN(k, "|", 2)
+		newCart.Items = append(newCart.Items, cartItem{Slug: parts[0], Color: parts[1], Qty: q})
+	}
+	// need prices refreshed
+	for i := range newCart.Items {
+		p, _ := s.products.GetBySlug(r.Context(), newCart.Items[i].Slug)
+		if p != nil {
+			newCart.Items[i].Price = p.BasePrice
+		}
+	}
+	writeCart(w, newCart)
+	http.Redirect(w, r, "/cart", 302)
+}
+
+func (s *Server) handleCartRemove(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method", 405)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "form", 400)
+		return
+	}
+	slug := r.FormValue("slug")
+	color := r.FormValue("color")
+	cart := readCart(r)
+	newItems := []cartItem{}
+	for _, it := range cart.Items {
+		if !(it.Slug == slug && it.Color == color) {
+			newItems = append(newItems, it)
+		}
+	}
+	cart.Items = newItems
+	writeCart(w, cart)
+	http.Redirect(w, r, "/cart", 302)
+}
+
+func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method", 405)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "form", 400)
+		return
+	}
+	email := r.FormValue("email")
+	name := r.FormValue("name")
+	phone := r.FormValue("phone")
+	dni := r.FormValue("dni")
+	postal := r.FormValue("postal_code")
+	if email == "" || name == "" {
+		http.Redirect(w, r, "/cart?err=datos", 302)
+		return
+	}
+	shippingMethod := r.FormValue("shipping")
+	if shippingMethod == "" {
+		shippingMethod = "retiro"
+	}
+	address := r.FormValue("address")
+	province := r.FormValue("province")
+	if shippingMethod == "envio" {
+		if province == "" || address == "" || postal == "" || dni == "" || phone == "" {
+			http.Redirect(w, r, "/cart?err=envio", 302)
+			return
+		}
+		// validar DNI (7-8 dígitos) y CP (4 o 5 dígitos)
+		dniRe := regexp.MustCompile(`^\d{7,8}$`)
+		pcRe := regexp.MustCompile(`^\d{4,5}$`)
+		if !dniRe.MatchString(dni) || !pcRe.MatchString(postal) {
+			http.Redirect(w, r, "/cart?err=formato", 302)
+			return
+		}
+	}
+	cp := readCart(r)
+	if len(cp.Items) == 0 {
+		http.Redirect(w, r, "/cart?err=vacio", 302)
+		return
+	}
+	lines := aggregateCart(cp, func(slug string) (*domain.Product, error) { return s.products.GetBySlug(r.Context(), slug) })
+	if len(lines) == 0 {
+		http.Redirect(w, r, "/cart?err=vacio", 302)
+		return
+	}
+	o := &domain.Order{ID: uuid.New(), Status: domain.OrderStatusAwaitingPay, Email: email, Name: name, Phone: phone, DNI: dni, PostalCode: postal, ShippingMethod: shippingMethod}
+	itemsTotal := 0.0
+	for _, l := range lines {
+		p, _ := s.products.GetBySlug(r.Context(), l.Slug)
+		var pid *uuid.UUID
+		var title string
+		if p != nil {
+			pid = &p.ID
+			title = p.Name
+		} else {
+			title = "Producto"
+		}
+		o.Items = append(o.Items, domain.OrderItem{ID: uuid.New(), ProductID: pid, Qty: l.Qty, UnitPrice: l.UnitPrice, Title: title, Color: l.Color})
+		itemsTotal += l.UnitPrice * float64(l.Qty)
+	}
+	shippingCost := 0.0
+	if shippingMethod == "envio" {
+		shippingCost = shippingCostFor(province)
+		if address == "" {
+			address = "(sin dirección)"
+		}
+		o.Address = address
+		o.Province = province
+	}
+	o.ShippingCost = shippingCost
+	o.Total = itemsTotal + shippingCost
+	if err := s.orders.Orders.Save(r.Context(), o); err != nil {
+		http.Redirect(w, r, "/cart?err=orden", 302)
+		return
+	}
+	url, err := s.payments.CreatePreference(r.Context(), o)
+	if err != nil {
+		url = "/pay/" + o.ID.String()
+	} else {
+		_ = s.orders.Orders.Save(r.Context(), o)
+	}
+	writeCart(w, cartPayload{})
+	http.Redirect(w, r, url, 302)
+}
+
+func (s *Server) handlePaySimulated(w http.ResponseWriter, r *http.Request) {
+	idStr := strings.TrimPrefix(r.URL.Path, "/pay/")
+	uid, err := uuid.Parse(idStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	o, err := s.orders.Orders.FindByID(r.Context(), uid)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	q := r.URL.Query()
+	status := strings.ToLower(q.Get("status"))
+	if status == "" {
+		status = strings.ToLower(q.Get("collection_status"))
+	}
+	success := false
+	if status == "approved" {
+		success = true
+	}
+	if status != "" { // hubo callback real
+		if success {
+			o.MPStatus = "approved"
+			o.Status = domain.OrderStatusFinished
+			if !o.Notified {
+				o.Notified = true
+				_ = s.orders.Orders.Save(r.Context(), o)
+				go sendOrderNotify(o, true)
+			} else {
+				_ = s.orders.Orders.Save(r.Context(), o)
+			}
+		} else {
+			o.MPStatus = status
+			_ = s.orders.Orders.Save(r.Context(), o)
+		}
+	}
+	msg := "Pago pendiente / simulado"
+	if status == "rejected" {
+		msg = "El pago fue rechazado."
+	}
+	if success {
+		msg = "Pago aprobado. Gracias por tu compra."
+	}
+	data := map[string]any{"Order": o, "StatusMsg": msg, "Success": success}
+	if u := readUserSession(w, r); u != nil {
+		data["User"] = u
+	}
+	s.render(w, "pay.html", data)
+}
+
+// ---------- Helpers ----------
+func (s *Server) render(w http.ResponseWriter, name string, data any) {
+	if m, ok := data.(map[string]any); ok {
+		if _, exists := m["Year"]; !exists {
+			m["Year"] = time.Now().Year()
+		}
+		if _, exists := m["User"]; !exists { // inyectar usuario
+			if u := readUserSession(w, nil); u != nil {
+				m["User"] = u
+			}
+		}
+		data = m
+	} else {
+		m2 := map[string]any{"Year": time.Now().Year()}
+		if u := readUserSession(w, nil); u != nil {
+			m2["User"] = u
+		}
+		data = m2
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := s.tmpl.ExecuteTemplate(w, name, data); err != nil {
+		log.Error().Err(err).Str("tpl", name).Msg("render")
+		http.Error(w, "tpl", 500)
+	}
+}
+
+func writeJSON(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func secretKey() []byte {
+	k := os.Getenv("SESSION_KEY")
+	if k == "" {
+		k = "dev-insecure"
+	}
+	return []byte(k)
+}
+
+func readCart(r *http.Request) cartPayload {
+	c, err := r.Cookie("cart")
+	if err != nil {
+		return cartPayload{}
+	}
+	parts := strings.SplitN(c.Value, ".", 2)
+	if len(parts) != 2 {
+		return cartPayload{}
+	}
+	sig, _ := base64.RawURLEncoding.DecodeString(parts[0])
+	payload, _ := base64.RawURLEncoding.DecodeString(parts[1])
+	h := hmac.New(sha256.New, secretKey())
+	h.Write(payload)
+	if !hmac.Equal(sig, h.Sum(nil)) {
+		return cartPayload{}
+	}
+	var cp cartPayload
+	_ = json.Unmarshal(payload, &cp)
+	return cp
+}
+
+func writeCart(w http.ResponseWriter, cp cartPayload) {
+	b, _ := json.Marshal(cp)
+	h := hmac.New(sha256.New, secretKey())
+	h.Write(b)
+	sig := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+	val := sig + "." + base64.RawURLEncoding.EncodeToString(b)
+	http.SetCookie(w, &http.Cookie{Name: "cart", Value: val, Path: "/", MaxAge: 60 * 60 * 24 * 7, HttpOnly: true})
+}
+
+// apiProductUpload maneja creación de producto + imágenes (multipart/form-data)
+func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method", 405)
+		return
+	}
+	// límite memoria para cabeceras, archivos se almacenan en temp
+	if err := r.ParseMultipartForm(25 << 20); err != nil { // 25MB
+		http.Error(w, "multipart", 400)
+		return
+	}
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" {
+		http.Error(w, "name", 400)
+		return
+	}
+	bpStr := r.FormValue("base_price")
+	bp, _ := strconv.ParseFloat(bpStr, 64)
+	if bp < 0 {
+		http.Error(w, "price", 400)
+		return
+	}
+	cat := r.FormValue("category")
+	sdesc := r.FormValue("short_desc")
+	ready := r.FormValue("ready_to_ship") == "true" || r.FormValue("ready_to_ship") == "1"
+	p := &domain.Product{Name: name, Category: cat, ShortDesc: sdesc, BasePrice: bp, ReadyToShip: ready}
+	if err := s.products.Create(r.Context(), p); err != nil {
+		log.Error().Err(err).Msg("crear producto")
+		http.Error(w, "crear", 500)
+		return
+	}
+	// procesar archivos (image o images)
+	files := []*multipart.FileHeader{}
+	if r.MultipartForm != nil {
+		if fhArr, ok := r.MultipartForm.File["image"]; ok {
+			files = append(files, fhArr...)
+		}
+		if fhArr, ok := r.MultipartForm.File["images"]; ok {
+			files = append(files, fhArr...)
+		}
+	}
+	imgs := []domain.Image{}
+	for _, fh := range files {
+		if fh.Size == 0 {
+			continue
+		}
+		f, err := fh.Open()
+		if err != nil {
+			continue
+		}
+		data, err := io.ReadAll(f)
+		_ = f.Close()
+		if err != nil || len(data) == 0 {
+			continue
+		}
+		// guardar usando storage
+		storedPath, err := s.storage.SaveImage(r.Context(), fh.Filename, data)
+		if err != nil {
+			log.Warn().Err(err).Str("file", fh.Filename).Msg("no se pudo guardar imagen")
+			continue
+		}
+		// asegurar URL servible (prefijar '/')
+		if !strings.HasPrefix(storedPath, "/") {
+			storedPath = "/" + strings.ReplaceAll(storedPath, "\\", "/")
+		}
+		imgs = append(imgs, domain.Image{URL: storedPath, Alt: name})
+	}
+	if len(imgs) > 0 {
+		if err := s.products.AddImages(r.Context(), p.ID, imgs); err != nil {
+			log.Error().Err(err).Msg("add images")
+		}
+		// recargar para incluir imágenes
+		if rp, err := s.products.GetBySlug(r.Context(), p.Slug); err == nil {
+			p = rp
+		}
+	}
+	writeJSON(w, 201, p)
+}
+
+// ----------------- OAuth Google -----------------
+
+type sessionUser struct {
+	Email string `json:"email"`
+	Name  string `json:"name"`
+}
+
+func writeUserSession(w http.ResponseWriter, u *sessionUser) {
+	if u == nil { // clear
+		http.SetCookie(w, &http.Cookie{Name: "sess", Value: "", Path: "/", MaxAge: -1, HttpOnly: true})
+		return
+	}
+	b, _ := json.Marshal(u)
+	h := hmac.New(sha256.New, secretKey())
+	h.Write(b)
+	sig := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+	val := sig + "." + base64.RawURLEncoding.EncodeToString(b)
+	http.SetCookie(w, &http.Cookie{Name: "sess", Value: val, Path: "/", MaxAge: 60 * 60 * 24 * 30, HttpOnly: true})
+}
+
+func readUserSession(w http.ResponseWriter, r *http.Request) *sessionUser {
+	// r puede ser nil (cuando se llama desde render); en ese caso no leer cookie
+	if r == nil {
+		return nil
+	}
+	c, err := r.Cookie("sess")
+	if err != nil || c.Value == "" {
+		return nil
+	}
+	parts := strings.SplitN(c.Value, ".", 2)
+	if len(parts) != 2 {
+		return nil
+	}
+	sig, _ := base64.RawURLEncoding.DecodeString(parts[0])
+	payload, _ := base64.RawURLEncoding.DecodeString(parts[1])
+	h := hmac.New(sha256.New, secretKey())
+	h.Write(payload)
+	if !hmac.Equal(sig, h.Sum(nil)) {
+		return nil
+	}
+	var u sessionUser
+	if err := json.Unmarshal(payload, &u); err != nil {
+		return nil
+	}
+	if u.Email == "" {
+		return nil
+	}
+	return &u
+}
+
+func (s *Server) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
+	if s.oauthCfg == nil {
+		http.Error(w, "oauth no configurado", 500)
+		return
+	}
+	state := uuid.New().String()
+	http.SetCookie(w, &http.Cookie{Name: "oauth_state", Value: state, Path: "/", MaxAge: 300, HttpOnly: true, Secure: false})
+	url := s.oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOnline)
+	http.Redirect(w, r, url, 302)
+}
+
+func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
+	if s.oauthCfg == nil {
+		http.Error(w, "oauth no configurado", 500)
+		return
+	}
+	q := r.URL.Query()
+	state := q.Get("state")
+	code := q.Get("code")
+	c, _ := r.Cookie("oauth_state")
+	if c == nil || c.Value == "" || c.Value != state {
+		http.Error(w, "state", 400)
+		return
+	}
+	tok, err := s.oauthCfg.Exchange(r.Context(), code)
+	if err != nil {
+		log.Error().Err(err).Msg("exchange oauth")
+		http.Error(w, "oauth", 400)
+		return
+	}
+	client := s.oauthCfg.Client(r.Context(), tok)
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
+	if err != nil || resp.StatusCode != 200 {
+		log.Error().Err(err).Msg("userinfo")
+		http.Error(w, "userinfo", 400)
+		return
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var info struct {
+		Email string `json:"email"`
+		Name  string `json:"name"`
+	}
+	_ = json.Unmarshal(body, &info)
+	if info.Email == "" { // fallback name
+		log.Warn().Msg("email vacío oauth")
+		http.Error(w, "email", 400)
+		return
+	}
+	// persist customer
+	if s.customers != nil {
+		cust, err := s.customers.FindByEmail(r.Context(), info.Email)
+		if err != nil {
+			if err == domain.ErrNotFound {
+				cust = &domain.Customer{ID: uuid.New(), Email: info.Email, Name: info.Name}
+				_ = s.customers.Save(r.Context(), cust)
+			}
+		}
+	}
+	writeUserSession(w, &sessionUser{Email: info.Email, Name: info.Name})
+	http.Redirect(w, r, "/", 302)
+}
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	writeUserSession(w, nil)
+	http.Redirect(w, r, "/", 302)
+}
+
+// sendOrderEmail envía un email simple con datos de la orden si hay configuración SMTP.
+func sendOrderEmail(o *domain.Order, success bool) error {
+	host := os.Getenv("SMTP_HOST")
+	port := os.Getenv("SMTP_PORT")
+	user := os.Getenv("SMTP_USER")
+	pass := os.Getenv("SMTP_PASS")
+	to := os.Getenv("ORDER_NOTIFY_EMAIL")
+	if to == "" {
+		to = "matias.orset@hotmail.com"
+	}
+	if host == "" || port == "" || user == "" || pass == "" {
+		log.Warn().Msg("SMTP no configurado, se omite envío de email")
+		return nil
+	}
+	addr := host + ":" + port
+	statusTxt := "PAGO FALLIDO"
+	if success {
+		statusTxt = "PAGO APROBADO"
+	}
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "Subject: Nueva orden %s #%s\r\n", statusTxt, o.ID.String())
+	fmt.Fprintf(&buf, "From: %s\r\n", user)
+	fmt.Fprintf(&buf, "To: %s\r\n", to)
+	buf.WriteString("MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n")
+	fmt.Fprintf(&buf, "Estado: %s\n", statusTxt)
+	fmt.Fprintf(&buf, "Orden: %s\n", o.ID)
+	fmt.Fprintf(&buf, "Nombre: %s\nEmail: %s\nTel: %s\nDNI: %s\n", o.Name, o.Email, o.Phone, o.DNI)
+	if o.ShippingMethod == "envio" {
+		fmt.Fprintf(&buf, "Envío a: %s (%s, %s) CP:%s\n", o.Address, o.Province, o.ShippingMethod, o.PostalCode)
+	} else {
+		buf.WriteString("Retiro en local\n")
+	}
+	buf.WriteString("Items:\n")
+	for _, it := range o.Items {
+		fmt.Fprintf(&buf, "- %s x%d $%.2f Color:%s\n", it.Title, it.Qty, it.UnitPrice, it.Color)
+	}
+	fmt.Fprintf(&buf, "Total: $%.2f (Envío: $%.2f)\n", o.Total, o.ShippingCost)
+	auth := smtp.PlainAuth("", user, pass, host)
+	if err := smtp.SendMail(addr, auth, user, []string{to}, buf.Bytes()); err != nil {
+		log.Error().Err(err).Msg("email send")
+		return err
+	}
+	return nil
+}
+
+// sendOrderTelegram envía una notificación a Telegram con los datos de la orden.
+func sendOrderTelegram(o *domain.Order, success bool) error {
+	token := os.Getenv("TELEGRAM_BOT_TOKEN")
+	chatID := os.Getenv("TELEGRAM_CHAT_ID")
+	if token == "" || chatID == "" {
+		return fmt.Errorf("telegram vars faltantes")
+	}
+	statusTxt := "PAGO FALLIDO"
+	if success {
+		statusTxt = "PAGO APROBADO"
+	}
+	var b strings.Builder
+	b.WriteString("Orden ")
+	b.WriteString(o.ID.String())
+	b.WriteString(" - ")
+	b.WriteString(statusTxt)
+	b.WriteString("\n")
+	fmt.Fprintf(&b, "Nombre: %s\nEmail: %s\nTel: %s\nDNI: %s\n", o.Name, o.Email, o.Phone, o.DNI)
+	if o.ShippingMethod == "envio" {
+		fmt.Fprintf(&b, "Envío a: %s (%s %s) CP:%s\n", o.Address, o.Province, o.ShippingMethod, o.PostalCode)
+	} else {
+		b.WriteString("Retiro en local\n")
+	}
+	b.WriteString("Items:\n")
+	for _, it := range o.Items {
+		fmt.Fprintf(&b, "- %s x%d $%.2f %s\n", it.Title, it.Qty, it.UnitPrice, it.Color)
+	}
+	fmt.Fprintf(&b, "Total: $%.2f (Envio: $%.2f)\n", o.Total, o.ShippingCost)
+	apiURL := "https://api.telegram.org/bot" + token + "/sendMessage"
+	form := url.Values{}
+	form.Set("chat_id", chatID)
+	form.Set("text", b.String())
+	form.Set("disable_web_page_preview", "1")
+	resp, err := http.PostForm(apiURL, form)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("telegram status %d: %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+// sendOrderNotify prioriza Telegram y opcionalmente email (si SMTP configurado y Telegram falló)
+func sendOrderNotify(o *domain.Order, success bool) {
+	if err := sendOrderTelegram(o, success); err != nil {
+		log.Warn().Err(err).Msg("telegram notif fallo")
+		// fallback email sólo si SMTP configurado
+		if os.Getenv("SMTP_HOST") != "" {
+			_ = sendOrderEmail(o, success)
+		}
+	}
+}
+
+func (s *Server) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
+	page := 1
+	if p, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && p > 0 {
+		page = p
+	}
+	list, total, err := s.orders.Orders.List(r.Context(), nil, page, 20)
+	if err != nil {
+		http.Error(w, "err", 500)
+		return
+	}
+	pages := (int(total) + 19) / 20
+	data := map[string]any{"Orders": list, "Page": page, "Pages": pages}
+	s.render(w, "admin_orders.html", data)
+}

@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: tienda3d_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+  app:
+    build: .
+    container_name: tienda3d_app
+    env_file: .env
+    environment:
+      DB_DSN: ${DB_DSN}
+      SESSION_KEY: ${SESSION_KEY}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      ORDER_NOTIFY_EMAIL: ${ORDER_NOTIFY_EMAIL}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN}
+    depends_on:
+      - db
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      - ./uploads:/app/uploads
+volumes:
+  db_data: {}

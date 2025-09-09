@@ -1,0 +1,52 @@
+{{define "layout_start"}}
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>{{block "title" .}}Croma 3D — Venta por mayor y menor{{end}}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" href="/public/assets/styles.css?v=dark4" />
+</head>
+<body class="site">
+<header class="topbar">
+  <div class="container row between center">
+    <a href="/" class="brand">
+      <span class="brand-title">Croma 3D</span>
+      <span class="brand-sub">Impresión 3D • Mayorista y minorista</span>
+    </a>
+    <nav class="mainnav">
+      <a href="/products">Productos</a>
+      <a href="/cart">Carrito</a>
+      <a class="whatsapp" href="https://wa.me/5493410000000" target="_blank" rel="noopener">WhatsApp</a>
+    </nav>
+  </div>
+</header>
+<main class="container content">
+{{end}}
+
+{{define "layout_end"}}
+</main>
+<footer class="footer">
+  <div class="container grid-3">
+    <div>
+      <div class="f-title">Horarios</div>
+      <ul class="f-list">
+        <li>Lunes a viernes: 9 a 18 hs</li>
+        <li>Sábados: 10 a 13 hs</li>
+      </ul>
+    </div>
+    <div>
+      <div class="f-title">Ubicación</div>
+      <p>Laprida 4680, Rosario, Santa Fe</p>
+      <a class="link" href="https://maps.google.com/?q=Laprida+4680+Rosario+Santa+Fe" target="_blank" rel="noopener">Ver en Google Maps</a>
+    </div>
+    <div>
+      <div class="f-title">Contacto</div>
+      <p><a class="link" href="mailto:matias.orset@hotmail.com">matias.orset@hotmail.com</a></p>
+    </div>
+  </div>
+  <div class="copyright">© 2025 Chroma 3D — <a class="link" href="https://www.roxiumlabs.com/" target="_blank" rel="noopener">Dev by RoxiumLabs</a></div>
+</footer>
+</body>
+</html>
+{{end}}

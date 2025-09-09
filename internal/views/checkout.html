@@ -1,0 +1,18 @@
+{{define "checkout.html"}}
+{{template "layout" .}}
+{{end}}
+{{define "content"}}
+<h1 class="text-2xl font-bold mb-4">Checkout</h1>
+<p class="mb-4 text-sm text-gray-600">Resumen (demo). El flujo real creará la preferencia de pago.</p>
+<form id="checkoutForm" class="space-y-4 max-w-md">
+  <input name="email" type="email" placeholder="Email" required class="border p-2 w-full" />
+  <input name="quote_id" placeholder="QuoteID" class="border p-2 w-full" />
+  <button class="px-4 py-2 bg-green-600 text-white rounded" type="submit">Pagar con MP (demo)</button>
+</form>
+<pre id="resp" class="mt-4 text-xs"></pre>
+<script>
+const f=document.getElementById('checkoutForm');
+f.addEventListener('submit',async e=>{e.preventDefault();const fd=new FormData(f);let r=await fetch('/api/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:fd.get('email'),quote_id:fd.get('quote_id')})});document.getElementById('resp').textContent=await r.text();});
+</script>
+{{end}}
+
