@@ -1,35 +1,79 @@
+
 services:
   db:
     image: postgres:15-alpine
     container_name: tienda3d_db
+    env_file:
+      - .env
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "${DB_PORT:-5432}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    # NO exponemos 5432 al host; la app se conecta por la red interna de Compose
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   app:
-    build: .
+    build: ../..
     container_name: tienda3d_app
-    env_file: .env
+    env_file:
+      - .env
     environment:
-      DB_DSN: ${DB_DSN}
-      SESSION_KEY: ${SESSION_KEY}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      ORDER_NOTIFY_EMAIL: ${ORDER_NOTIFY_EMAIL}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
-      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN}
+      # DB interna por nombre de servicio
+      DB_HOST: db
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      APP_ENV: production
+      # el resto de tus secretos van en .env (NO acá)
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "8080:8080"  # útil para debug local. Si querés, podés sacarlo cuando Caddy esté enfrente.
     volumes:
       - ./uploads:/app/uploads
+      - ./public:/app/public
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.7
+    container_name: tienda3d_caddy
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+  # opcional: pgAdmin web
+  # pgadmin:
+  #   image: dpage/pgadmin4
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@tu-dominio
+  #     PGADMIN_DEFAULT_PASSWORD: cambia-esto
+  #   depends_on: [db]
+  #   ports:
+  #     - "8081:80"
+  #   restart: unless-stopped
+
 volumes:
   db_data: {}
+  caddy_data: {}
+  caddy_config: {}
