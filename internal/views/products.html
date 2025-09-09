@@ -42,7 +42,7 @@
   <div class="card">
     <div class="card-media">
       {{if .Images}}
-        <img src="{{(index .Images 0).URL}}" alt="{{(index .Images 0).Alt}}" />
+        <img src="{{(index .Images 0).URL}}" alt="{{(index .Images 0).Alt}}" loading="lazy" />
       {{else}}
         <div class="placeholder">IMG</div>
       {{end}}

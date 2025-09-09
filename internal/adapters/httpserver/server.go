@@ -172,18 +172,59 @@ func (s *Server) handleProduct(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	colorsMap := map[string]struct{}{}
+	// Recolectar colores únicos en orden de aparición (hasta 16)
+	seen := map[string]struct{}{}
+	colors := []string{}
 	for _, v := range p.Variants {
-		if v.Color != "" {
-			colorsMap[v.Color] = struct{}{}
+		c := strings.TrimSpace(v.Color)
+		if c == "" {
+			continue
+		}
+		if _, ok := seen[c]; ok {
+			continue
+		}
+		seen[c] = struct{}{}
+		colors = append(colors, c)
+		if len(colors) == 16 {
+			break
 		}
 	}
-	colors := []string{}
-	for c := range colorsMap {
-		colors = append(colors, c)
+	// Paleta base para completar hasta 16 si faltan
+	basePalette := []string{
+		"#111827", // gris muy oscuro / fondo
+		"#ffffff", // blanco
+		"#6366f1", // indigo
+		"#10b981", // verde
+		"#f59e0b", // ámbar
+		"#ef4444", // rojo
+		"#3b82f6", // azul
+		"#8b5cf6", // violeta
+		"#ec4899", // rosa fuerte
+		"#14b8a6", // teal
+		"#f472b6", // rosa claro
+		"#fcd34d", // amarillo claro
+		"#a3e635", // lima
+		"#dc2626", // rojo oscuro
+		"#334155", // slate
+		"#64748b", // slate claro
 	}
 	if len(colors) == 0 {
-		colors = []string{"#111827", "#6366f1", "#16a34a", "#f59e0b", "#ff3d00"}
+		// Si no hay variantes con color, usamos directamente la paleta completa
+		colors = append([]string{}, basePalette...)
+	} else if len(colors) < 16 {
+		for _, c := range basePalette {
+			if len(colors) == 16 {
+				break
+			}
+			if _, ok := seen[c]; ok {
+				continue
+			}
+			seen[c] = struct{}{}
+			colors = append(colors, c)
+		}
+	}
+	if len(colors) > 16 {
+		colors = colors[:16]
 	}
 	added := 0
 	if r.URL.Query().Get("added") == "1" {

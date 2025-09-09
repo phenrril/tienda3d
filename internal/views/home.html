@@ -3,18 +3,17 @@
 <section class="hero hero-split">
   <div class="hero-copy">
     <h1 class="mega">Dale vida a tus ideas en 3D</h1>
-    <p class="lead">Modelos impresos de alta calidad listos para enviar o fabricar bajo demanda. Personalizá materiales, colores y terminaciones.</p>
+    <p class="hero-lead">Modelos impresos de alta calidad listos para enviar o fabricar bajo demanda. Personalizá materiales, colores y terminaciones.</p>
     <div class="hero-actions">
       <a href="/products" class="btn-primary">Ver catálogo</a>
-      <a href="/contact" class="btn-secondary">Consultas</a>
     </div>
     <p class="hero-hours">Producción diaria • Envíos a todo el país • Soporte personalizado</p>
   </div>
   <div class="hero-carousel" id="heroCarousel">
     <img class="hc-slide active" src="/public/assets/img/img1.webp" alt="Modelo 3D 1" />
-    <img class="hc-slide" src="/public/assets/img/img2.webp" alt="Modelo 3D 2" />
-    <img class="hc-slide" src="/public/assets/img/img3.webp" alt="Modelo 3D 3" />
-    <img class="hc-slide" src="/public/assets/img/img4.webp" alt="Modelo 3D 4" />
+    <img class="hc-slide" src="/public/assets/img/img2.webp" alt="Modelo 3D 2" loading="lazy" />
+    <img class="hc-slide" src="/public/assets/img/img3.webp" alt="Modelo 3D 3" loading="lazy" />
+    <img class="hc-slide" src="/public/assets/img/img4.webp" alt="Modelo 3D 4" loading="lazy" />
     <div class="hc-dots" id="hcDots"></div>
   </div>
 </section>
@@ -36,7 +35,7 @@
     <div class="card">
       <div class="card-media">
         {{if .Images}}
-          <img src="{{(index .Images 0).URL}}" alt="{{(index .Images 0).Alt}}" />
+          <img src="{{(index .Images 0).URL}}" alt="{{(index .Images 0).Alt}}" loading="lazy" />
         {{else}}<div class="placeholder">IMG</div>{{end}}
         <div class="badges">{{if .ReadyToShip}}<span class="badge green">En stock</span>{{end}}</div>
       </div>
