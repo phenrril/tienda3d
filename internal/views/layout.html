@@ -5,22 +5,34 @@
 <meta charset="utf-8" />
 <title>{{block "title" .}}Croma 3D — Venta por mayor y menor{{end}}</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="/public/assets/img/chroma-logo.png" />
+<link rel="apple-touch-icon" href="/public/assets/img/chroma-logo.png" />
 <link rel="stylesheet" href="/public/assets/styles.css?v=dark4" />
 </head>
 <body class="site">
 <header class="topbar">
   <div class="container row between center">
     <a href="/" class="brand">
-      <span class="brand-title">Croma 3D</span>
-      <span class="brand-sub">Impresión 3D • Mayorista y minorista</span>
+      <img src="/public/assets/img/chroma-logo.png" alt="Croma 3D" class="brand-logo" width="48" height="48" loading="lazy" />
+      <span class="brand-text">
+        <span class="brand-title">Croma 3D</span>
+        <span class="brand-sub">Impresión 3D • Mayorista y minorista</span>
+      </span>
     </a>
+    <!-- Botón toggle móvil -->
+    <button class="nav-toggle" aria-label="Abrir menú" aria-expanded="false">☰</button>
     <nav class="mainnav">
       <a href="/products">Productos</a>
       <a href="/cart">Carrito</a>
-      <a class="whatsapp" href="https://wa.me/5493410000000" target="_blank" rel="noopener">WhatsApp</a>
+      <a class="whatsapp" href="https://wa.me/5493416620117" target="_blank" rel="noopener">WhatsApp</a>
     </nav>
   </div>
 </header>
+<!-- Backdrop para menú m��vil -->
+<div class="nav-backdrop"></div>
 <main class="container content">
 {{end}}
 
@@ -43,10 +55,23 @@
     <div>
       <div class="f-title">Contacto</div>
       <p><a class="link" href="mailto:matias.orset@hotmail.com">matias.orset@hotmail.com</a></p>
+      <p><a class="link" href="tel:+543416620117">341 662 0117</a></p>
     </div>
   </div>
   <div class="copyright">© 2025 Chroma 3D — <a class="link" href="https://www.roxiumlabs.com/" target="_blank" rel="noopener">Dev by RoxiumLabs</a></div>
 </footer>
+<script>
+(function(){
+  const btn=document.querySelector('.nav-toggle');
+  const body=document.body;
+  const backdrop=document.querySelector('.nav-backdrop');
+  if(!btn)return;
+  function close(){body.classList.remove('nav-open');btn.setAttribute('aria-expanded','false');}
+  btn.addEventListener('click',()=>{const open=body.classList.toggle('nav-open');btn.setAttribute('aria-expanded',open);});
+  backdrop.addEventListener('click',close);
+  window.addEventListener('keydown',e=>{if(e.key==='Escape' && body.classList.contains('nav-open')) close();});
+})();
+</script>
 </body>
 </html>
 {{end}}

@@ -35,6 +35,10 @@
           {{range $i,$c := .Colors}}
             <button type="button" class="swatch {{if eq $i 0}}active{{end}}" data-color="{{$c}}" style="--c: {{$c}}"></button>
           {{end}}
+          <button type="button" class="swatch swatch-other" data-color="" aria-label="Otro color" title="Otro"></button>
+        </div>
+        <div class="custom-color-row" id="customColorRow" style="display:none">
+          <input type="text" id="customColorInput" placeholder="Escribe el color (ej: rojo o #ff0000)" autocomplete="off" />
         </div>
         <input type="hidden" name="color" id="colorInput" value="{{.DefaultColor}}" />
       </div>
@@ -51,9 +55,38 @@
 </article>
 <script>
 (function(){
-  const sw=document.querySelectorAll('.swatch');
+  const sw=[...document.querySelectorAll('.swatch')];
   const inp=document.getElementById('colorInput');
-  sw.forEach(b=>b.addEventListener('click',()=>{sw.forEach(x=>x.classList.remove('active'));b.classList.add('active');inp.value=b.dataset.color;}));
+  const otherBtn=document.querySelector('.swatch-other');
+  const customRow=document.getElementById('customColorRow');
+  const customInput=document.getElementById('customColorInput');
+  const defaultColor=inp.value;
+  sw.forEach(b=>b.addEventListener('click',()=>{
+    sw.forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    if(b.classList.contains('swatch-other')){
+      customRow.style.display='';
+      customInput.focus();
+      inp.value=customInput.value.trim();
+    }else{
+      customRow.style.display='none';
+      inp.value=b.dataset.color;
+    }
+  }));
+  if(customInput){
+    customInput.addEventListener('input',()=>{
+      const val=customInput.value.trim();
+      inp.value=val;
+      if(otherBtn && val){
+        otherBtn.style.setProperty('--c', val);
+      }
+    });
+  }
+  const form=inp.closest('form');
+  if(form){
+    form.addEventListener('submit',()=>{ if(inp.value.trim()===''){ inp.value=defaultColor; } });
+  }
+  // Carrusel
   const root=document.getElementById('pdCarousel');
   if(!root) return;
   const slides=[...root.querySelectorAll('.pd-slide')];
@@ -62,11 +95,11 @@
   let idx=0; let auto=null; const AUTOPLAY=5000;
   const prevBtn=root.querySelector('.pd-nav.prev');
   const nextBtn=root.querySelector('.pd-nav.next');
-  if(total===1){ // ocultar controles
+  if(total===1){
     prevBtn.style.display='none';
     nextBtn.style.display='none';
     const tb=root.querySelector('.pd-thumbs'); if(tb) tb.style.display='none';
-    return; // no autoplay necesario
+    return;
   }
   function show(n){slides[idx].classList.remove('active');thumbs[idx].classList.remove('active');idx=(n+total)%total;slides[idx].classList.add('active');thumbs[idx].classList.add('active');}
   function next(){show(idx+1);}function prev(){show(idx-1);}function start(){auto=setInterval(next,AUTOPLAY);}function restart(){clearInterval(auto);start();}
