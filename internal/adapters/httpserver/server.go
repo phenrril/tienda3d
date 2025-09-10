@@ -1171,7 +1171,7 @@ func sendOrderEmail(o *domain.Order, success bool) error {
 	pass := os.Getenv("SMTP_PASS")
 	to := os.Getenv("ORDER_NOTIFY_EMAIL")
 	if to == "" {
-		to = "matias.orset@hotmail.com"
+		to = "chroma3dimpresiones@gmail.com"
 	}
 	if host == "" || port == "" || user == "" || pass == "" {
 		log.Warn().Msg("SMTP no configurado, se omite envío de email")
