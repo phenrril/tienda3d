@@ -264,3 +264,39 @@ body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantar
 }
 /* === End Extra Responsive Pass === */
 body.nav-open{overflow:hidden}
+
+/* Botón flotante WhatsApp (mejorado: tamaño responsive + animación) */
+.wa-float{
+  position:fixed;
+  right:calc(clamp(12px,3vw,20px) + env(safe-area-inset-right,0px));
+  bottom:calc(clamp(12px,3vw,20px) + env(safe-area-inset-bottom,0px));
+  width:clamp(56px,10vw,72px);
+  height:clamp(56px,10vw,72px);
+  border-radius:50%;
+  background:#ffffff;
+  color:#25D366; /* hace que el SVG use este color si usa currentColor */
+  border:2px solid #25D366;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 10px 28px rgba(0,0,0,.38),0 0 0 1px rgba(0,0,0,.12);
+  z-index:120;
+  transition:transform .15s ease,filter .15s ease;
+  animation:wa-pop .6s cubic-bezier(.2,.8,.2,1) .15s both;
+}
+.wa-float svg{width:62%;height:62%;display:block}
+.wa-float:hover{filter:brightness(.96);transform:translateY(-1px) scale(1.02)}
+.wa-float:active{transform:translateY(0) scale(.99)}
+.wa-float:focus{outline:3px solid rgba(255,255,255,.6);outline-offset:2px}
+/* halo/pulse sutil que corre un par de veces para llamar la atención */
+.wa-float::after{
+  content:"";position:absolute;inset:0;border-radius:50%;
+  background:rgba(37,211,102,.32);
+  animation:wa-pulse 1.2s ease-out .5s 2;
+  pointer-events:none
+}
+@keyframes wa-pop{0%{opacity:0;transform:translateY(10px) scale(.6)}60%{opacity:1;transform:translateY(0) scale(1.06)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes wa-pulse{0%{transform:scale(1);opacity:.5}100%{transform:scale(1.75);opacity:0}}
+/* Respeta usuarios con reduced motion */
+@media (prefers-reduced-motion: reduce){
+  .wa-float{animation:none}
+  .wa-float::after{animation:none}
+}
