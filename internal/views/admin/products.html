@@ -1,0 +1,78 @@
+{{define "admin_products.html"}}
+{{template "layout_start" .}}
+<h1>Productos</h1>
+<nav class="admin-nav"><a href="/admin/products" class="active">Productos</a> | <a href="/admin/orders">Órdenes</a> | <a href="/admin/logout">Salir</a></nav>
+<section class="grid" style="margin-top:1rem;grid-template-columns:1fr 1fr;gap:2rem">
+  <div>
+    <h2>Crear / Editar</h2>
+    <form id="prodForm" class="form-card">
+      <input type="hidden" name="slug" id="pfSlug" />
+      <label>Nombre<input type="text" name="name" id="pfName" required /></label>
+      <label>Categoría<input type="text" name="category" id="pfCategory" /></label>
+      <label>Descripción corta<textarea name="short_desc" id="pfShort"></textarea></label>
+      <label>Precio base<input type="number" step="0.01" min="0" name="base_price" id="pfPrice" required /></label>
+      <label class="row center" style="gap:.5rem"><input type="checkbox" name="ready_to_ship" id="pfReady" /> Listo para envío</label>
+      <div class="row" style="gap:.5rem">
+        <button class="btn-primary" type="submit" id="pfSubmit">Guardar</button>
+        <button class="btn-secondary" type="button" id="pfReset">Limpiar</button>
+        <button class="btn-danger" type="button" id="pfDelete" style="display:none">Eliminar</button>
+      </div>
+    </form>
+    <h3>Subir imágenes</h3>
+    <form id="uploadForm" class="form-card" enctype="multipart/form-data">
+      <label>Producto (slug)
+        <select name="existing_slug" id="upSlug">
+          <option value="">-- nuevo (usar formulario arriba) --</option>
+          {{range .Products}}<option value="{{.Slug}}">{{.Name}} ({{.Slug}})</option>{{end}}
+        </select>
+      </label>
+      <label>Archivos<input type="file" multiple name="images" id="upFiles" accept="image/*" /></label>
+      <button class="btn-primary" type="submit">Subir</button>
+    </form>
+  </div>
+  <div>
+    <h2>Listado ({{.Total}})</h2>
+    <table class="table" id="prodTable" style="font-size:0.85rem">
+      <thead><tr><th>Nombre</th><th>Slug</th><th>Precio</th><th>Stock</th><th>Imgs</th></tr></thead>
+      <tbody>
+        {{range .Products}}
+        <tr data-slug="{{.Slug}}">
+          <td>{{.Name}}</td>
+          <td style="font-family:monospace">{{.Slug}}</td>
+          <td>${{printf "%.2f" .BasePrice}}</td>
+          <td>{{if .ReadyToShip}}✔{{else}}-{{end}}</td>
+          <td>{{len .Images}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</section>
+<script>
+(function(){
+  const token='{{.AdminToken}}';
+  const tbl=document.getElementById('prodTable');
+  const form=document.getElementById('prodForm');
+  const fSlug=document.getElementById('pfSlug');
+  const fName=document.getElementById('pfName');
+  const fCat=document.getElementById('pfCategory');
+  const fDesc=document.getElementById('pfShort');
+  const fPrice=document.getElementById('pfPrice');
+  const fReady=document.getElementById('pfReady');
+  const btnDel=document.getElementById('pfDelete');
+  const btnReset=document.getElementById('pfReset');
+  function fill(p){ fSlug.value=p.Slug; fName.value=p.Name; fCat.value=p.Category||''; fDesc.value=p.ShortDesc||''; fPrice.value=p.BasePrice; fReady.checked=!!p.ReadyToShip; btnDel.style.display=''; }
+  function clear(){ form.reset(); fSlug.value=''; btnDel.style.display='none'; }
+  if(tbl){ tbl.addEventListener('click', async e=>{const tr=e.target.closest('tr'); if(!tr) return; const slug=tr.dataset.slug; const res=await fetch('/api/products/'+slug,{headers:{Authorization:'Bearer '+token}}); if(res.ok){ const p=await res.json(); fill(p);} }); }
+  form.addEventListener('submit', async e=>{e.preventDefault(); const slug=fSlug.value.trim(); const payload={ name:fName.value.trim(), category:fCat.value.trim(), short_desc:fDesc.value, base_price:parseFloat(fPrice.value||'0'), ready_to_ship:fReady.checked}; let method='POST', url='/api/products'; if(slug){ method='PUT'; url='/api/products/'+slug; }
+    const res=await fetch(url,{method, headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body:JSON.stringify(payload)}); if(res.ok){ location.reload(); } else { alert('Error guardando'); }
+  });
+  btnReset.addEventListener('click', clear);
+  btnDel.addEventListener('click', async ()=>{ if(!confirm('Eliminar?')) return; const slug=fSlug.value.trim(); if(!slug) return; const res=await fetch('/api/products/'+slug,{method:'DELETE', headers:{Authorization:'Bearer '+token}}); if(res.ok){ location.reload(); } else { alert('Error'); } });
+  const upForm=document.getElementById('uploadForm');
+  upForm.addEventListener('submit', async e=>{e.preventDefault(); const fd=new FormData(upForm); const res=await fetch('/api/products/upload',{method:'POST', headers:{Authorization:'Bearer '+token}, body:fd}); if(res.ok){ location.reload(); } else { alert('Error upload'); } });
+})();
+</script>
+{{template "layout_end" .}}
+{{end}}
+
