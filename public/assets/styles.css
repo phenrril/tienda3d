@@ -265,6 +265,26 @@ body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantar
 /* === End Extra Responsive Pass === */
 body.nav-open{overflow:hidden}
 
+/* === Modal Genérico (Cómo comprar) === */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:110;opacity:0;transition:opacity .22s ease}
+.modal-backdrop.show{opacity:1}
+.modal{background:linear-gradient(150deg,#1a2430,#141c25 60%);border:1px solid var(--border);border-radius:22px;padding:26px 26px 30px;max-width:560px;width:100%;position:relative;box-shadow:0 10px 40px -8px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.04);opacity:0;transform:translateY(18px) scale(.94);transition:opacity .25s ease,transform .32s cubic-bezier(.4,0,.2,1)}
+.modal.show{opacity:1;transform:translateY(0) scale(1)}
+.modal-title{margin:0 0 14px;font-size:24px;font-weight:700;letter-spacing:.5px}
+.modal-close{position:absolute;top:10px;right:10px;background:#12202c;border:1px solid var(--border);color:var(--text);width:36px;height:36px;border-radius:12px;cursor:pointer;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center;font-weight:600;transition:background .18s,border-color .18s}
+.modal-close:hover{background:var(--panel-alt)}
+.modal-steps{margin:0 0 16px;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
+.modal-steps li strong{color:#fff;font-weight:600}
+.modal-note{font-size:13px;color:var(--muted);margin:0 0 18px}
+.modal-actions{text-align:right}
+@media (max-width:560px){
+  .modal{padding:22px 20px 26px;border-radius:20px}
+  .modal-title{font-size:20px}
+  .modal-close{width:32px;height:32px;font-size:18px}
+  .modal-steps{font-size:13px}
+}
+/* === Fin Modal === */
+
 /* Botón flotante WhatsApp (mejorado: tamaño responsive + animación) */
 .wa-float{
   position:fixed;
@@ -397,4 +417,3 @@ body.nav-open{overflow:hidden}
   .admin-card{padding:20px 16px 24px;border-radius:20px}
   .form-row-2{grid-template-columns:1fr}
 }
-
