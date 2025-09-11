@@ -27,6 +27,7 @@
     <h1 class="pd-title">{{.Product.Name}}</h1>
     <div class="pd-price">${{printf "%.2f" .Product.BasePrice}}</div>
     <p class="pd-desc">{{.Product.ShortDesc}}</p>
+    <div class="pd-size">Tamaño aprox: {{printf "%.0f" .Product.WidthMM}}x{{printf "%.0f" .Product.HeightMM}}x{{printf "%.0f" .Product.DepthMM}}mm</div>
     <form method="post" action="/cart" class="pd-form">
       <input type="hidden" name="slug" value="{{.Product.Slug}}" />
       <div class="color-picker">
@@ -77,16 +78,11 @@
     customInput.addEventListener('input',()=>{
       const val=customInput.value.trim();
       inp.value=val;
-      if(otherBtn && val){
-        otherBtn.style.setProperty('--c', val);
-      }
+      if(otherBtn && val){ otherBtn.style.setProperty('--c', val); }
     });
   }
   const form=inp.closest('form');
-  if(form){
-    form.addEventListener('submit',()=>{ if(inp.value.trim()===''){ inp.value=defaultColor; } });
-  }
-  // Carrusel
+  if(form){ form.addEventListener('submit',()=>{ if(inp.value.trim()===''){ inp.value=defaultColor; } }); }
   const root=document.getElementById('pdCarousel');
   if(!root) return;
   const slides=[...root.querySelectorAll('.pd-slide')];
@@ -95,19 +91,15 @@
   let idx=0; let auto=null; const AUTOPLAY=5000;
   const prevBtn=root.querySelector('.pd-nav.prev');
   const nextBtn=root.querySelector('.pd-nav.next');
-  if(total===1){
-    prevBtn.style.display='none';
-    nextBtn.style.display='none';
-    const tb=root.querySelector('.pd-thumbs'); if(tb) tb.style.display='none';
-    return;
-  }
+  if(total===1){ prevBtn.style.display='none'; nextBtn.style.display='none'; const tb=root.querySelector('.pd-thumbs'); if(tb) tb.style.display='none'; return; }
   function show(n){slides[idx].classList.remove('active');thumbs[idx].classList.remove('active');idx=(n+total)%total;slides[idx].classList.add('active');thumbs[idx].classList.add('active');}
-  function next(){show(idx+1);}function prev(){show(idx-1);}function start(){auto=setInterval(next,AUTOPLAY);}function restart(){clearInterval(auto);start();}
+  function next(){show(idx+1);} function prev(){show(idx-1);} function start(){auto=setInterval(next,AUTOPLAY);} function restart(){clearInterval(auto);start();}
   thumbs.forEach(t=>t.addEventListener('click',()=>{show(parseInt(t.dataset.index));restart();}));
   prevBtn.addEventListener('click',()=>{prev();restart();});
   nextBtn.addEventListener('click',()=>{next();restart();});
-  let sx=null;root.addEventListener('pointerdown',e=>{sx=e.clientX;});root.addEventListener('pointerup',e=>{if(sx==null) return;const dx=e.clientX-sx;if(Math.abs(dx)>40){dx<0?next():prev();restart();}sx=null;});
-  root.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){next();restart();}else if(e.key==='ArrowLeft'){prev();restart();}});root.tabIndex=0;start();
+  let sx=null; root.addEventListener('pointerdown',e=>{sx=e.clientX;}); root.addEventListener('pointerup',e=>{ if(sx==null) return; const dx=e.clientX-sx; if(Math.abs(dx)>40){ dx<0?next():prev(); restart(); } sx=null; });
+  root.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){next();restart();} else if(e.key==='ArrowLeft'){prev();restart();} });
+  root.tabIndex=0; start();
 })();
 </script>
 {{template "layout_end" .}}
