@@ -118,3 +118,12 @@ func (r *ProductRepo) DeleteFullBySlug(ctx context.Context, slug string) ([]stri
 		return nil
 	})
 }
+
+func (r *ProductRepo) DistinctCategories(ctx context.Context) ([]string, error) {
+	cats := []string{}
+	if err := r.db.WithContext(ctx).Model(&domain.Product{}).
+		Distinct("category").Where("category <> ''").Order("category asc").Pluck("category", &cats).Error; err != nil {
+		return nil, err
+	}
+	return cats, nil
+}

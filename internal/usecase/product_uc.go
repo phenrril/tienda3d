@@ -64,3 +64,12 @@ func (uc *ProductUC) DeleteFullBySlug(ctx context.Context, slug string) ([]strin
 	// fallback: simple delete sin paths
 	return nil, uc.DeleteBySlug(ctx, slug)
 }
+
+func (uc *ProductUC) Categories(ctx context.Context) ([]string, error) {
+	if repo, ok := uc.Products.(interface {
+		DistinctCategories(context.Context) ([]string, error)
+	}); ok {
+		return repo.DistinctCategories(ctx)
+	}
+	return []string{}, nil
+}
