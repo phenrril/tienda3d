@@ -148,6 +148,7 @@ func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
 	if pages == 0 {
 		pages = 1
 	}
+	cats, _ := s.products.Categories(r.Context())
 	data := map[string]any{
 		"Products":    list,
 		"Total":       total,
@@ -157,6 +158,7 @@ func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
 		"Sort":        sort,
 		"Category":    category,
 		"StockFilter": stock,
+		"Categories":  cats,
 	}
 	if u := readUserSession(w, r); u != nil {
 		data["User"] = u

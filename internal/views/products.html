@@ -9,7 +9,9 @@
     <div class="field">
       <select name="category">
         <option value="">Todas las categorías</option>
-        {{if .Category}}<option value="{{.Category}}" selected>{{.Category}}</option>{{end}}
+        {{range .Categories}}
+          <option value="{{.}}" {{if eq $.Category .}}selected{{end}}>{{.}}</option>
+        {{end}}
       </select>
     </div>
     <div class="field">
