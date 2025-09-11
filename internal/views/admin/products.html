@@ -10,6 +10,11 @@
       <label>Nombre<input type="text" name="name" id="pfName" required /></label>
       <label>Categoría<input type="text" name="category" id="pfCategory" /></label>
       <label>Descripción corta<textarea name="short_desc" id="pfShort"></textarea></label>
+      <div class="row" style="gap:.5rem">
+        <label style="flex:1">Ancho (mm)<input type="number" step="0.1" min="0" id="pfWidth" /></label>
+        <label style="flex:1">Alto (mm)<input type="number" step="0.1" min="0" id="pfHeight" /></label>
+        <label style="flex:1">Profundidad (mm)<input type="number" step="0.1" min="0" id="pfDepth" /></label>
+      </div>
       <label>Precio base<input type="number" step="0.01" min="0" name="base_price" id="pfPrice" required /></label>
       <label class="row center" style="gap:.5rem"><input type="checkbox" name="ready_to_ship" id="pfReady" /> Listo para envío</label>
       <div class="row" style="gap:.5rem">
@@ -33,13 +38,14 @@
   <div>
     <h2>Listado ({{.Total}})</h2>
     <table class="table" id="prodTable" style="font-size:0.85rem">
-      <thead><tr><th>Nombre</th><th>Slug</th><th>Precio</th><th>Stock</th><th>Imgs</th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Slug</th><th>Precio</th><th>Dims</th><th>Stock</th><th>Imgs</th></tr></thead>
       <tbody>
         {{range .Products}}
         <tr data-slug="{{.Slug}}">
           <td>{{.Name}}</td>
           <td style="font-family:monospace">{{.Slug}}</td>
           <td>${{printf "%.2f" .BasePrice}}</td>
+          <td>{{if or (gt .WidthMM 0) (gt .HeightMM 0) (gt .DepthMM 0)}}{{printf "%.0f" .WidthMM}}x{{printf "%.0f" .HeightMM}}x{{printf "%.0f" .DepthMM}}mm{{else}}-{{end}}</td>
           <td>{{if .ReadyToShip}}✔{{else}}-{{end}}</td>
           <td>{{len .Images}}</td>
         </tr>
@@ -59,12 +65,15 @@
   const fDesc=document.getElementById('pfShort');
   const fPrice=document.getElementById('pfPrice');
   const fReady=document.getElementById('pfReady');
+  const fWidth=document.getElementById('pfWidth');
+  const fHeight=document.getElementById('pfHeight');
+  const fDepth=document.getElementById('pfDepth');
   const btnDel=document.getElementById('pfDelete');
   const btnReset=document.getElementById('pfReset');
-  function fill(p){ fSlug.value=p.Slug; fName.value=p.Name; fCat.value=p.Category||''; fDesc.value=p.ShortDesc||''; fPrice.value=p.BasePrice; fReady.checked=!!p.ReadyToShip; btnDel.style.display=''; }
-  function clear(){ form.reset(); fSlug.value=''; btnDel.style.display='none'; }
+  function fill(p){ fSlug.value=p.Slug; fName.value=p.Name; fCat.value=p.Category||''; fDesc.value=p.ShortDesc||''; fPrice.value=p.BasePrice; fReady.checked=!!p.ReadyToShip; fWidth.value=p.WidthMM||0; fHeight.value=p.HeightMM||0; fDepth.value=p.DepthMM||0; btnDel.style.display=''; }
+  function clear(){ form.reset(); fSlug.value=''; btnDel.style.display='none'; fWidth.value=fHeight.value=fDepth.value=''; }
   if(tbl){ tbl.addEventListener('click', async e=>{const tr=e.target.closest('tr'); if(!tr) return; const slug=tr.dataset.slug; const res=await fetch('/api/products/'+slug,{headers:{Authorization:'Bearer '+token}}); if(res.ok){ const p=await res.json(); fill(p);} }); }
-  form.addEventListener('submit', async e=>{e.preventDefault(); const slug=fSlug.value.trim(); const payload={ name:fName.value.trim(), category:fCat.value.trim(), short_desc:fDesc.value, base_price:parseFloat(fPrice.value||'0'), ready_to_ship:fReady.checked}; let method='POST', url='/api/products'; if(slug){ method='PUT'; url='/api/products/'+slug; }
+  form.addEventListener('submit', async e=>{e.preventDefault(); const slug=fSlug.value.trim(); const payload={ name:fName.value.trim(), category:fCat.value.trim(), short_desc:fDesc.value, base_price:parseFloat(fPrice.value||'0'), ready_to_ship:fReady.checked, width_mm:parseFloat(fWidth.value||'0'), height_mm:parseFloat(fHeight.value||'0'), depth_mm:parseFloat(fDepth.value||'0') }; let method='POST', url='/api/products'; if(slug){ method='PUT'; url='/api/products/'+slug; }
     const res=await fetch(url,{method, headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body:JSON.stringify(payload)}); if(res.ok){ location.reload(); } else { alert('Error guardando'); }
   });
   btnReset.addEventListener('click', clear);
@@ -75,4 +84,3 @@
 </script>
 {{template "layout_end" .}}
 {{end}}
-

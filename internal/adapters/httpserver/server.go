@@ -286,16 +286,19 @@ func (s *Server) apiProducts(w http.ResponseWriter, r *http.Request) {
 			ShortDesc   string  `json:"short_desc"`
 			BasePrice   float64 `json:"base_price"`
 			ReadyToShip bool    `json:"ready_to_ship"`
+			WidthMM     float64 `json:"width_mm"`
+			HeightMM    float64 `json:"height_mm"`
+			DepthMM     float64 `json:"depth_mm"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "json", 400)
 			return
 		}
-		if req.Name == "" || req.BasePrice < 0 {
+		if req.Name == "" || req.BasePrice < 0 || req.WidthMM < 0 || req.HeightMM < 0 || req.DepthMM < 0 {
 			http.Error(w, "datos", 400)
 			return
 		}
-		p := &domain.Product{Name: req.Name, Category: req.Category, ShortDesc: req.ShortDesc, BasePrice: req.BasePrice, ReadyToShip: req.ReadyToShip}
+		p := &domain.Product{Name: req.Name, Category: req.Category, ShortDesc: req.ShortDesc, BasePrice: req.BasePrice, ReadyToShip: req.ReadyToShip, WidthMM: req.WidthMM, HeightMM: req.HeightMM, DepthMM: req.DepthMM}
 		if err := s.products.Create(r.Context(), p); err != nil {
 			http.Error(w, "crear", 500)
 			return
@@ -337,6 +340,9 @@ func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {
 			ShortDesc   *string  `json:"short_desc"`
 			BasePrice   *float64 `json:"base_price"`
 			ReadyToShip *bool    `json:"ready_to_ship"`
+			WidthMM     *float64 `json:"width_mm"`
+			HeightMM    *float64 `json:"height_mm"`
+			DepthMM     *float64 `json:"depth_mm"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "json", 400)
@@ -356,6 +362,15 @@ func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {
 		}
 		if req.ReadyToShip != nil {
 			p.ReadyToShip = *req.ReadyToShip
+		}
+		if req.WidthMM != nil && *req.WidthMM >= 0 {
+			p.WidthMM = *req.WidthMM
+		}
+		if req.HeightMM != nil && *req.HeightMM >= 0 {
+			p.HeightMM = *req.HeightMM
+		}
+		if req.DepthMM != nil && *req.DepthMM >= 0 {
+			p.DepthMM = *req.DepthMM
 		}
 		if err := s.products.Create(r.Context(), p); err != nil { // Save reutiliza Create()
 			http.Error(w, "save", 500)
@@ -1036,14 +1051,13 @@ func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if p == nil { // creación nueva
+	if p == nil { // creación nueva con dimensiones
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
 			http.Error(w, "name", 400)
 			return
 		}
-		bpStr := r.FormValue("base_price")
-		bp, _ := strconv.ParseFloat(bpStr, 64)
+		bp, _ := strconv.ParseFloat(r.FormValue("base_price"), 64)
 		if bp < 0 {
 			http.Error(w, "price", 400)
 			return
@@ -1051,7 +1065,19 @@ func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 		cat := r.FormValue("category")
 		sdesc := r.FormValue("short_desc")
 		ready := r.FormValue("ready_to_ship") == "true" || r.FormValue("ready_to_ship") == "1"
-		p = &domain.Product{Name: name, Category: cat, ShortDesc: sdesc, BasePrice: bp, ReadyToShip: ready}
+		wm, _ := strconv.ParseFloat(r.FormValue("width_mm"), 64)
+		hm, _ := strconv.ParseFloat(r.FormValue("height_mm"), 64)
+		dm, _ := strconv.ParseFloat(r.FormValue("depth_mm"), 64)
+		if wm < 0 {
+			wm = 0
+		}
+		if hm < 0 {
+			hm = 0
+		}
+		if dm < 0 {
+			dm = 0
+		}
+		p = &domain.Product{Name: name, Category: cat, ShortDesc: sdesc, BasePrice: bp, ReadyToShip: ready, WidthMM: wm, HeightMM: hm, DepthMM: dm}
 		if err := s.products.Create(r.Context(), p); err != nil {
 			log.Error().Err(err).Msg("crear producto")
 			http.Error(w, "crear", 500)
@@ -1165,14 +1191,11 @@ func (s *Server) handleAdminAuth(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "credenciales", 401)
 			return
 		}
-		// emitir token y set cookie
 		email := user + "@local"
 		if _, ok := s.adminAllowed[email]; !ok {
-			// si lista vacía permitimos cualquiera
 			if len(s.adminAllowed) == 0 {
 				s.adminAllowed[email] = struct{}{}
 			} else {
-				// intentar usar uno existente permitido
 				for k := range s.adminAllowed {
 					email = k
 					break
