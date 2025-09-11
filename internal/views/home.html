@@ -1,11 +1,22 @@
 {{define "home.html"}}
 {{template "layout_start" .}}
+<style>
+/* Fallback modal (evita problemas de caché) */
+#howBuyBackdrop{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:20px;z-index:110;opacity:0;pointer-events:none;transition:opacity .25s ease}
+#howBuyBackdrop.show{opacity:1;pointer-events:auto}
+#howBuyBackdrop .modal{background:#1a2430;border:1px solid #243044;border-radius:22px;padding:24px 24px 28px;max-width:560px;width:100%;color:#e5e7eb;font-family:Poppins,sans-serif;opacity:0;transform:translateY(20px) scale(.94);transition:opacity .28s ease,transform .35s cubic-bezier(.4,0,.2,1)}
+#howBuyBackdrop.show .modal{opacity:1;transform:translateY(0) scale(1)}
+#howBuyBackdrop .modal-title{margin:0 0 14px;font-size:24px}
+#howBuyBackdrop .modal-close{position:absolute;top:10px;right:10px;background:#12202c;border:1px solid #243044;color:#e5e7eb;width:36px;height:36px;border-radius:12px;cursor:pointer;font-size:20px;font-weight:600}
+#howBuyBackdrop .modal-close:hover{background:#1f2c39}
+</style>
 <section class="hero hero-split">
   <div class="hero-copy">
     <h1 class="mega">Dale vida a tus ideas en 3D</h1>
     <p class="hero-lead">Modelos impresos de alta calidad listos para enviar o fabricar bajo demanda. Personalizá materiales, colores y terminaciones.</p>
     <div class="hero-actions">
       <a href="/products" class="btn-primary">Ver catálogo</a>
+      <button type="button" class="btn-secondary" id="btnHowBuy">Cómo comprar</button>
     </div>
     <p class="hero-hours">Producción diaria • Envíos a todo el país • Soporte personalizado</p>
   </div>
@@ -17,17 +28,44 @@
     <div class="hc-dots" id="hcDots"></div>
   </div>
 </section>
+<!-- Modal Cómo Comprar -->
+<div class="modal-backdrop" id="howBuyBackdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="howBuyTitle">
+    <button class="modal-close" id="howBuyClose" aria-label="Cerrar">×</button>
+    <h2 id="howBuyTitle" class="modal-title">Cómo comprar</h2>
+    <ol class="modal-steps">
+      <li><strong>Elegí:</strong> Abrí el catálogo y seleccioná el producto que te gusta.</li>
+      <li><strong>Personalizá:</strong> Ajustá color / material (si aplica) y agregalo al carrito.</li>
+      <li><strong>Confirmá y pagá:</strong> Completá tus datos, elegí envío o retiro y generá el pago seguro (Mercado Pago).</li>
+      <li><strong>Listo:</strong> Procesamos producción / envío. ¿Modelo propio? Pedí cotización o escribinos por <a class="link" href="https://wa.me/5493416219815" target="_blank" rel="noopener">WhatsApp</a>.</li>
+    </ol>
+    <p class="modal-note">Tiempo estimado producción bajo demanda: 24-72 hs según complejidad y cola.</p>
+    <div class="modal-actions"><button class="btn-primary" id="howBuyOk">Entendido</button></div>
+  </div>
+</div>
 <script>
 (function(){
+  // Carrusel
   const slides=[...document.querySelectorAll('#heroCarousel .hc-slide')];
   const dotsC=document.getElementById('hcDots');
   slides.forEach((_,i)=>{const d=document.createElement('div');d.className='dot'+(i===0?' active':'');d.dataset.i=i;d.onclick=()=>go(i,true);dotsC.appendChild(d);});
-  let idx=0, timer=null;function go(n,manual){slides[idx].classList.remove('active');dotsC.children[idx].classList.remove('active');idx=(n+slides.length)%slides.length;slides[idx].classList.add('active');dotsC.children[idx].classList.add('active');if(manual){restart();}}
-  function next(){go(idx+1);}function start(){timer=setInterval(next,3000);}function restart(){clearInterval(timer);start();}
-  start();
+  let idx=0,timer=null;function go(n,manual){slides[idx].classList.remove('active');dotsC.children[idx].classList.remove('active');idx=(n+slides.length)%slides.length;slides[idx].classList.add('active');dotsC.children[idx].classList.add('active');if(manual){restart();}}
+  function next(){go(idx+1);}function start(){timer=setInterval(next,3000);}function restart(){clearInterval(timer);start();}start();
+  // Modal
+  const btn=document.getElementById('btnHowBuy');
+  const bd=document.getElementById('howBuyBackdrop');
+  const modal=bd?bd.querySelector('.modal'):null;
+  const closeBtn=document.getElementById('howBuyClose');
+  const okBtn=document.getElementById('howBuyOk');
+  function open(){ if(!bd||!modal) return; bd.hidden=false; bd.classList.add('show'); modal.classList.add('show'); document.body.style.overflow='hidden'; closeBtn&&closeBtn.focus(); }
+  function close(){ if(!bd||!modal) return; bd.classList.remove('show'); modal.classList.remove('show'); document.body.style.overflow=''; setTimeout(()=>{bd.hidden=true;},140); btn&&btn.focus(); }
+  btn&&btn.addEventListener('click',open);
+  closeBtn&&closeBtn.addEventListener('click',close);
+  okBtn&&okBtn.addEventListener('click',close);
+  bd&&bd.addEventListener('click',e=>{if(e.target===bd) close();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!bd.hidden) close();});
 })();
 </script>
-
 <section style="margin-top:40px">
   <h2 class="title" style="margin-bottom:10px">Destacados</h2>
   <div class="cards cards--home">

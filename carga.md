@@ -70,7 +70,16 @@ Campos:
 - `category` (opt)
 - `short_desc` (opt)
 - `ready_to_ship` (`true|false|1|0`)
+- `width_mm` (opt, número >=0, ancho en milímetros)
+- `height_mm` (opt, número >=0, alto en milímetros)
+- `depth_mm` (opt, número >=0, profundidad/fondo en milímetros)
 - `image` (1 archivo) y/o `images` (múltiples). Puedes incluir varias filas `images`.
+- `existing_slug` (opt) si solo quieres agregar imágenes a un producto existente (ignora dimensiones si ya existe).
+
+Notas dimensiones:
+- Si omites las medidas se guardan como 0.
+- Valores negativos se normalizan a 0 internamente.
+- Útiles para mostrar specs o cálculos futuros de volumen.
 
 Ejemplo Postman (form-data) agregar también Auth Bearer.
 
@@ -83,10 +92,13 @@ curl -X POST http://localhost:8080/api/products/upload \
   -F category=jardin \
   -F short_desc="Maceta decorativa" \
   -F ready_to_ship=true \
+  -F width_mm=120 \
+  -F height_mm=90 \
+  -F depth_mm=110 \
   -F images=@img1.webp \
   -F images=@img2.webp
 ```
-Respuesta 201 incluye `Images` con URLs `/uploads/images/...`.
+Respuesta 201 incluye `Images` con URLs `/uploads/images/...` y las medidas guardadas.
 
 ### 2.2 JSON simple (sin subir archivos)
 `POST /api/products`
@@ -98,10 +110,16 @@ Body JSON:
   "category": "jardin",
   "short_desc": "Maceta decorativa impresa en 3D",
   "base_price": 3500,
-  "ready_to_ship": true
+  "ready_to_ship": true,
+  "width_mm": 120,
+  "height_mm": 90,
+  "depth_mm": 110
 }
 ```
-(No genera imágenes.)
+Observaciones:
+- Las medidas son opcionales; si no se envían quedan 0.
+- Validación: solo se rechaza si alguna medida viene negativa.
+- Este endpoint no crea imágenes.
 
 ## 3. Listar productos
 `GET /api/products` (requiere token admin)
@@ -201,6 +219,7 @@ curl -X POST http://localhost:8080/api/products/upload \
   -F name="Clip Bolsa" \
   -F base_price=600 \
   -F ready_to_ship=true \
+  -F width_mm=30 -F height_mm=15 -F depth_mm=8 \
   -F image=@clip.jpg
 ```
 Delete completo:
