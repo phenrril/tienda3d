@@ -101,10 +101,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/auth/google/login", s.handleGoogleLogin)
 	s.mux.HandleFunc("/auth/google/callback", s.handleGoogleCallback)
 	s.mux.HandleFunc("/logout", s.handleLogout)
-	// Admin auth
-	s.mux.HandleFunc("/admin/login", s.handleAdminLogin)
-	// Admin
+	// Admin auth (JSON legacy) y nuevo formulario
+	s.mux.HandleFunc("/admin/login", s.handleAdminLogin) // existente
+	s.mux.HandleFunc("/admin/auth", s.handleAdminAuth)   // nuevo formulario user/pass
+	s.mux.HandleFunc("/admin/logout", s.handleAdminLogout)
+	// Admin vistas
 	s.mux.HandleFunc("/admin/orders", s.handleAdminOrders)
+	s.mux.HandleFunc("/admin/products", s.handleAdminProducts)
 }
 
 // ---------- SSR Handlers ----------
@@ -310,6 +313,50 @@ func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {
 		p, err := s.products.GetBySlug(r.Context(), idStr)
 		if err != nil {
 			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, 200, p)
+		return
+	}
+	if r.Method == http.MethodPut { // update básico
+		idStr := strings.TrimPrefix(r.URL.Path, "/api/products/")
+		if idStr == "" {
+			http.Error(w, "slug", 400)
+			return
+		}
+		p, err := s.products.GetBySlug(r.Context(), idStr)
+		if err != nil || p == nil {
+			http.Error(w, "not found", 404)
+			return
+		}
+		var req struct {
+			Name        *string  `json:"name"`
+			Category    *string  `json:"category"`
+			ShortDesc   *string  `json:"short_desc"`
+			BasePrice   *float64 `json:"base_price"`
+			ReadyToShip *bool    `json:"ready_to_ship"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "json", 400)
+			return
+		}
+		if req.Name != nil {
+			p.Name = *req.Name
+		}
+		if req.Category != nil {
+			p.Category = *req.Category
+		}
+		if req.ShortDesc != nil {
+			p.ShortDesc = *req.ShortDesc
+		}
+		if req.BasePrice != nil && *req.BasePrice >= 0 {
+			p.BasePrice = *req.BasePrice
+		}
+		if req.ReadyToShip != nil {
+			p.ReadyToShip = *req.ReadyToShip
+		}
+		if err := s.products.Create(r.Context(), p); err != nil { // Save reutiliza Create()
+			http.Error(w, "save", 500)
 			return
 		}
 		writeJSON(w, 200, p)
@@ -977,25 +1024,37 @@ func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "multipart", 400)
 		return
 	}
-	name := strings.TrimSpace(r.FormValue("name"))
-	if name == "" {
-		http.Error(w, "name", 400)
-		return
+	existingSlug := strings.TrimSpace(r.FormValue("existing_slug"))
+	var p *domain.Product
+	if existingSlug != "" { // añadir imágenes a producto existente
+		if prod, err := s.products.GetBySlug(r.Context(), existingSlug); err == nil {
+			p = prod
+		} else {
+			http.Error(w, "prod", 404)
+			return
+		}
 	}
-	bpStr := r.FormValue("base_price")
-	bp, _ := strconv.ParseFloat(bpStr, 64)
-	if bp < 0 {
-		http.Error(w, "price", 400)
-		return
-	}
-	cat := r.FormValue("category")
-	sdesc := r.FormValue("short_desc")
-	ready := r.FormValue("ready_to_ship") == "true" || r.FormValue("ready_to_ship") == "1"
-	p := &domain.Product{Name: name, Category: cat, ShortDesc: sdesc, BasePrice: bp, ReadyToShip: ready}
-	if err := s.products.Create(r.Context(), p); err != nil {
-		log.Error().Err(err).Msg("crear producto")
-		http.Error(w, "crear", 500)
-		return
+	if p == nil { // creación nueva
+		name := strings.TrimSpace(r.FormValue("name"))
+		if name == "" {
+			http.Error(w, "name", 400)
+			return
+		}
+		bpStr := r.FormValue("base_price")
+		bp, _ := strconv.ParseFloat(bpStr, 64)
+		if bp < 0 {
+			http.Error(w, "price", 400)
+			return
+		}
+		cat := r.FormValue("category")
+		sdesc := r.FormValue("short_desc")
+		ready := r.FormValue("ready_to_ship") == "true" || r.FormValue("ready_to_ship") == "1"
+		p = &domain.Product{Name: name, Category: cat, ShortDesc: sdesc, BasePrice: bp, ReadyToShip: ready}
+		if err := s.products.Create(r.Context(), p); err != nil {
+			log.Error().Err(err).Msg("crear producto")
+			http.Error(w, "crear", 500)
+			return
+		}
 	}
 	// procesar archivos (image o images)
 	files := []*multipart.FileHeader{}
@@ -1021,32 +1080,253 @@ func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 		if err != nil || len(data) == 0 {
 			continue
 		}
-		// guardar usando storage
 		storedPath, err := s.storage.SaveImage(r.Context(), fh.Filename, data)
 		if err != nil {
 			log.Warn().Err(err).Str("file", fh.Filename).Msg("no se pudo guardar imagen")
 			continue
 		}
-		// asegurar URL servible (prefijar '/')
 		if !strings.HasPrefix(storedPath, "/") {
 			storedPath = "/" + strings.ReplaceAll(storedPath, "\\", "/")
 		}
-		imgs = append(imgs, domain.Image{URL: storedPath, Alt: name})
+		imgs = append(imgs, domain.Image{URL: storedPath, Alt: p.Name})
 	}
 	if len(imgs) > 0 {
 		if err := s.products.AddImages(r.Context(), p.ID, imgs); err != nil {
 			log.Error().Err(err).Msg("add images")
 		}
-		// recargar para incluir imágenes
 		if rp, err := s.products.GetBySlug(r.Context(), p.Slug); err == nil {
 			p = rp
 		}
 	}
-	writeJSON(w, 201, p)
+	writeJSON(w, 201, map[string]any{"product": p, "added_images": len(imgs)})
 }
 
-// ----------------- OAuth Google -----------------
+// --- Admin vistas nuevas ---
+func (s *Server) handleAdminProducts(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", 302)
+		return
+	}
+	list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 200})
+	// incluir token para JS
+	tok := s.readAdminToken(r)
+	data := map[string]any{"Products": list, "Total": total, "AdminToken": tok}
+	s.render(w, "admin_products.html", data)
+}
 
+// reemplazar template faltante admin_orders.html
+func (s *Server) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", 302)
+		return
+	}
+	page := 1
+	if p, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && p > 0 {
+		page = p
+	}
+	list, total, err := s.orders.Orders.List(r.Context(), nil, page, 20)
+	if err != nil {
+		http.Error(w, "err", 500)
+		return
+	}
+	pages := (int(total) + 19) / 20
+	data := map[string]any{"Orders": list, "Page": page, "Pages": pages, "AdminToken": s.readAdminToken(r)}
+	s.render(w, "admin_orders.html", data)
+}
+
+func (s *Server) handleAdminAuth(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		if s.isAdminSession(r) {
+			http.Redirect(w, r, "/admin/products", 302)
+			return
+		}
+		data := map[string]any{}
+		s.render(w, "admin_auth.html", data)
+		return
+	}
+	if r.Method == http.MethodPost {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "form", 400)
+			return
+		}
+		user := strings.TrimSpace(r.FormValue("user"))
+		pass := strings.TrimSpace(r.FormValue("pass"))
+		cfgUser := os.Getenv("ADMIN_USER")
+		cfgPass := os.Getenv("ADMIN_PASS")
+		if cfgUser == "" {
+			cfgUser = "admin"
+		}
+		if cfgPass == "" {
+			cfgPass = "admin123"
+		}
+		if user != cfgUser || pass != cfgPass {
+			http.Error(w, "credenciales", 401)
+			return
+		}
+		// emitir token y set cookie
+		email := user + "@local"
+		if _, ok := s.adminAllowed[email]; !ok {
+			// si lista vacía permitimos cualquiera
+			if len(s.adminAllowed) == 0 {
+				s.adminAllowed[email] = struct{}{}
+			} else {
+				// intentar usar uno existente permitido
+				for k := range s.adminAllowed {
+					email = k
+					break
+				}
+			}
+		}
+		tok, _, err := s.issueAdminToken(email, 12*time.Hour)
+		if err != nil {
+			http.Error(w, "token", 500)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{Name: "admin_token", Value: tok, Path: "/", MaxAge: 60 * 60 * 12})
+		http.Redirect(w, r, "/admin/products", 302)
+		return
+	}
+	http.Error(w, "method", 405)
+}
+
+func (s *Server) handleAdminLogout(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{Name: "admin_token", Value: "", Path: "/", MaxAge: -1})
+	http.Redirect(w, r, "/admin/auth", 302)
+}
+
+func (s *Server) isAdminSession(r *http.Request) bool {
+	if tok := s.readAdminToken(r); tok != "" {
+		if _, err := s.verifyAdminToken(tok); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) readAdminToken(r *http.Request) string {
+	c, err := r.Cookie("admin_token")
+	if err != nil || c.Value == "" {
+		return ""
+	}
+	return c.Value
+}
+
+func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
+	auth := r.Header.Get("Authorization")
+	if strings.HasPrefix(strings.ToLower(auth), "bearer ") {
+		tok := strings.TrimSpace(auth[7:])
+		if _, err := s.verifyAdminToken(tok); err == nil {
+			return true
+		}
+	}
+	// fallback cookie
+	if tok := s.readAdminToken(r); tok != "" {
+		if _, err := s.verifyAdminToken(tok); err == nil {
+			return true
+		}
+	}
+	http.Error(w, "unauthorized", 401)
+	return false
+}
+
+func sendOrderEmail(o *domain.Order, success bool) error {
+	host := os.Getenv("SMTP_HOST")
+	port := os.Getenv("SMTP_PORT")
+	user := os.Getenv("SMTP_USER")
+	pass := os.Getenv("SMTP_PASS")
+	to := os.Getenv("ORDER_NOTIFY_EMAIL")
+	if to == "" {
+		to = "chroma3dimpresiones@gmail.com"
+	}
+	if host == "" || port == "" || user == "" || pass == "" {
+		log.Warn().Msg("SMTP no configurado, se omite envío de email")
+		return nil
+	}
+	addr := host + ":" + port
+	statusTxt := "PAGO FALLIDO"
+	if success {
+		statusTxt = "PAGO APROBADO"
+	}
+	var buf bytes.Buffer
+	_, _ = fmt.Fprintf(&buf, "Subject: Nueva orden %s #%s\r\n", statusTxt, o.ID.String())
+	_, _ = fmt.Fprintf(&buf, "From: %s\r\n", user)
+	_, _ = fmt.Fprintf(&buf, "To: %s\r\n", to)
+	buf.WriteString("MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n")
+	_, _ = fmt.Fprintf(&buf, "Estado: %s\n", statusTxt)
+	_, _ = fmt.Fprintf(&buf, "Orden: %s\n", o.ID)
+	_, _ = fmt.Fprintf(&buf, "Nombre: %s\nEmail: %s\nTel: %s\nDNI: %s\n", o.Name, o.Email, o.Phone, o.DNI)
+	if o.ShippingMethod == "envio" {
+		_, _ = fmt.Fprintf(&buf, "Envío a: %s (%s, %s) CP:%s\n", o.Address, o.Province, o.ShippingMethod, o.PostalCode)
+	} else {
+		buf.WriteString("Retiro en local\n")
+	}
+	buf.WriteString("Items:\n")
+	for _, it := range o.Items {
+		_, _ = fmt.Fprintf(&buf, "- %s x%d $%.2f Color:%s\n", it.Title, it.Qty, it.UnitPrice, it.Color)
+	}
+	_, _ = fmt.Fprintf(&buf, "Total: $%.2f (Envío: $%.2f)\n", o.Total, o.ShippingCost)
+	auth := smtp.PlainAuth("", user, pass, host)
+	if err := smtp.SendMail(addr, auth, user, []string{to}, buf.Bytes()); err != nil {
+		log.Error().Err(err).Msg("email send")
+		return err
+	}
+	return nil
+}
+
+func sendOrderTelegram(o *domain.Order, success bool) error {
+	token := os.Getenv("TELEGRAM_BOT_TOKEN")
+	chatID := os.Getenv("TELEGRAM_CHAT_ID")
+	if token == "" || chatID == "" {
+		return fmt.Errorf("telegram vars faltantes")
+	}
+	statusTxt := "PAGO FALLIDO"
+	if success {
+		statusTxt = "PAGO APROBADO"
+	}
+	var b strings.Builder
+	b.WriteString("Orden ")
+	b.WriteString(o.ID.String())
+	b.WriteString(" - ")
+	b.WriteString(statusTxt)
+	b.WriteString("\n")
+	fmt.Fprintf(&b, "Nombre: %s\nEmail: %s\nTel: %s\nDNI: %s\n", o.Name, o.Email, o.Phone, o.DNI)
+	if o.ShippingMethod == "envio" {
+		fmt.Fprintf(&b, "Envío a: %s (%s %s) CP:%s\n", o.Address, o.Province, o.ShippingMethod, o.PostalCode)
+	} else {
+		b.WriteString("Retiro en local\n")
+	}
+	b.WriteString("Items:\n")
+	for _, it := range o.Items {
+		fmt.Fprintf(&b, "- %s x%d $%.2f %s\n", it.Title, it.Qty, it.UnitPrice, it.Color)
+	}
+	fmt.Fprintf(&b, "Total: $%.2f (Envio: $%.2f)\n", o.Total, o.ShippingCost)
+	apiURL := "https://api.telegram.org/bot" + token + "/sendMessage"
+	form := url.Values{}
+	form.Set("chat_id", chatID)
+	form.Set("text", b.String())
+	form.Set("disable_web_page_preview", "1")
+	resp, err := http.PostForm(apiURL, form)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("telegram status %d: %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+func sendOrderNotify(o *domain.Order, success bool) {
+	if err := sendOrderTelegram(o, success); err != nil {
+		log.Warn().Err(err).Msg("telegram notif fallo")
+		if os.Getenv("SMTP_HOST") != "" {
+			_ = sendOrderEmail(o, success)
+		}
+	}
+}
+
+// sesiones usuario (Google OAuth)
 type sessionUser struct {
 	Email string `json:"email"`
 	Name  string `json:"name"`
@@ -1066,7 +1346,6 @@ func writeUserSession(w http.ResponseWriter, u *sessionUser) {
 }
 
 func readUserSession(w http.ResponseWriter, r *http.Request) *sessionUser {
-	// r puede ser nil (cuando se llama desde render); en ese caso no leer cookie
 	if r == nil {
 		return nil
 	}
@@ -1139,19 +1418,15 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		Name  string `json:"name"`
 	}
 	_ = json.Unmarshal(body, &info)
-	if info.Email == "" { // fallback name
-		log.Warn().Msg("email vacío oauth")
+	if info.Email == "" {
 		http.Error(w, "email", 400)
 		return
 	}
-	// persist customer
 	if s.customers != nil {
-		cust, err := s.customers.FindByEmail(r.Context(), info.Email)
-		if err != nil {
-			if err == domain.ErrNotFound {
-				cust = &domain.Customer{ID: uuid.New(), Email: info.Email, Name: info.Name}
-				_ = s.customers.Save(r.Context(), cust)
-			}
+		if cust, err := s.customers.FindByEmail(r.Context(), info.Email); err != nil && err == domain.ErrNotFound {
+			_ = s.customers.Save(r.Context(), &domain.Customer{ID: uuid.New(), Email: info.Email, Name: info.Name})
+		} else if cust == nil && err == nil {
+			_ = s.customers.Save(r.Context(), &domain.Customer{ID: uuid.New(), Email: info.Email, Name: info.Name})
 		}
 	}
 	writeUserSession(w, &sessionUser{Email: info.Email, Name: info.Name})
@@ -1163,123 +1438,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", 302)
 }
 
-// sendOrderEmail envía un email simple con datos de la orden si hay configuración SMTP.
-func sendOrderEmail(o *domain.Order, success bool) error {
-	host := os.Getenv("SMTP_HOST")
-	port := os.Getenv("SMTP_PORT")
-	user := os.Getenv("SMTP_USER")
-	pass := os.Getenv("SMTP_PASS")
-	to := os.Getenv("ORDER_NOTIFY_EMAIL")
-	if to == "" {
-		to = "chroma3dimpresiones@gmail.com"
-	}
-	if host == "" || port == "" || user == "" || pass == "" {
-		log.Warn().Msg("SMTP no configurado, se omite envío de email")
-		return nil
-	}
-	addr := host + ":" + port
-	statusTxt := "PAGO FALLIDO"
-	if success {
-		statusTxt = "PAGO APROBADO"
-	}
-	var buf bytes.Buffer
-	_, _ = fmt.Fprintf(&buf, "Subject: Nueva orden %s #%s\r\n", statusTxt, o.ID.String())
-	_, _ = fmt.Fprintf(&buf, "From: %s\r\n", user)
-	_, _ = fmt.Fprintf(&buf, "To: %s\r\n", to)
-	buf.WriteString("MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n")
-	_, _ = fmt.Fprintf(&buf, "Estado: %s\n", statusTxt)
-	_, _ = fmt.Fprintf(&buf, "Orden: %s\n", o.ID)
-	_, _ = fmt.Fprintf(&buf, "Nombre: %s\nEmail: %s\nTel: %s\nDNI: %s\n", o.Name, o.Email, o.Phone, o.DNI)
-	if o.ShippingMethod == "envio" {
-		_, _ = fmt.Fprintf(&buf, "Envío a: %s (%s, %s) CP:%s\n", o.Address, o.Province, o.ShippingMethod, o.PostalCode)
-	} else {
-		buf.WriteString("Retiro en local\n")
-	}
-	buf.WriteString("Items:\n")
-	for _, it := range o.Items {
-		_, _ = fmt.Fprintf(&buf, "- %s x%d $%.2f Color:%s\n", it.Title, it.Qty, it.UnitPrice, it.Color)
-	}
-	_, _ = fmt.Fprintf(&buf, "Total: $%.2f (Envío: $%.2f)\n", o.Total, o.ShippingCost)
-	auth := smtp.PlainAuth("", user, pass, host)
-	if err := smtp.SendMail(addr, auth, user, []string{to}, buf.Bytes()); err != nil {
-		log.Error().Err(err).Msg("email send")
-		return err
-	}
-	return nil
-}
-
-// sendOrderTelegram envía una notificación a Telegram con los datos de la orden.
-func sendOrderTelegram(o *domain.Order, success bool) error {
-	token := os.Getenv("TELEGRAM_BOT_TOKEN")
-	chatID := os.Getenv("TELEGRAM_CHAT_ID")
-	if token == "" || chatID == "" {
-		return fmt.Errorf("telegram vars faltantes")
-	}
-	statusTxt := "PAGO FALLIDO"
-	if success {
-		statusTxt = "PAGO APROBADO"
-	}
-	var b strings.Builder
-	b.WriteString("Orden ")
-	b.WriteString(o.ID.String())
-	b.WriteString(" - ")
-	b.WriteString(statusTxt)
-	b.WriteString("\n")
-	fmt.Fprintf(&b, "Nombre: %s\nEmail: %s\nTel: %s\nDNI: %s\n", o.Name, o.Email, o.Phone, o.DNI)
-	if o.ShippingMethod == "envio" {
-		fmt.Fprintf(&b, "Envío a: %s (%s %s) CP:%s\n", o.Address, o.Province, o.ShippingMethod, o.PostalCode)
-	} else {
-		b.WriteString("Retiro en local\n")
-	}
-	b.WriteString("Items:\n")
-	for _, it := range o.Items {
-		fmt.Fprintf(&b, "- %s x%d $%.2f %s\n", it.Title, it.Qty, it.UnitPrice, it.Color)
-	}
-	fmt.Fprintf(&b, "Total: $%.2f (Envio: $%.2f)\n", o.Total, o.ShippingCost)
-	apiURL := "https://api.telegram.org/bot" + token + "/sendMessage"
-	form := url.Values{}
-	form.Set("chat_id", chatID)
-	form.Set("text", b.String())
-	form.Set("disable_web_page_preview", "1")
-	resp, err := http.PostForm(apiURL, form)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("telegram status %d: %s", resp.StatusCode, string(body))
-	}
-	return nil
-}
-
-// sendOrderNotify prioriza Telegram y opcionalmente email (si SMTP configurado y Telegram falló)
-func sendOrderNotify(o *domain.Order, success bool) {
-	if err := sendOrderTelegram(o, success); err != nil {
-		log.Warn().Err(err).Msg("telegram notif fallo")
-		// fallback email sólo si SMTP configurado
-		if os.Getenv("SMTP_HOST") != "" {
-			_ = sendOrderEmail(o, success)
-		}
-	}
-}
-
-func (s *Server) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
-	page := 1
-	if p, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && p > 0 {
-		page = p
-	}
-	list, total, err := s.orders.Orders.List(r.Context(), nil, page, 20)
-	if err != nil {
-		http.Error(w, "err", 500)
-		return
-	}
-	pages := (int(total) + 19) / 20
-	data := map[string]any{"Orders": list, "Page": page, "Pages": pages}
-	s.render(w, "admin_orders.html", data)
-}
-
-// --- Admin Auth ---
+// --- Admin Auth (legacy API key + email whitelist) ---
 func (s *Server) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method", 405)
@@ -1367,20 +1526,6 @@ func (s *Server) verifyAdminToken(tok string) (string, error) {
 		return "", fmt.Errorf("not allowed")
 	}
 	return email, nil
-}
-
-func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
-	auth := r.Header.Get("Authorization")
-	if !strings.HasPrefix(strings.ToLower(auth), "bearer ") {
-		http.Error(w, "unauthorized", 401)
-		return false
-	}
-	tok := strings.TrimSpace(auth[7:])
-	if _, err := s.verifyAdminToken(tok); err != nil {
-		http.Error(w, "unauthorized", 401)
-		return false
-	}
-	return true
 }
 
 func secureCompare(a, b string) bool {
