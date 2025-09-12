@@ -6,12 +6,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// Product representa un modelo listo para imprimir o un ítem fabricable bajo demanda.
 type Product struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
 	Slug        string    `gorm:"uniqueIndex;size:140"`
-	Name        string    `gorm:"size:180"`           // constraint NOT NULL se aplicará manualmente tras backfill
-	BasePrice   float64   `gorm:"type:decimal(12,2)"` // idem
+	Name        string    `gorm:"size:180"`
+	BasePrice   float64   `gorm:"type:decimal(12,2)"`
 	Category    string    `gorm:"size:100"`
 	ShortDesc   string    `gorm:"type:text"`
 	ReadyToShip bool      `gorm:"default:true"`

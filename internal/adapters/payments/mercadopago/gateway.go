@@ -19,8 +19,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Gateway real simple MercadoPago (checkout preferences)
-
 type Gateway struct {
 	token      string
 	httpClient *http.Client
@@ -30,7 +28,6 @@ func NewGateway(token string) *Gateway {
 	return &Gateway{token: token, httpClient: &http.Client{Timeout: 10 * time.Second}}
 }
 
-// payload MP
 type mpItem struct {
 	Title      string  `json:"title"`
 	Quantity   int     `json:"quantity"`
@@ -115,7 +112,7 @@ func (g *Gateway) CreatePreference(ctx context.Context, o *domain.Order) (string
 		NotificationURL:     baseURL + "/webhooks/mp",
 		StatementDescriptor: "CROMA3D",
 	}
-	// Nota: evitamos usar shipments para no depender de la UI de MP y asegurarnos que aparezca como línea.
+
 	type reqExt struct {
 		mpPrefReq
 		ExternalReference string `json:"external_reference"`
@@ -159,7 +156,6 @@ func (g *Gateway) CreatePreference(ctx context.Context, o *domain.Order) (string
 	return initPoint, nil
 }
 
-// PaymentInfo obtiene info básica de un pago y devuelve (status, external_reference)
 func (g *Gateway) PaymentInfo(ctx context.Context, paymentID string) (string, string, error) {
 	if g.token == "" || paymentID == "" {
 		return "", "", errors.New("params")
@@ -193,7 +189,6 @@ func (g *Gateway) VerifyWebhook(signature string, body []byte) (interface{}, err
 	return map[string]any{"status": "received", "len": len(body)}, nil
 }
 
-// VerifyExternalRef valida el external_reference y devuelve orderID si la firma es correcta.
 func VerifyExternalRef(ext string) (string, bool) {
 	parts := strings.Split(ext, "|")
 	if len(parts) != 2 {
@@ -205,5 +200,5 @@ func VerifyExternalRef(ext string) (string, bool) {
 }
 
 func init() {
-	// noop
+
 }

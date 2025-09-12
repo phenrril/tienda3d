@@ -33,12 +33,12 @@ type App struct {
 	ShippingMethod string  `gorm:"size:30"`
 	ShippingCost   float64 `gorm:"type:decimal(12,2)"`
 	Storage        domain.FileStorage
-	Customers      domain.CustomerRepo // nuevo
-	OAuthConfig    *oauth2.Config      // nuevo
+	Customers      domain.CustomerRepo
+	OAuthConfig    *oauth2.Config
 }
 
 func NewApp(db *gorm.DB) (*App, error) {
-	// repos
+
 	prodRepo := postgres.NewProductRepo(db)
 	orderRepo := postgres.NewOrderRepo(db)
 	modelRepo := postgres.NewUploadedModelRepo(db)
@@ -50,7 +50,6 @@ func NewApp(db *gorm.DB) (*App, error) {
 	_ = os.MkdirAll(storageDir, 0755)
 	storage := localfs.New(storageDir)
 
-	// Selección de credenciales MP
 	token := os.Getenv("MP_ACCESS_TOKEN")
 	appEnv := strings.ToLower(os.Getenv("APP_ENV"))
 	if appEnv == "production" || appEnv == "prod" {
@@ -70,7 +69,6 @@ func NewApp(db *gorm.DB) (*App, error) {
 
 	payment := mercadopago.NewGateway(token)
 
-	// OAuth Google config (si variables presentes)
 	var oauthCfg *oauth2.Config
 	googleID := os.Getenv("GOOGLE_CLIENT_ID")
 	googleSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
@@ -101,7 +99,6 @@ func NewApp(db *gorm.DB) (*App, error) {
 	app.Customers = custRepo
 	app.OAuthConfig = oauthCfg
 
-	// templates parse
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
@@ -125,11 +122,11 @@ func (a *App) MigrateAndSeed() error {
 	); err != nil {
 		return err
 	}
-	// Backfill slugs y campos obligatorios si existen datos previos
+
 	if err := backfillSlugs(a.DB); err != nil {
 		return err
 	}
-	// Ya no se crean productos demo. La base queda vacía hasta carga manual.
+
 	return nil
 }
 
@@ -145,7 +142,7 @@ func backfillSlugs(db *gorm.DB) error {
 			base = p.ID.String()[:8]
 		}
 		slug := base
-		// asegurar unicidad
+
 		var count int64
 		i := 1
 		for {
@@ -162,21 +159,20 @@ func backfillSlugs(db *gorm.DB) error {
 			return err
 		}
 	}
-	// Backfill campos obligatorios legacy
+
 	if err := db.Exec("UPDATE products SET name = 'Producto' WHERE name IS NULL OR name = ''").Error; err != nil {
 		return err
 	}
 	if err := db.Exec("UPDATE products SET base_price = 0 WHERE base_price IS NULL").Error; err != nil {
 		return err
 	}
-	// Reforzar constraints (ignorar errores si ya existen)
+
 	_ = db.Exec("ALTER TABLE products ALTER COLUMN slug SET NOT NULL").Error
 	_ = db.Exec("ALTER TABLE products ALTER COLUMN name SET NOT NULL").Error
 	_ = db.Exec("ALTER TABLE products ALTER COLUMN base_price SET NOT NULL").Error
 	return nil
 }
 
-// seedProducts eliminado del flujo (mantener función si se quisiera usar manualmente)
 func seedProducts(db *gorm.DB) {
 	prods := []domain.Product{
 		{ID: uuid.New(), Slug: "llavero-logo", Name: "Llavero Logo", BasePrice: 1200, Category: "accesorios", ShortDesc: "Llavero impreso", ReadyToShip: true},

@@ -2,10 +2,6 @@ package simple
 
 import "github.com/phenrril/tienda3d/internal/domain"
 
-// PricingServiceSimple implementa una fórmula básica.
-// Price = (volumeCM3 * coefMaterial) + (timeMin * rateQuality) + overhead + margin
-// Devuelve breakdown para transparencia.
-
 type Service struct{}
 
 func NewPricingService() *Service { return &Service{} }

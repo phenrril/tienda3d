@@ -21,7 +21,7 @@ const requestIDKey key = 1
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := make([]byte, 8)
-		_, _ = rand.Read(id) // ignore err
+		_, _ = rand.Read(id)
 		ctx := context.WithValue(r.Context(), requestIDKey, fmtHex(id))
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -81,7 +81,6 @@ type gzipResponseWriter struct {
 
 func (w *gzipResponseWriter) Write(b []byte) (int, error) { return w.Writer.Write(b) }
 
-// RateLimit simple para /api endpoints por IP.
 func RateLimit(maxPerMin int) func(http.Handler) http.Handler {
 	var mu sync.Mutex
 	buckets := map[string]*bucket{}
@@ -111,6 +110,69 @@ func RateLimit(maxPerMin int) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func PublicRateLimit(perPathLimits map[string]int) func(http.Handler) http.Handler {
+
+	var mu sync.Mutex
+	buckets := map[string]*bucket{}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			limit, ok := perPathLimits[r.URL.Path]
+			if !ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+			ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+			if ip == "" {
+				ip = r.RemoteAddr
+			}
+			key := r.URL.Path + "|" + ip
+			mu.Lock()
+			b, ok := buckets[key]
+			if !ok || time.Since(b.ts) > time.Minute {
+				b = &bucket{count: 0, ts: time.Now()}
+				buckets[key] = b
+			}
+			if b.count >= limit {
+				mu.Unlock()
+				w.Header().Set("Retry-After", "60")
+				http.Error(w, "rate limit", http.StatusTooManyRequests)
+				return
+			}
+			b.count++
+			remaining := limit - b.count
+			mu.Unlock()
+			w.Header().Set("X-RateLimit-Limit", strconvItoa(limit))
+			w.Header().Set("X-RateLimit-Remaining", strconvItoa(remaining))
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func strconvItoa(i int) string { return fmtInt(i) }
+
+func fmtInt(i int) string {
+	if i == 0 {
+		return "0"
+	}
+	neg := false
+	if i < 0 {
+		neg = true
+		i = -i
+	}
+	buf := [20]byte{}
+	pos := len(buf)
+	for i > 0 {
+		pos--
+		buf[pos] = byte('0' + i%10)
+		i /= 10
+	}
+	if neg {
+		pos--
+		buf[pos] = '-'
+	}
+	return string(buf[pos:])
 }
 
 type bucket struct {

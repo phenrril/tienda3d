@@ -7,17 +7,15 @@ import (
 	"github.com/google/uuid"
 )
 
-// R E P O S
-
 type ProductRepo interface {
 	Save(ctx context.Context, p *Product) error
 	FindBySlug(ctx context.Context, slug string) (*Product, error)
 	List(ctx context.Context, filter ProductFilter) ([]Product, int64, error)
-	AddImages(ctx context.Context, productID uuid.UUID, imgs []Image) error // añadido para guardar imágenes
-	DistinctCategories(ctx context.Context) ([]string, error)               // NUEVO: listado categorías únicas
+	AddImages(ctx context.Context, productID uuid.UUID, imgs []Image) error
+	DistinctCategories(ctx context.Context) ([]string, error)
 }
 
-type CustomerRepo interface { // nuevo
+type CustomerRepo interface {
 	FindByEmail(ctx context.Context, email string) (*Customer, error)
 	Save(ctx context.Context, c *Customer) error
 }
@@ -28,7 +26,7 @@ type ProductFilter struct {
 	Sort        string
 	Page        int
 	PageSize    int
-	Query       string // texto libre
+	Query       string
 }
 
 type OrderRepo interface {
@@ -36,8 +34,8 @@ type OrderRepo interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*Order, error)
 	FindByPreferenceID(ctx context.Context, prefID string) (*Order, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, st OrderStatus) error
-	List(ctx context.Context, status *OrderStatus, mpStatus *string, page, pageSize int) ([]Order, int64, error) // agregado mpStatus
-	ListInRange(ctx context.Context, from, to time.Time) ([]Order, error)                                        // NUEVO: listado completo por rango de fechas
+	List(ctx context.Context, status *OrderStatus, mpStatus *string, page, pageSize int) ([]Order, int64, error)
+	ListInRange(ctx context.Context, from, to time.Time) ([]Order, error)
 }
 
 type QuoteRepo interface {
@@ -54,8 +52,6 @@ type PageRepo interface {
 	FindBySlug(ctx context.Context, slug string) (*Page, error)
 	Save(ctx context.Context, p *Page) error
 }
-
-// S E R V I C E S
 
 type QuoteService interface {
 	EstimateFromModel(ctx context.Context, modelID uuid.UUID, cfg QuoteConfig) (*Quote, error)

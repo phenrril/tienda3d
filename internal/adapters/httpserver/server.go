@@ -16,7 +16,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"sort" // NUEVO para ordenar top productos y días
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -41,14 +41,16 @@ type Server struct {
 	storage   domain.FileStorage
 	customers domain.CustomerRepo
 	oauthCfg  *oauth2.Config
-	// admin auth
+
 	adminAllowed map[string]struct{}
 	adminSecret  []byte
 }
 
+var emailRe = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
+
 func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config) http.Handler {
 	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, models: m, storage: fs, customers: customers, oauthCfg: oauthCfg, mux: http.NewServeMux()}
-	// admin auth init
+
 	allowed := map[string]struct{}{}
 	if raw := os.Getenv("ADMIN_ALLOWED_EMAILS"); raw != "" {
 		for _, e := range strings.Split(raw, ",") {
@@ -69,51 +71,61 @@ func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usec
 	s.adminSecret = []byte(sec)
 
 	s.routes()
-	return Chain(s.mux, RateLimit(60), Gzip, RequestID, Recovery, Logging)
+	return Chain(s.mux,
+		PublicRateLimit(map[string]int{
+			"/api/quote":    15,
+			"/api/checkout": 10,
+			"/webhooks/mp":  30,
+		}),
+		RateLimit(60),
+		Gzip,
+		RequestID,
+		Recovery,
+		Logging,
+	)
 }
 
 func (s *Server) routes() {
-	// estáticos
+
 	s.mux.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("public"))))
-	// exponer uploads (imágenes guardadas vía API)
+
 	s.mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
-	// SSR
+
 	s.mux.HandleFunc("/", s.handleHome)
 	s.mux.HandleFunc("/products", s.handleProducts)
 	s.mux.HandleFunc("/product/", s.handleProduct)
 	s.mux.HandleFunc("/quote/", s.handleQuoteView)
 	s.mux.HandleFunc("/checkout", s.handleCheckout)
 	s.mux.HandleFunc("/pay/", s.handlePaySimulated)
-	// Cart
-	s.mux.HandleFunc("/cart", s.handleCart) // GET ver / POST agregar
+
+	s.mux.HandleFunc("/cart", s.handleCart)
 	s.mux.HandleFunc("/cart/update", s.handleCartUpdate)
 	s.mux.HandleFunc("/cart/remove", s.handleCartRemove)
 	s.mux.HandleFunc("/cart/checkout", s.handleCartCheckout)
-	// API JSON
+
 	s.mux.HandleFunc("/api/products", s.apiProducts)
 	s.mux.HandleFunc("/api/products/", s.apiProductByID)
-	// nuevo endpoint multipart
+
 	s.mux.HandleFunc("/api/products/upload", s.apiProductUpload)
 	s.mux.HandleFunc("/api/quote", s.apiQuote)
 	s.mux.HandleFunc("/api/checkout", s.apiCheckout)
 	s.mux.HandleFunc("/webhooks/mp", s.webhookMP)
 	s.mux.HandleFunc("/api/products/delete", s.apiProductsBulkDelete)
-	// Auth Google
+
 	s.mux.HandleFunc("/auth/google/login", s.handleGoogleLogin)
 	s.mux.HandleFunc("/auth/google/callback", s.handleGoogleCallback)
 	s.mux.HandleFunc("/logout", s.handleLogout)
-	// Admin auth (JSON legacy) y nuevo formulario
-	s.mux.HandleFunc("/admin/login", s.handleAdminLogin) // existente
-	s.mux.HandleFunc("/admin/auth", s.handleAdminAuth)   // nuevo formulario user/pass
+
+	s.mux.HandleFunc("/admin/login", s.handleAdminLogin)
+	s.mux.HandleFunc("/admin/auth", s.handleAdminAuth)
 	s.mux.HandleFunc("/admin/logout", s.handleAdminLogout)
-	// Admin vistas
+
 	s.mux.HandleFunc("/admin/orders", s.handleAdminOrders)
 	s.mux.HandleFunc("/admin/products", s.handleAdminProducts)
-	// NUEVO reporte ventas
+
 	s.mux.HandleFunc("/admin/sales", s.handleAdminSales)
 }
 
-// ---------- SSR Handlers ----------
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
@@ -140,7 +152,7 @@ func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
 	sort := qv.Get("sort")
 	query := qv.Get("q")
 	category := qv.Get("category")
-	stock := qv.Get("stock") // values: available, all
+	stock := qv.Get("stock")
 	var readyPtr *bool
 	if stock == "available" {
 		b := true
@@ -180,7 +192,7 @@ func (s *Server) handleProduct(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	// Recolectar colores únicos en orden de aparición (hasta 16)
+
 	seen := map[string]struct{}{}
 	colors := []string{}
 	for _, v := range p.Variants {
@@ -197,27 +209,27 @@ func (s *Server) handleProduct(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	// Paleta base para completar hasta 16 si faltan
+
 	basePalette := []string{
-		"#111827", // gris muy oscuro / fondo
-		"#ffffff", // blanco
-		"#6366f1", // indigo
-		"#10b981", // verde
-		"#f59e0b", // ámbar
-		"#ef4444", // rojo
-		"#3b82f6", // azul
-		"#8b5cf6", // violeta
-		"#ec4899", // rosa fuerte
-		"#14b8a6", // teal
-		"#f472b6", // rosa claro
-		"#fcd34d", // amarillo claro
-		"#a3e635", // lima
-		"#dc2626", // rojo oscuro
-		"#334155", // slate
-		"#64748b", // slate claro
+		"#111827",
+		"#ffffff",
+		"#6366f1",
+		"#10b981",
+		"#f59e0b",
+		"#ef4444",
+		"#3b82f6",
+		"#8b5cf6",
+		"#ec4899",
+		"#14b8a6",
+		"#f472b6",
+		"#fcd34d",
+		"#a3e635",
+		"#dc2626",
+		"#334155",
+		"#64748b",
 	}
 	if len(colors) == 0 {
-		// Si no hay variantes con color, usamos directamente la paleta completa
+
 		colors = append([]string{}, basePalette...)
 	} else if len(colors) < 16 {
 		for _, c := range basePalette {
@@ -272,7 +284,6 @@ func (s *Server) handleCheckout(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "checkout.html", data)
 }
 
-// ---------- API ----------
 func (s *Server) apiProducts(w http.ResponseWriter, r *http.Request) {
 	if !s.requireAdmin(w, r) {
 		return
@@ -326,7 +337,7 @@ func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, p)
 		return
 	}
-	if r.Method == http.MethodPut { // update básico
+	if r.Method == http.MethodPut {
 		idStr := strings.TrimPrefix(r.URL.Path, "/api/products/")
 		if idStr == "" {
 			http.Error(w, "slug", 400)
@@ -375,7 +386,7 @@ func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {
 		if req.DepthMM != nil && *req.DepthMM >= 0 {
 			p.DepthMM = *req.DepthMM
 		}
-		if err := s.products.Create(r.Context(), p); err != nil { // Save reutiliza Create()
+		if err := s.products.Create(r.Context(), p); err != nil {
 			http.Error(w, "save", 500)
 			return
 		}
@@ -388,7 +399,7 @@ func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "slug", 400)
 			return
 		}
-		// eliminación completa (producto + imágenes + variantes + archivos)
+
 		imgPaths, err := s.products.DeleteFullBySlug(r.Context(), idStr)
 		if err != nil {
 			if errors.Is(err, domain.ErrNotFound) {
@@ -404,11 +415,11 @@ func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {
 			if sp == "" {
 				continue
 			}
-			// normalizar ruta local: quitar prefijo '/'
+
 			if strings.HasPrefix(sp, "/") {
 				sp = sp[1:]
 			}
-			// sólo intentar si apunta dentro de uploads
+
 			if !strings.Contains(sp, "uploads") {
 				continue
 			}
@@ -459,6 +470,8 @@ func (s *Server) apiQuote(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method", 405)
 		return
 	}
+
+	dec := json.NewDecoder(io.LimitReader(r.Body, 2048))
 	var req struct {
 		UploadedModelID string  `json:"uploaded_model_id"`
 		Material        string  `json:"material"`
@@ -466,8 +479,29 @@ func (s *Server) apiQuote(w http.ResponseWriter, r *http.Request) {
 		Infill          int     `json:"infill_pct"`
 		Quality         string  `json:"quality"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := dec.Decode(&req); err != nil {
 		http.Error(w, "json", 400)
+		return
+	}
+
+	mat := strings.ToUpper(strings.TrimSpace(req.Material))
+	allowedMat := map[string]struct{}{string(domain.MaterialPLA): {}, string(domain.MaterialPETG): {}, string(domain.MaterialTPU): {}}
+	if _, ok := allowedMat[mat]; !ok {
+		http.Error(w, "datos", 400)
+		return
+	}
+	qual := strings.ToLower(strings.TrimSpace(req.Quality))
+	allowedQual := map[string]struct{}{string(domain.QualityDraft): {}, string(domain.QualityStandard): {}, string(domain.QualityHigh): {}}
+	if _, ok := allowedQual[qual]; !ok {
+		http.Error(w, "datos", 400)
+		return
+	}
+	if req.Layer <= 0 || req.Layer > 1.0 {
+		http.Error(w, "datos", 400)
+		return
+	}
+	if req.Infill < 0 || req.Infill > 100 {
+		http.Error(w, "datos", 400)
 		return
 	}
 	id, err := uuid.Parse(req.UploadedModelID)
@@ -480,11 +514,12 @@ func (s *Server) apiQuote(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "model", 404)
 		return
 	}
-	q, err := s.quotes.CreateFromModel(r.Context(), model, domain.QuoteConfig{Material: domain.Material(req.Material), LayerHeightMM: req.Layer, InfillPct: req.Infill, Quality: domain.PrintQuality(req.Quality)})
+	q, err := s.quotes.CreateFromModel(r.Context(), model, domain.QuoteConfig{Material: domain.Material(mat), LayerHeightMM: req.Layer, InfillPct: req.Infill, Quality: domain.PrintQuality(qual)})
 	if err != nil {
 		http.Error(w, "quote", 500)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, 200, q)
 }
 
@@ -493,12 +528,17 @@ func (s *Server) apiCheckout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method", 405)
 		return
 	}
+	dec := json.NewDecoder(io.LimitReader(r.Body, 2048))
 	var req struct {
 		QuoteID string `json:"quote_id"`
 		Email   string `json:"email"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := dec.Decode(&req); err != nil {
 		http.Error(w, "json", 400)
+		return
+	}
+	if !emailRe.MatchString(strings.TrimSpace(req.Email)) {
+		http.Error(w, "email", 400)
 		return
 	}
 	qid, err := uuid.Parse(req.QuoteID)
@@ -511,7 +551,11 @@ func (s *Server) apiCheckout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "quote", 404)
 		return
 	}
-	order, err := s.orders.CreateFromQuote(r.Context(), q, req.Email)
+	if time.Now().After(q.ExpireAt) {
+		http.Error(w, "expired", 400)
+		return
+	}
+	order, err := s.orders.CreateFromQuote(r.Context(), q, strings.ToLower(strings.TrimSpace(req.Email)))
 	if err != nil {
 		http.Error(w, "order", 500)
 		return
@@ -521,6 +565,7 @@ func (s *Server) apiCheckout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "payment", 500)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, 200, map[string]any{"init_point": payURL, "order_id": order.ID})
 }
 
@@ -529,7 +574,7 @@ func (s *Server) webhookMP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method", 405)
 		return
 	}
-	body, _ := io.ReadAll(r.Body)
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 65536))
 	var evt struct {
 		Type   string `json:"type"`
 		Action string `json:"action"`
@@ -601,8 +646,6 @@ func (s *Server) webhookMP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-// --- Cart ---
-// cartItem define items crudos en cookie
 type cartItem struct {
 	Slug  string  `json:"slug"`
 	Color string  `json:"color"`
@@ -646,7 +689,7 @@ func aggregateCart(cp cartPayload, lookup func(slug string) (*domain.Product, er
 			if len(p.Images) > 0 {
 				l.Image = p.Images[0].URL
 			}
-			// usar precio actual base en vez del guardado si difiere
+
 			if p.BasePrice != 0 {
 				l.UnitPrice = p.BasePrice
 			}
@@ -713,7 +756,7 @@ func (s *Server) handleCart(w http.ResponseWriter, r *http.Request) {
 		s.render(w, "cart.html", data)
 		return
 	}
-	if r.Method == http.MethodPost { // agregar
+	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, "form", 400)
 			return
@@ -749,10 +792,10 @@ func (s *Server) handleCartUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	slug := r.FormValue("slug")
 	color := r.FormValue("color")
-	op := r.FormValue("op") // inc / dec / set
+	op := r.FormValue("op")
 	qtyStr := r.FormValue("qty")
 	cart := readCart(r)
-	// expand aggregated modifications re-creando lista
+
 	agg := map[string]int{}
 	for _, it := range cart.Items {
 		if it.Qty > 0 {
@@ -779,7 +822,7 @@ func (s *Server) handleCartUpdate(w http.ResponseWriter, r *http.Request) {
 		cur = 0
 	}
 	agg[key] = cur
-	// rebuild
+
 	newCart := cartPayload{}
 	for k, q := range agg {
 		if q <= 0 {
@@ -788,7 +831,7 @@ func (s *Server) handleCartUpdate(w http.ResponseWriter, r *http.Request) {
 		parts := strings.SplitN(k, "|", 2)
 		newCart.Items = append(newCart.Items, cartItem{Slug: parts[0], Color: parts[1], Qty: q})
 	}
-	// need prices refreshed
+
 	for i := range newCart.Items {
 		p, _ := s.products.GetBySlug(r.Context(), newCart.Items[i].Slug)
 		if p != nil {
@@ -844,10 +887,10 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 	if shippingMethod == "" {
 		shippingMethod = "retiro"
 	}
-	// nuevas variantes de dirección por método
+
 	addrEnvio := r.FormValue("address_envio")
 	addrCadete := r.FormValue("address_cadete")
-	legacyAddr := r.FormValue("address") // fallback si hubiera formularios viejos en cache
+	legacyAddr := r.FormValue("address")
 	province := r.FormValue("province")
 	address := ""
 	switch shippingMethod {
@@ -858,7 +901,7 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 	default:
 		address = legacyAddr
 	}
-	// Validaciones específicas por método
+
 	if shippingMethod == "envio" {
 		if province == "" || address == "" || postal == "" || dni == "" || phone == "" {
 			http.Redirect(w, r, "/cart?err=envio", 302)
@@ -870,12 +913,12 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/cart?err=formato", 302)
 			return
 		}
-	} else if shippingMethod == "cadete" { // método local
+	} else if shippingMethod == "cadete" {
 		if address == "" || phone == "" {
 			http.Redirect(w, r, "/cart?err=cadete", 302)
 			return
 		}
-		if province == "" { // fijar provincia default
+		if province == "" {
 			province = "Santa Fe"
 		}
 	}
@@ -960,7 +1003,7 @@ func (s *Server) handlePaySimulated(w http.ResponseWriter, r *http.Request) {
 	if status == "approved" {
 		success = true
 	}
-	if status != "" { // hubo callback real
+	if status != "" {
 		if success {
 			o.MPStatus = "approved"
 			o.Status = domain.OrderStatusFinished
@@ -990,13 +1033,12 @@ func (s *Server) handlePaySimulated(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "pay.html", data)
 }
 
-// ---------- Helpers ----------
 func (s *Server) render(w http.ResponseWriter, name string, data any) {
 	if m, ok := data.(map[string]any); ok {
 		if _, exists := m["Year"]; !exists {
 			m["Year"] = time.Now().Year()
 		}
-		if _, exists := m["User"]; !exists { // inyectar usuario
+		if _, exists := m["User"]; !exists {
 			if u := readUserSession(w, nil); u != nil {
 				m["User"] = u
 			}
@@ -1060,7 +1102,6 @@ func writeCart(w http.ResponseWriter, cp cartPayload) {
 	http.SetCookie(w, &http.Cookie{Name: "cart", Value: val, Path: "/", MaxAge: 60 * 60 * 24 * 7, HttpOnly: true})
 }
 
-// apiProductUpload maneja creación de producto + imágenes (multipart/form-data)
 func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 	if !s.requireAdmin(w, r) {
 		return
@@ -1069,14 +1110,14 @@ func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method", 405)
 		return
 	}
-	// límite memoria para cabeceras, archivos se almacenan en temp
-	if err := r.ParseMultipartForm(25 << 20); err != nil { // 25MB
+
+	if err := r.ParseMultipartForm(25 << 20); err != nil {
 		http.Error(w, "multipart", 400)
 		return
 	}
 	existingSlug := strings.TrimSpace(r.FormValue("existing_slug"))
 	var p *domain.Product
-	if existingSlug != "" { // añadir imágenes a producto existente
+	if existingSlug != "" {
 		if prod, err := s.products.GetBySlug(r.Context(), existingSlug); err == nil {
 			p = prod
 		} else {
@@ -1084,7 +1125,7 @@ func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if p == nil { // creación nueva con dimensiones
+	if p == nil {
 		name := strings.TrimSpace(r.FormValue("name"))
 		if name == "" {
 			http.Error(w, "name", 400)
@@ -1117,7 +1158,7 @@ func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// procesar archivos (image o images)
+
 	files := []*multipart.FileHeader{}
 	if r.MultipartForm != nil {
 		if fhArr, ok := r.MultipartForm.File["image"]; ok {
@@ -1162,20 +1203,18 @@ func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 201, map[string]any{"product": p, "added_images": len(imgs)})
 }
 
-// --- Admin vistas nuevas ---
 func (s *Server) handleAdminProducts(w http.ResponseWriter, r *http.Request) {
 	if !s.isAdminSession(r) {
 		http.Redirect(w, r, "/admin/auth", 302)
 		return
 	}
 	list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 200})
-	// incluir token para JS
+
 	tok := s.readAdminToken(r)
 	data := map[string]any{"Products": list, "Total": total, "AdminToken": tok}
 	s.render(w, "admin_products.html", data)
 }
 
-// reemplazar template faltante admin_orders.html
 func (s *Server) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
 	if !s.isAdminSession(r) {
 		http.Redirect(w, r, "/admin/auth", 302)
@@ -1187,7 +1226,7 @@ func (s *Server) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
 	}
 	var mpStatus *string
 	filterApproved := false
-	if r.URL.Query().Get("approved") == "1" { // checkbox activado
+	if r.URL.Query().Get("approved") == "1" {
 		st := "approved"
 		mpStatus = &st
 		filterApproved = true
@@ -1202,7 +1241,6 @@ func (s *Server) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "admin_orders.html", data)
 }
 
-// NUEVO: Reporte de ventas
 func (s *Server) handleAdminSales(w http.ResponseWriter, r *http.Request) {
 	if !s.isAdminSession(r) {
 		http.Redirect(w, r, "/admin/auth", 302)
@@ -1210,7 +1248,7 @@ func (s *Server) handleAdminSales(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	layout := "admin_sales.html"
-	// rango de fechas (por defecto últimos 30 días)
+
 	const layoutIn = "2006-01-02"
 	var (
 		to   time.Time
@@ -1242,15 +1280,14 @@ func (s *Server) handleAdminSales(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "err", 500)
 		return
 	}
-	// NUEVO: solo considerar órdenes aprobadas por MP
+
 	orders := make([]domain.Order, 0, len(ordersAll))
 	for _, o := range ordersAll {
-		if strings.EqualFold(o.MPStatus, "approved") { // considerar sólo aprobadas
+		if strings.EqualFold(o.MPStatus, "approved") {
 			orders = append(orders, o)
 		}
 	}
 
-	// Agregados (solo aprobadas)
 	var totalRevenue, shippingRevenue float64
 	statusCounts := map[string]int{}
 	mpStatusCounts := map[string]int{}
@@ -1302,7 +1339,7 @@ func (s *Server) handleAdminSales(w http.ResponseWriter, r *http.Request) {
 	if len(orders) > 0 {
 		avgOrderValue = totalRevenue / float64(len(orders))
 	}
-	// ordenar top productos
+
 	prodList := make([]struct {
 		Title   string
 		Qty     int
@@ -1320,7 +1357,7 @@ func (s *Server) handleAdminSales(w http.ResponseWriter, r *http.Request) {
 	if len(prodList) > 25 {
 		prodList = prodList[:25]
 	}
-	// ordenar días cronológicamente
+
 	dayKeys := make([]string, 0, len(dayRevenue))
 	for k := range dayRevenue {
 		dayKeys = append(dayKeys, k)
@@ -1340,7 +1377,7 @@ func (s *Server) handleAdminSales(w http.ResponseWriter, r *http.Request) {
 		}{Day: k, Revenue: v.Revenue, Orders: v.Orders})
 	}
 
-	if strings.ToLower(q.Get("format")) == "csv" { // export solo aprobadas
+	if strings.ToLower(q.Get("format")) == "csv" {
 		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=ventas_%s_%s.csv", from.Format(layoutIn), to.Format(layoutIn)))
 		fmt.Fprintln(w, "order_id,created_at,status,mp_status,total,shipping_method,shipping_cost,province")
@@ -1366,7 +1403,7 @@ func (s *Server) handleAdminSales(w http.ResponseWriter, r *http.Request) {
 		"DailySeries":          daySeries,
 		"AdminToken":           s.readAdminToken(r),
 	}
-	// inyectar para layout nav etc
+
 	s.render(w, layout, data)
 }
 
@@ -1410,12 +1447,12 @@ func (s *Server) handleAdminAuth(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		tok, _, err := s.issueAdminToken(email, 12*time.Hour)
+		tok, _, err := s.issueAdminToken(email, 6*time.Hour)
 		if err != nil {
 			http.Error(w, "token", 500)
 			return
 		}
-		http.SetCookie(w, &http.Cookie{Name: "admin_token", Value: tok, Path: "/", MaxAge: 60 * 60 * 12})
+		http.SetCookie(w, &http.Cookie{Name: "admin_token", Value: tok, Path: "/", MaxAge: 60 * 60 * 6, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
 		http.Redirect(w, r, "/admin/products", 302)
 		return
 	}
@@ -1423,7 +1460,7 @@ func (s *Server) handleAdminAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAdminLogout(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{Name: "admin_token", Value: "", Path: "/", MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: "admin_token", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
 	http.Redirect(w, r, "/admin/auth", 302)
 }
 
@@ -1452,7 +1489,7 @@ func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
 			return true
 		}
 	}
-	// fallback cookie
+
 	if tok := s.readAdminToken(r); tok != "" {
 		if _, err := s.verifyAdminToken(tok); err == nil {
 			return true
@@ -1559,15 +1596,14 @@ func sendOrderNotify(o *domain.Order, success bool) {
 	}
 }
 
-// sesiones usuario (Google OAuth)
 type sessionUser struct {
 	Email string `json:"email"`
 	Name  string `json:"name"`
 }
 
 func writeUserSession(w http.ResponseWriter, u *sessionUser) {
-	if u == nil { // clear
-		http.SetCookie(w, &http.Cookie{Name: "sess", Value: "", Path: "/", MaxAge: -1, HttpOnly: true})
+	if u == nil {
+		http.SetCookie(w, &http.Cookie{Name: "sess", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
 		return
 	}
 	b, _ := json.Marshal(u)
@@ -1575,7 +1611,8 @@ func writeUserSession(w http.ResponseWriter, u *sessionUser) {
 	h.Write(b)
 	sig := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
 	val := sig + "." + base64.RawURLEncoding.EncodeToString(b)
-	http.SetCookie(w, &http.Cookie{Name: "sess", Value: val, Path: "/", MaxAge: 60 * 60 * 24 * 30, HttpOnly: true})
+
+	http.SetCookie(w, &http.Cookie{Name: "sess", Value: val, Path: "/", MaxAge: 60 * 60 * 24 * 7, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
 }
 
 func readUserSession(w http.ResponseWriter, r *http.Request) *sessionUser {
@@ -1671,7 +1708,6 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", 302)
 }
 
-// --- Admin Auth (legacy API key + email whitelist) ---
 func (s *Server) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method", 405)

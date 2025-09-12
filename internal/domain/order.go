@@ -35,7 +35,7 @@ type Order struct {
 	ShippingMethod string  `gorm:"size:30"`
 	ShippingCost   float64 `gorm:"type:decimal(12,2)"`
 	Notified       bool    `gorm:"not null;default:false"`
-	// GORM timestamps
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

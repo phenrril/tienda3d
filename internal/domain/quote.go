@@ -14,7 +14,6 @@ const (
 	QualityHigh     PrintQuality = "quality"
 )
 
-// Quote representa una cotización calculada.
 type Quote struct {
 	ID              uuid.UUID    `gorm:"type:uuid;primaryKey"`
 	UploadedModelID uuid.UUID    `gorm:"type:uuid;index"`
@@ -28,7 +27,6 @@ type Quote struct {
 	CreatedAt       time.Time
 }
 
-// QuoteConfig parámetros para recalcular.
 type QuoteConfig struct {
 	Material      Material
 	LayerHeightMM float64

@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// UploadedModel archivo subido (STL/3MF) pendiente o usado en cotizaciones.
 type UploadedModel struct {
 	ID               uuid.UUID `gorm:"type:uuid;primaryKey"`
 	OwnerEmail       string    `gorm:"size:140"`
