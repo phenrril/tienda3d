@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -89,7 +90,7 @@ func (r *OrderRepo) UpdateStatus(ctx context.Context, id uuid.UUID, st domain.Or
 	return r.db.WithContext(ctx).Model(&domain.Order{}).Where("id = ?", id).Update("status", st).Error
 }
 
-func (r *OrderRepo) List(ctx context.Context, status *domain.OrderStatus, page, pageSize int) ([]domain.Order, int64, error) {
+func (r *OrderRepo) List(ctx context.Context, status *domain.OrderStatus, mpStatus *string, page, pageSize int) ([]domain.Order, int64, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -100,6 +101,9 @@ func (r *OrderRepo) List(ctx context.Context, status *domain.OrderStatus, page, 
 	if status != nil {
 		q = q.Where("status = ?", *status)
 	}
+	if mpStatus != nil && *mpStatus != "" {
+		q = q.Where("mp_status = ?", *mpStatus)
+	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -109,4 +113,19 @@ func (r *OrderRepo) List(ctx context.Context, status *domain.OrderStatus, page, 
 		return nil, 0, err
 	}
 	return list, total, nil
+}
+
+func (r *OrderRepo) ListInRange(ctx context.Context, from, to time.Time) ([]domain.Order, error) {
+	// NUEVO: trae todas las órdenes (sin paginar) entre from y to (inclusive), precargando items
+	if to.Before(from) {
+		from, to = to, from
+	}
+	// normalizar a límites (from 00:00:00, to 23:59:59.999)
+	from = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location())
+	to = time.Date(to.Year(), to.Month(), to.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), to.Location())
+	var list []domain.Order
+	if err := r.db.WithContext(ctx).Where("created_at BETWEEN ? AND ?", from, to).Order("created_at asc").Preload("Items").Find(&list).Error; err != nil {
+		return nil, err
+	}
+	return list, nil
 }

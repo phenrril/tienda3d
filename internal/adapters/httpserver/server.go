@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sort" // NUEVO para ordenar top productos y días
 	"strconv"
 	"strings"
 	"time"
@@ -108,6 +109,8 @@ func (s *Server) routes() {
 	// Admin vistas
 	s.mux.HandleFunc("/admin/orders", s.handleAdminOrders)
 	s.mux.HandleFunc("/admin/products", s.handleAdminProducts)
+	// NUEVO reporte ventas
+	s.mux.HandleFunc("/admin/sales", s.handleAdminSales)
 }
 
 // ---------- SSR Handlers ----------
@@ -1182,14 +1185,189 @@ func (s *Server) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
 	if p, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && p > 0 {
 		page = p
 	}
-	list, total, err := s.orders.Orders.List(r.Context(), nil, page, 20)
+	var mpStatus *string
+	filterApproved := false
+	if r.URL.Query().Get("approved") == "1" { // checkbox activado
+		st := "approved"
+		mpStatus = &st
+		filterApproved = true
+	}
+	list, total, err := s.orders.Orders.List(r.Context(), nil, mpStatus, page, 20)
 	if err != nil {
 		http.Error(w, "err", 500)
 		return
 	}
 	pages := (int(total) + 19) / 20
-	data := map[string]any{"Orders": list, "Page": page, "Pages": pages, "AdminToken": s.readAdminToken(r)}
+	data := map[string]any{"Orders": list, "Page": page, "Pages": pages, "AdminToken": s.readAdminToken(r), "FilterApproved": filterApproved}
 	s.render(w, "admin_orders.html", data)
+}
+
+// NUEVO: Reporte de ventas
+func (s *Server) handleAdminSales(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", 302)
+		return
+	}
+	q := r.URL.Query()
+	layout := "admin_sales.html"
+	// rango de fechas (por defecto últimos 30 días)
+	const layoutIn = "2006-01-02"
+	var (
+		to   time.Time
+		from time.Time
+		err  error
+	)
+	if ds := q.Get("to"); ds != "" {
+		to, err = time.Parse(layoutIn, ds)
+		if err != nil {
+			to = time.Now()
+		}
+	} else {
+		to = time.Now()
+	}
+	if ds := q.Get("from"); ds != "" {
+		from, err = time.Parse(layoutIn, ds)
+		if err != nil {
+			from = to.AddDate(0, 0, -29)
+		}
+	} else {
+		from = to.AddDate(0, 0, -29)
+	}
+	if from.After(to) {
+		from, to = to, from
+	}
+
+	ordersAll, err := s.orders.Orders.ListInRange(r.Context(), from, to)
+	if err != nil {
+		http.Error(w, "err", 500)
+		return
+	}
+	// NUEVO: solo considerar órdenes aprobadas por MP
+	orders := make([]domain.Order, 0, len(ordersAll))
+	for _, o := range ordersAll {
+		if strings.EqualFold(o.MPStatus, "approved") { // considerar sólo aprobadas
+			orders = append(orders, o)
+		}
+	}
+
+	// Agregados (solo aprobadas)
+	var totalRevenue, shippingRevenue float64
+	statusCounts := map[string]int{}
+	mpStatusCounts := map[string]int{}
+	shippingMethodCounts := map[string]int{}
+	provinceCounts := map[string]int{}
+	itemsRevenue := 0.0
+	productAgg := map[string]struct {
+		Title   string
+		Qty     int
+		Revenue float64
+	}{}
+	dayRevenue := map[string]struct {
+		Revenue float64
+		Orders  int
+	}{}
+
+	for _, o := range orders {
+		totalRevenue += o.Total
+		shippingRevenue += o.ShippingCost
+		statusCounts[string(o.Status)]++
+		if o.MPStatus != "" {
+			mpStatusCounts[o.MPStatus]++
+		}
+		if o.ShippingMethod != "" {
+			shippingMethodCounts[o.ShippingMethod]++
+		}
+		if o.Province != "" {
+			provinceCounts[o.Province]++
+		}
+		dayKey := o.CreatedAt.Format("2006-01-02")
+		dr := dayRevenue[dayKey]
+		dr.Revenue += o.Total
+		dr.Orders++
+		dayRevenue[dayKey] = dr
+		lineItems := 0.0
+		for _, it := range o.Items {
+			lineRev := it.UnitPrice * float64(it.Qty)
+			lineItems += lineRev
+			key := it.Title
+			cur := productAgg[key]
+			cur.Title = it.Title
+			cur.Qty += it.Qty
+			cur.Revenue += lineRev
+			productAgg[key] = cur
+		}
+		itemsRevenue += lineItems
+	}
+	avgOrderValue := 0.0
+	if len(orders) > 0 {
+		avgOrderValue = totalRevenue / float64(len(orders))
+	}
+	// ordenar top productos
+	prodList := make([]struct {
+		Title   string
+		Qty     int
+		Revenue float64
+	}, 0, len(productAgg))
+	for _, v := range productAgg {
+		prodList = append(prodList, v)
+	}
+	sort.Slice(prodList, func(i, j int) bool {
+		if prodList[i].Qty == prodList[j].Qty {
+			return prodList[i].Revenue > prodList[j].Revenue
+		}
+		return prodList[i].Qty > prodList[j].Qty
+	})
+	if len(prodList) > 25 {
+		prodList = prodList[:25]
+	}
+	// ordenar días cronológicamente
+	dayKeys := make([]string, 0, len(dayRevenue))
+	for k := range dayRevenue {
+		dayKeys = append(dayKeys, k)
+	}
+	sort.Strings(dayKeys)
+	daySeries := []struct {
+		Day     string
+		Revenue float64
+		Orders  int
+	}{}
+	for _, k := range dayKeys {
+		v := dayRevenue[k]
+		daySeries = append(daySeries, struct {
+			Day     string
+			Revenue float64
+			Orders  int
+		}{Day: k, Revenue: v.Revenue, Orders: v.Orders})
+	}
+
+	if strings.ToLower(q.Get("format")) == "csv" { // export solo aprobadas
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=ventas_%s_%s.csv", from.Format(layoutIn), to.Format(layoutIn)))
+		fmt.Fprintln(w, "order_id,created_at,status,mp_status,total,shipping_method,shipping_cost,province")
+		for _, o := range orders {
+			fmt.Fprintf(w, "%s,%s,%s,%s,%.2f,%s,%.2f,%s\n", o.ID, o.CreatedAt.Format(time.RFC3339), o.Status, o.MPStatus, o.Total, o.ShippingMethod, o.ShippingCost, strings.ReplaceAll(o.Province, ",", " "))
+		}
+		return
+	}
+
+	data := map[string]any{
+		"From":                 from.Format(layoutIn),
+		"To":                   to.Format(layoutIn),
+		"OrdersCount":          len(orders),
+		"TotalRevenue":         totalRevenue,
+		"ItemsRevenue":         itemsRevenue,
+		"ShippingRevenue":      shippingRevenue,
+		"AvgOrderValue":        avgOrderValue,
+		"StatusCounts":         statusCounts,
+		"MPStatusCounts":       mpStatusCounts,
+		"ShippingMethodCounts": shippingMethodCounts,
+		"ProvinceCounts":       provinceCounts,
+		"TopProducts":          prodList,
+		"DailySeries":          daySeries,
+		"AdminToken":           s.readAdminToken(r),
+	}
+	// inyectar para layout nav etc
+	s.render(w, layout, data)
 }
 
 func (s *Server) handleAdminAuth(w http.ResponseWriter, r *http.Request) {
