@@ -841,19 +841,39 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 	if shippingMethod == "" {
 		shippingMethod = "retiro"
 	}
-	address := r.FormValue("address")
+	// nuevas variantes de dirección por método
+	addrEnvio := r.FormValue("address_envio")
+	addrCadete := r.FormValue("address_cadete")
+	legacyAddr := r.FormValue("address") // fallback si hubiera formularios viejos en cache
 	province := r.FormValue("province")
+	address := ""
+	switch shippingMethod {
+	case "envio":
+		address = addrEnvio
+	case "cadete":
+		address = addrCadete
+	default:
+		address = legacyAddr
+	}
+	// Validaciones específicas por método
 	if shippingMethod == "envio" {
 		if province == "" || address == "" || postal == "" || dni == "" || phone == "" {
 			http.Redirect(w, r, "/cart?err=envio", 302)
 			return
 		}
-		// validar DNI (7-8 dígitos) y CP (4 o 5 dígitos)
 		dniRe := regexp.MustCompile(`^\d{7,8}$`)
 		pcRe := regexp.MustCompile(`^\d{4,5}$`)
 		if !dniRe.MatchString(dni) || !pcRe.MatchString(postal) {
 			http.Redirect(w, r, "/cart?err=formato", 302)
 			return
+		}
+	} else if shippingMethod == "cadete" { // método local
+		if address == "" || phone == "" {
+			http.Redirect(w, r, "/cart?err=cadete", 302)
+			return
+		}
+		if province == "" { // fijar provincia default
+			province = "Santa Fe"
 		}
 	}
 	cp := readCart(r)
@@ -888,6 +908,16 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 			address = "(sin dirección)"
 		}
 		o.Address = address
+		o.Province = province
+	} else if shippingMethod == "cadete" {
+		shippingCost = 5000
+		if address == "" {
+			address = "(sin dirección)"
+		}
+		o.Address = address
+		if province == "" {
+			province = "Santa Fe"
+		}
 		o.Province = province
 	}
 	o.ShippingCost = shippingCost
@@ -1280,8 +1310,8 @@ func sendOrderEmail(o *domain.Order, success bool) error {
 	_, _ = fmt.Fprintf(&buf, "Estado: %s\n", statusTxt)
 	_, _ = fmt.Fprintf(&buf, "Orden: %s\n", o.ID)
 	_, _ = fmt.Fprintf(&buf, "Nombre: %s\nEmail: %s\nTel: %s\nDNI: %s\n", o.Name, o.Email, o.Phone, o.DNI)
-	if o.ShippingMethod == "envio" {
-		_, _ = fmt.Fprintf(&buf, "Envío a: %s (%s, %s) CP:%s\n", o.Address, o.Province, o.ShippingMethod, o.PostalCode)
+	if o.ShippingMethod == "envio" || o.ShippingMethod == "cadete" {
+		_, _ = fmt.Fprintf(&buf, "Envío (%s) a: %s (%s) CP:%s\n", o.ShippingMethod, o.Address, o.Province, o.PostalCode)
 	} else {
 		buf.WriteString("Retiro en local\n")
 	}
@@ -1315,8 +1345,8 @@ func sendOrderTelegram(o *domain.Order, success bool) error {
 	b.WriteString(statusTxt)
 	b.WriteString("\n")
 	fmt.Fprintf(&b, "Nombre: %s\nEmail: %s\nTel: %s\nDNI: %s\n", o.Name, o.Email, o.Phone, o.DNI)
-	if o.ShippingMethod == "envio" {
-		fmt.Fprintf(&b, "Envío a: %s (%s %s) CP:%s\n", o.Address, o.Province, o.ShippingMethod, o.PostalCode)
+	if o.ShippingMethod == "envio" || o.ShippingMethod == "cadete" {
+		fmt.Fprintf(&b, "Envío (%s) a: %s (%s %s) CP:%s\n", o.ShippingMethod, o.Address, o.Province, o.ShippingMethod, o.PostalCode)
 	} else {
 		b.WriteString("Retiro en local\n")
 	}

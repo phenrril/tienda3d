@@ -9,9 +9,9 @@
     <div><strong>Email:</strong> {{.Order.Email}}</div>
     <div><strong>Teléfono:</strong> {{.Order.Phone}}</div>
     <div><strong>DNI:</strong> {{.Order.DNI}}</div>
-    <div><strong>Método:</strong> {{if eq .Order.ShippingMethod "envio"}}Envío{{else}}Retiro{{end}}</div>
-    {{if eq .Order.ShippingMethod "envio"}}
-      <div><strong>Dirección:</strong> {{.Order.Address}} ({{.Order.PostalCode}} – {{.Order.Province}})</div>
+    <div><strong>Método:</strong> {{if eq .Order.ShippingMethod "envio"}}Envío{{else if eq .Order.ShippingMethod "cadete"}}Cadete (Rosario){{else}}Retiro{{end}}</div>
+    {{if or (eq .Order.ShippingMethod "envio") (eq .Order.ShippingMethod "cadete") }}
+      <div><strong>Dirección:</strong> {{.Order.Address}} {{if .Order.PostalCode}}({{.Order.PostalCode}} – {{.Order.Province}}){{end}}</div>
       <div><strong>Costo envío:</strong> ${{printf "%.2f" .Order.ShippingCost}}</div>
     {{end}}
     <div><strong>Total:</strong> ${{printf "%.2f" .Order.Total}}</div>
