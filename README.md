@@ -13,6 +13,8 @@ Permitir la carga, visualización y compra de productos impresos en 3D, con inte
 - Endpoint multipart `POST /api/products/upload` para crear producto + múltiples imágenes en una sola request.
 - Eliminación completa de producto (DELETE `/api/products/{slug}`) borra registros + archivos físicos en `uploads/`.
 - Borrado masivo simple (`POST /api/products/delete`).
+- Autenticación Admin con JWT (login por API key + lista de emails permitidos) protegiendo endpoints de gestión.
+- Endpoint admin paginado de órdenes `GET /admin/orders`.
 - Al subir imágenes se guardan en `uploads/images/...` (storage local) y se sirven vía `/uploads/...`.
 - Integración opcional: OAuth Google (si se configuran las variables), notificaciones a Telegram y/o email (SMTP).
 - Docker Compose parametrizado por `.env` (sin secretos en el YAML).
@@ -25,6 +27,7 @@ Permitir la carga, visualización y compra de productos impresos en 3D, con inte
 - **Storage local**: archivos en carpeta configurable (`STORAGE_DIR`, por defecto `uploads`).
 - **Notificaciones**: Telegram y opcional email (SMTP) tras pago aprobado.
 - **OAuth Google**: login rápido (opcional).
+- **Admin JWT**: gestión segura de productos y órdenes.
 
 ```
 /cmd/tienda3d          # main real
@@ -37,11 +40,27 @@ Permitir la carga, visualización y compra de productos impresos en 3D, con inte
 /uploads               # imágenes subidas (dinámicas)
 ```
 
+## Autenticación Admin (JWT)
+Requiere definir:
+- `ADMIN_API_KEY`: clave secreta que se envía en el login.
+- `ADMIN_ALLOWED_EMAILS`: lista separada por coma de emails autorizados (si se envía email en login se valida pertenezca).
+- `JWT_ADMIN_SECRET` (opcional; si falta se usa `SECRET_KEY`).
+
+Flujo:
+1. `POST /admin/login` con header `X-Admin-Key: <ADMIN_API_KEY>` y opcional body `{ "email": "permitido@example.com" }`.
+2. Respuesta contiene `{ token, exp, email }`.
+3. Usar `Authorization: Bearer <token>` en llamadas a endpoints protegidos.
+4. Expiración típica: 30 minutos (renovar con nuevo login).
+
+Endpoints protegidos actuales: creación/listado/detalle/borrado de productos, upload multipart, borrado masivo y listado de órdenes `/admin/orders`.
+
 ## Variables de entorno (completas)
 Obligatorias mínimas para entorno local:
 - `DB_DSN` cadena Postgres (si usás docker compose se arma con variables POSTGRES_*)
 - `SESSION_KEY` clave aleatoria segura (firmar cookies)
 - `MP_ACCESS_TOKEN` token MercadoPago (TEST-... o prod)
+- `ADMIN_API_KEY` (para login admin)
+- `ADMIN_ALLOWED_EMAILS` (al menos un email, p.ej. tu correo)
 
 Recomendadas / adicionales:
 - `PORT` (default 8080)
@@ -50,6 +69,7 @@ Recomendadas / adicionales:
 - `PUBLIC_BASE_URL` URL pública (para back_urls y webhooks de MP)
 - `BASE_URL` (usado también para OAuth Google)
 - `SECRET_KEY` firma del external_reference MP (fallback "dev")
+- `JWT_ADMIN_SECRET` secreto dedicado para firmar JWT admin (si no, usa `SECRET_KEY`)
 - `STORAGE_DIR` carpeta para archivos subidos (default `uploads`)
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `ORDER_NOTIFY_EMAIL` (notificación email)
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` (notificación Telegram)
@@ -76,6 +96,9 @@ PUBLIC_BASE_URL=http://localhost:8080
 BASE_URL=http://localhost:8080
 STORAGE_DIR=uploads
 SECRET_KEY=sign_ref_key
+ADMIN_API_KEY=super_admin_key
+ADMIN_ALLOWED_EMAILS=tuemail@example.com
+JWT_ADMIN_SECRET=jwt_admin_secret
 SMTP_HOST=
 SMTP_PORT=587
 SMTP_USER=
@@ -96,7 +119,7 @@ Asegurate de crear `.env` a partir de `.env.example` antes de levantar.
 
 ## Flujos principales
 ### 1. Carga de productos
-Opción recomendada: `POST /api/products/upload` (multipart) con uno o más campos `image` / `images`. El backend guarda cada archivo en `uploads/images/<timestamp>-<filename>` y registra las rutas.
+Opción recomendada: `POST /api/products/upload` (multipart) con uno o más campos `image` / `images`. El backend guarda cada archivo en `uploads/images/<timestamp>-<filename>` y registra las rutas. Requiere Bearer token admin.
 
 ### 2. Visualización
 - `/products` listado con filtros.
@@ -112,19 +135,27 @@ Opción recomendada: `POST /api/products/upload` (multipart) con uno o más camp
 - Página de estado `/pay/{orderID}` se usa como success/pending/failure.
 
 ### 5. Eliminación de productos
-- `DELETE /api/products/{slug}` elimina DB + archivos.
-- `POST /api/products/delete` borrado masivo simple (no borra archivos físicos).
+- `DELETE /api/products/{slug}` elimina DB + archivos (Bearer admin).
+- `POST /api/products/delete` borrado masivo simple (Bearer admin) (no borra archivos físicos).
+
+### 6. Órdenes (Admin)
+- `GET /admin/orders` listado paginado de órdenes (Bearer admin). Útil para ver estado después de webhooks.
 
 ## Endpoints principales
-Web: `/`, `/products`, `/product/{slug}`, `/cart`, `/checkout`, `/pay/{id}`
-API: 
+Web (SSR): `/`, `/products`, `/product/{slug}`, `/cart`, `/checkout`, `/pay/{id}`
+
+Admin / protegidos (Bearer):
+- `POST /admin/login` (obtención token)
+- `GET /admin/orders`
 - `POST /api/products/upload`
 - `POST /api/products`
 - `GET /api/products`
 - `GET /api/products/{slug}`
 - `DELETE /api/products/{slug}`
 - `POST /api/products/delete`
-- `POST /api/quote` (cotización desde modelo subido)
+
+Públicos:
+- `POST /api/quote`
 - `POST /api/checkout`
 - `POST /webhooks/mp`
 
@@ -140,11 +171,12 @@ docker compose up -d --build
 ```
 
 ## Pruebas manuales rápidas
-1. Subir un producto (ver `carga.md`).
-2. Ver en `/products`.
-3. Agregar al carrito, cambiar cantidades.
-4. Simular pago (usar token TEST) -> redirección a MP sandbox -> completar -> volver a `/pay/{id}`.
-5. Ver logs para confirmar webhook.
+1. Login admin (`POST /admin/login`).
+2. Subir un producto (ver `carga.md`).
+3. Ver en `/products`.
+4. Agregar al carrito, cambiar cantidades.
+5. Simular pago (token TEST) -> MP sandbox -> volver a `/pay/{id}`.
+6. Ver `/admin/orders` para confirmar estado y logs para webhook.
 
 ## Notas
 - No se crean productos demo automáticamente.
@@ -152,6 +184,7 @@ docker compose up -d --build
 - El slug se recalcula si faltaba (backfill en migración).
 - Color picker: si no hay variantes, se muestran colores por defecto.
 - Para producción: configurar `APP_ENV=production`, `PROD_ACCESS_TOKEN`, dominio HTTPS en `PUBLIC_BASE_URL`.
+- JWT admin expira (≈30 min); re-logear para nuevo token.
 
 ---
 Ver `carga.md` para detalles de carga y ejemplos curl.
