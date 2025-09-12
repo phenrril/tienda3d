@@ -399,6 +399,8 @@ body.nav-open{overflow:hidden}
 .dropzone:hover{border-color:var(--accent);background:#162636;box-shadow:0 4px 20px -6px rgba(99,102,241,.35)}
 .dropzone.drag{border-color:var(--accent);background:#1d2f40}
 .dropzone input{display:none}
+.dropzone.small{border-radius:16px}
+.dropzone.small .dz-hint{font-size:12px}
 
 .preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-top:6px}
 .preview-grid img{width:100%;height:70px;object-fit:cover;border-radius:10px;border:1px solid #223140;background:#0f1822}
@@ -417,3 +419,11 @@ body.nav-open{overflow:hidden}
   .admin-card{padding:20px 16px 24px;border-radius:20px}
   .form-row-2{grid-template-columns:1fr}
 }
+
+/* Estilos adicionales para badges de modo */
+.mode-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.6px;padding:6px 10px;border-radius:999px;background:#1e293b;color:#cbd5e1;border:1px solid #334155;text-transform:uppercase}
+.mode-badge.create{background:#1e3a8a;color:#bfdbfe;border-color:#1d4ed8}
+.mode-badge.edit{background:#78350f;color:#fde68a;border-color:#b45309}
+
+/* Estilos para vista previa de dropzone */
+.dz-preview{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}

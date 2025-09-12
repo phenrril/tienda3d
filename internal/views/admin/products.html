@@ -2,56 +2,69 @@
 {{template "layout_start" .}}
 <h1>Productos</h1>
 <nav class="admin-nav"><a href="/admin/products" class="active">Productos</a> | <a href="/admin/orders">Órdenes</a> | <a href="/admin/logout">Salir</a></nav>
-<section class="grid" style="margin-top:1rem;grid-template-columns:1fr 1fr;gap:2rem">
-  <div>
-    <h2>Crear / Editar</h2>
-    <form id="prodForm" class="form-card">
+<section class="grid" style="margin-top:1rem;grid-template-columns:420px 1fr;gap:2rem;align-items:start">
+  <div class="admin-card" style="padding:18px 20px 24px">
+    <div class="row between center" style="margin-bottom:6px">
+      <h2 style="margin:0;font-size:18px">Gestión de producto</h2>
+      <span id="formMode" class="mode-badge create">Creación</span>
+    </div>
+    <form id="prodForm" class="form-card" autocomplete="off">
       <input type="hidden" name="slug" id="pfSlug" />
-      <label>Nombre<input type="text" name="name" id="pfName" required /></label>
-      <label>Categoría<input type="text" name="category" id="pfCategory" /></label>
-      <label>Descripción corta<textarea name="short_desc" id="pfShort"></textarea></label>
+      <label>Nombre<input type="text" name="name" id="pfName" required placeholder="Nombre visible" /></label>
+      <label>Categoría<input type="text" name="category" id="pfCategory" placeholder="(opcional)" /></label>
+      <label>Descripción corta<textarea name="short_desc" id="pfShort" placeholder="Resumen / marketing"></textarea></label>
       <div class="row" style="gap:.5rem">
-        <label style="flex:1">Ancho (mm)<input type="number" step="0.1" min="0" id="pfWidth" /></label>
-        <label style="flex:1">Alto (mm)<input type="number" step="0.1" min="0" id="pfHeight" /></label>
-        <label style="flex:1">Profundidad (mm)<input type="number" step="0.1" min="0" id="pfDepth" /></label>
+        <label style="flex:1">Ancho (mm)<input type="number" step="0.1" min="0" id="pfWidth" placeholder="0" /></label>
+        <label style="flex:1">Alto (mm)<input type="number" step="0.1" min="0" id="pfHeight" placeholder="0" /></label>
+        <label style="flex:1">Profundidad (mm)<input type="number" step="0.1" min="0" id="pfDepth" placeholder="0" /></label>
       </div>
-      <label>Precio base<input type="number" step="0.01" min="0" name="base_price" id="pfPrice" required /></label>
+      <label>Precio base<input type="number" step="0.01" min="0" name="base_price" id="pfPrice" required placeholder="0.00" /></label>
       <label class="row center" style="gap:.5rem"><input type="checkbox" name="ready_to_ship" id="pfReady" /> Listo para envío</label>
-      <div class="row" style="gap:.5rem">
-        <button class="btn-primary" type="submit" id="pfSubmit">Guardar</button>
-        <button class="btn-secondary" type="button" id="pfReset">Limpiar</button>
+      <div class="uploader-block">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;letter-spacing:.6px;color:var(--muted);text-transform:uppercase">Imágenes (opcional / arrastrar)
+          <div id="dropZone" class="dropzone small" style="padding:18px 14px">
+            <input type="file" multiple accept="image/*" id="pfImages" />
+            <span class="dz-hint">Soltá aquí o hacé click para seleccionar</span>
+            <small class="dz-count" style="display:block;margin-top:4px;color:var(--muted)">0 archivos</small>
+            <div id="preview" class="dz-preview"></div>
+          </div>
+        </label>
+      </div>
+      <div class="inline-btns" style="margin-top:4px">
+        <button class="btn-primary" type="submit" id="pfSubmit">Crear</button>
+        <button class="btn-secondary" type="button" id="pfReset">Nuevo</button>
         <button class="btn-danger" type="button" id="pfDelete" style="display:none">Eliminar</button>
       </div>
     </form>
-    <h3>Subir imágenes</h3>
-    <form id="uploadForm" class="form-card" enctype="multipart/form-data">
-      <label>Producto (slug)
-        <select name="existing_slug" id="upSlug">
-          <option value="">-- nuevo (usar formulario arriba) --</option>
-          {{range .Products}}<option value="{{.Slug}}">{{.Name}} ({{.Slug}})</option>{{end}}
-        </select>
-      </label>
-      <label>Archivos<input type="file" multiple name="images" id="upFiles" accept="image/*" /></label>
-      <button class="btn-primary" type="submit">Subir</button>
-    </form>
+    <p style="margin:14px 0 0;font-size:11px;color:var(--muted);line-height:1.4">Flujo: completar datos y (opcional) elegir imágenes. Al guardar, si es creación primero se crea el producto y luego se suben las imágenes seleccionadas. En edición podés cambiar datos y agregar nuevas imágenes (no reemplaza las existentes). Para remover imágenes viejas usar futura gestión de galería.</p>
   </div>
   <div>
-    <h2>Listado ({{.Total}})</h2>
-    <table class="table" id="prodTable" style="font-size:0.85rem">
-      <thead><tr><th>Nombre</th><th>Slug</th><th>Precio</th><th>Dims</th><th>Stock</th><th>Imgs</th></tr></thead>
-      <tbody>
-        {{range .Products}}
-        <tr data-slug="{{.Slug}}">
-          <td>{{.Name}}</td>
-          <td style="font-family:monospace">{{.Slug}}</td>
-          <td>${{printf "%.2f" .BasePrice}}</td>
-          <td>{{if or (gt .WidthMM 0) (gt .HeightMM 0) (gt .DepthMM 0)}}{{printf "%.0f" .WidthMM}}x{{printf "%.0f" .HeightMM}}x{{printf "%.0f" .DepthMM}}mm{{else}}-{{end}}</td>
-          <td>{{if .ReadyToShip}}✔{{else}}-{{end}}</td>
-          <td>{{len .Images}}</td>
-        </tr>
-        {{end}}
-      </tbody>
-    </table>
+    <h2 style="margin:0 0 10px;font-size:18px">Listado ({{.Total}})</h2>
+    <div style="overflow:auto">
+      <table class="table" id="prodTable" style="font-size:0.8rem;min-width:880px">
+        <thead><tr><th>Nombre</th><th>Slug</th><th>Precio</th><th>W</th><th>H</th><th>D</th><th>Stock</th><th>Imgs</th><th style="text-align:right">Acciones</th></tr></thead>
+        <tbody>
+          {{range .Products}}
+          <tr data-slug="{{.Slug}}">
+            <td>{{.Name}}</td>
+            <td style="font-family:monospace">{{.Slug}}</td>
+            <td>${{printf "%.2f" .BasePrice}}</td>
+            <td>{{printf "%.0f" .WidthMM}}</td>
+            <td>{{printf "%.0f" .HeightMM}}</td>
+            <td>{{printf "%.0f" .DepthMM}}</td>
+            <td>{{if .ReadyToShip}}✔{{else}}-{{end}}</td>
+            <td>{{len .Images}}</td>
+            <td style="text-align:right">
+              <div class="table-actions">
+                <button class="icon-btn action-edit" data-act="edit" title="Editar">✏️</button>
+                <button class="icon-btn danger action-del" data-act="del" title="Eliminar">🗑️</button>
+              </div>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
   </div>
 </section>
 <script>
@@ -70,16 +83,93 @@
   const fDepth=document.getElementById('pfDepth');
   const btnDel=document.getElementById('pfDelete');
   const btnReset=document.getElementById('pfReset');
-  function fill(p){ fSlug.value=p.Slug; fName.value=p.Name; fCat.value=p.Category||''; fDesc.value=p.ShortDesc||''; fPrice.value=p.BasePrice; fReady.checked=!!p.ReadyToShip; fWidth.value=p.WidthMM||0; fHeight.value=p.HeightMM||0; fDepth.value=p.DepthMM||0; btnDel.style.display=''; }
-  function clear(){ form.reset(); fSlug.value=''; btnDel.style.display='none'; fWidth.value=fHeight.value=fDepth.value=''; }
-  if(tbl){ tbl.addEventListener('click', async e=>{const tr=e.target.closest('tr'); if(!tr) return; const slug=tr.dataset.slug; const res=await fetch('/api/products/'+slug,{headers:{Authorization:'Bearer '+token}}); if(res.ok){ const p=await res.json(); fill(p);} }); }
-  form.addEventListener('submit', async e=>{e.preventDefault(); const slug=fSlug.value.trim(); const payload={ name:fName.value.trim(), category:fCat.value.trim(), short_desc:fDesc.value, base_price:parseFloat(fPrice.value||'0'), ready_to_ship:fReady.checked, width_mm:parseFloat(fWidth.value||'0'), height_mm:parseFloat(fHeight.value||'0'), depth_mm:parseFloat(fDepth.value||'0') }; let method='POST', url='/api/products'; if(slug){ method='PUT'; url='/api/products/'+slug; }
-    const res=await fetch(url,{method, headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body:JSON.stringify(payload)}); if(res.ok){ location.reload(); } else { alert('Error guardando'); }
+  const btnSubmit=document.getElementById('pfSubmit');
+  const modeBadge=document.getElementById('formMode');
+  const imagesInput=document.getElementById('pfImages');
+  const dropZone=document.getElementById('dropZone');
+  const preview=document.getElementById('preview');
+  const dzCount=document.querySelector('.dz-count');
+
+  function setModeEdit(edit){
+    if(edit){
+      modeBadge.textContent='Edición';
+      modeBadge.classList.remove('create');
+      modeBadge.classList.add('edit');
+      btnSubmit.textContent='Actualizar';
+    } else {
+      modeBadge.textContent='Creación';
+      modeBadge.classList.remove('edit');
+      modeBadge.classList.add('create');
+      btnSubmit.textContent='Crear';
+    }
+  }
+  function fill(p){
+    fSlug.value=p.Slug; fName.value=p.Name; fCat.value=p.Category||''; fDesc.value=p.ShortDesc||''; fPrice.value=p.BasePrice; fReady.checked=!!p.ReadyToShip; fWidth.value=p.WidthMM||0; fHeight.value=p.HeightMM||0; fDepth.value=p.DepthMM||0; btnDel.style.display=''; setModeEdit(true);
+  }
+  function clear(){ form.reset(); fSlug.value=''; btnDel.style.display='none'; fWidth.value=fHeight.value=fDepth.value=''; imagesInput.value=''; preview.innerHTML=''; dzCount.textContent='0 archivos'; setModeEdit(false); }
+
+  // Row actions
+  if(tbl){
+    tbl.addEventListener('click', async e=>{
+      const btn=e.target.closest('button');
+      if(!btn) return;
+      const tr=btn.closest('tr');
+      if(!tr) return;
+      const slug=tr.dataset.slug;
+      if(btn.dataset.act==='edit'){
+        const res=await fetch('/api/products/'+slug,{headers:{Authorization:'Bearer '+token}}); if(res.ok){ const p=await res.json(); fill(p);} return;
+      }
+      if(btn.dataset.act==='del'){
+        if(!confirm('Eliminar producto y todos sus datos?')) return;
+        const res=await fetch('/api/products/'+slug,{method:'DELETE',headers:{Authorization:'Bearer '+token}}); if(res.ok){ location.reload(); } else { alert('Error eliminando'); }
+        return;
+      }
+    });
+  }
+
+  // Submit create/update + optional images
+  form.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const slug=fSlug.value.trim();
+    const payload={ name:fName.value.trim(), category:fCat.value.trim(), short_desc:fDesc.value, base_price:parseFloat(fPrice.value||'0'), ready_to_ship:fReady.checked, width_mm:parseFloat(fWidth.value||'0'), height_mm:parseFloat(fHeight.value||'0'), depth_mm:parseFloat(fDepth.value||'0') };
+    if(!payload.name){ alert('Nombre requerido'); return; }
+    if(payload.base_price<0){ alert('Precio inválido'); return; }
+    let method='POST', url='/api/products';
+    if(slug){ method='PUT'; url='/api/products/'+slug; }
+    const res=await fetch(url,{method, headers:{'Content-Type':'application/json', Authorization:'Bearer '+token}, body:JSON.stringify(payload)});
+    if(!res.ok){ alert('Error guardando'); return; }
+    const prod=await res.json();
+    const finalSlug=prod.Slug || slug;
+    // Images?
+    if(imagesInput.files && imagesInput.files.length>0){
+      const fd=new FormData();
+      fd.append('existing_slug', finalSlug);
+      for(const f of imagesInput.files){ fd.append('images', f); }
+      const upRes=await fetch('/api/products/upload',{method:'POST', headers:{Authorization:'Bearer '+token}, body:fd});
+      if(!upRes.ok){ alert('Producto guardado, pero error subiendo imágenes'); location.reload(); return; }
+    }
+    location.reload();
   });
+
   btnReset.addEventListener('click', clear);
-  btnDel.addEventListener('click', async ()=>{ if(!confirm('Eliminar?')) return; const slug=fSlug.value.trim(); if(!slug) return; const res=await fetch('/api/products/'+slug,{method:'DELETE', headers:{Authorization:'Bearer '+token}}); if(res.ok){ location.reload(); } else { alert('Error'); } });
-  const upForm=document.getElementById('uploadForm');
-  upForm.addEventListener('submit', async e=>{e.preventDefault(); const fd=new FormData(upForm); const res=await fetch('/api/products/upload',{method:'POST', headers:{Authorization:'Bearer '+token}, body:fd}); if(res.ok){ location.reload(); } else { alert('Error upload'); } });
+  btnDel.addEventListener('click', async ()=>{ const slug=fSlug.value.trim(); if(!slug) return; if(!confirm('Eliminar producto y sus imágenes?')) return; const res=await fetch('/api/products/'+slug,{method:'DELETE', headers:{Authorization:'Bearer '+token}}); if(res.ok){ clear(); location.reload(); } else { alert('Error'); } });
+
+  // Drag & drop images preview
+  function refreshPreview(){
+    preview.innerHTML='';
+    const files=Array.from(imagesInput.files||[]);
+    dzCount.textContent=files.length+ (files.length===1?' archivo':' archivos');
+    files.slice(0,6).forEach(f=>{
+      const r=new FileReader();
+      r.onload=ev=>{ const img=document.createElement('img'); img.src=ev.target.result; img.alt=f.name; img.style.width='52px'; img.style.height='52px'; img.style.objectFit='cover'; img.style.borderRadius='10px'; img.style.border='1px solid #223140'; preview.appendChild(img); };
+      r.readAsDataURL(f);
+    });
+  }
+  imagesInput.addEventListener('change', refreshPreview);
+  ;['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault(); dropZone.classList.add('drag');}));
+  ;['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault(); dropZone.classList.remove('drag');}));
+  dropZone.addEventListener('drop', e=>{ const files=[...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')); if(files.length){ const dt=new DataTransfer(); files.forEach(f=>dt.items.add(f)); imagesInput.files=dt.files; refreshPreview(); }});
+
 })();
 </script>
 {{template "layout_end" .}}
