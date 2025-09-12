@@ -36,7 +36,8 @@ type OrderRepo interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*Order, error)
 	FindByPreferenceID(ctx context.Context, prefID string) (*Order, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, st OrderStatus) error
-	List(ctx context.Context, status *OrderStatus, page, pageSize int) ([]Order, int64, error)
+	List(ctx context.Context, status *OrderStatus, mpStatus *string, page, pageSize int) ([]Order, int64, error) // agregado mpStatus
+	ListInRange(ctx context.Context, from, to time.Time) ([]Order, error)                                        // NUEVO: listado completo por rango de fechas
 }
 
 type QuoteRepo interface {
