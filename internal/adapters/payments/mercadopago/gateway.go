@@ -45,6 +45,10 @@ type mpPrefReq struct {
 	AutoReturn          string            `json:"auto_return,omitempty"`
 	NotificationURL     string            `json:"notification_url,omitempty"`
 	StatementDescriptor string            `json:"statement_descriptor,omitempty"`
+	Shipments           *struct {
+		Cost float64 `json:"cost"`
+		Mode string  `json:"mode"`
+	} `json:"shipments,omitempty"`
 }
 
 type mpPrefResp struct {
@@ -77,12 +81,23 @@ func (g *Gateway) CreatePreference(ctx context.Context, o *domain.Order) (string
 		return "", errors.New("orden nil")
 	}
 	items := make([]mpItem, 0, len(o.Items)+1)
+	subtotal := 0.0
 	for _, it := range o.Items {
 		items = append(items, mpItem{Title: it.Title, Quantity: it.Qty, UnitPrice: it.UnitPrice, CurrencyID: "ARS"})
+		subtotal += it.UnitPrice * float64(it.Qty)
 	}
 	if o.ShippingCost > 0 {
-		items = append(items, mpItem{Title: "Envío", Quantity: 1, UnitPrice: o.ShippingCost, CurrencyID: "ARS"})
+		label := "Envío"
+		if o.ShippingMethod == "cadete" {
+			label = "Cadete (Rosario)"
+		}
+		items = append(items, mpItem{Title: label, Quantity: 1, UnitPrice: o.ShippingCost, CurrencyID: "ARS"})
 	}
+	calcTotal := subtotal + o.ShippingCost
+	if o.Total == 0 || (o.Total-calcTotal) > 0.01 || (calcTotal-o.Total) > 0.01 {
+		o.Total = calcTotal
+	}
+	log.Debug().Str("order", o.ID.String()).Float64("subtotal", subtotal).Float64("shipping", o.ShippingCost).Float64("total", o.Total).Int("items", len(items)).Msg("MP preference build (shipping as item)")
 	baseURL := os.Getenv("PUBLIC_BASE_URL")
 	if baseURL == "" {
 		baseURL = "http://localhost:8080"
@@ -100,13 +115,16 @@ func (g *Gateway) CreatePreference(ctx context.Context, o *domain.Order) (string
 		NotificationURL:     baseURL + "/webhooks/mp",
 		StatementDescriptor: "CROMA3D",
 	}
-	// incluir referencia externa
+	// Nota: evitamos usar shipments para no depender de la UI de MP y asegurarnos que aparezca como línea.
 	type reqExt struct {
 		mpPrefReq
 		ExternalReference string `json:"external_reference"`
 	}
 	payload := reqExt{mpPrefReq: reqBody, ExternalReference: extRef}
 	buf, _ := json.Marshal(payload)
+	if os.Getenv("MP_DEBUG") == "1" {
+		log.Debug().RawJSON("mp_pref_payload", buf).Msg("MP preference payload")
+	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.mercadopago.com/checkout/preferences", bytes.NewReader(buf))
 	if err != nil {
 		return "", err
@@ -119,7 +137,8 @@ func (g *Gateway) CreatePreference(ctx context.Context, o *domain.Order) (string
 	}
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
-		return "", fmt.Errorf("mp pref status %d", res.StatusCode)
+		body, _ := io.ReadAll(res.Body)
+		return "", fmt.Errorf("mp pref status %d: %s", res.StatusCode, string(body))
 	}
 	var pref mpPrefResp
 	if err := json.NewDecoder(res.Body).Decode(&pref); err != nil {
@@ -128,14 +147,13 @@ func (g *Gateway) CreatePreference(ctx context.Context, o *domain.Order) (string
 	if pref.ID == "" {
 		return "", errors.New("respuesta MP incompleta")
 	}
-	// elegir init point: sandbox si token test y NO estamos en producción
 	initPoint := pref.InitPoint
 	appEnv := strings.ToLower(os.Getenv("APP_ENV"))
 	if strings.HasPrefix(g.token, "TEST-") && appEnv != "production" && appEnv != "prod" && pref.SandboxInitPoint != "" {
 		initPoint = pref.SandboxInitPoint
-		log.Debug().Str("pref_id", pref.ID).Str("env", appEnv).Str("url", initPoint).Msg("MP preference sandbox")
+		log.Debug().Str("pref_id", pref.ID).Str("url", initPoint).Msg("MP preference sandbox")
 	} else {
-		log.Info().Str("pref_id", pref.ID).Str("env", appEnv).Str("url", initPoint).Msg("MP preference prod")
+		log.Info().Str("pref_id", pref.ID).Str("url", initPoint).Msg("MP preference prod")
 	}
 	o.MPPreferenceID = pref.ID
 	return initPoint, nil
