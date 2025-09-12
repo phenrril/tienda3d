@@ -763,6 +763,17 @@ func (s *Server) handleCart(w http.ResponseWriter, r *http.Request) {
 		}
 		slug := r.FormValue("slug")
 		color := r.FormValue("color")
+		// Intento fallback si slug vacío y multipart presente
+		if slug == "" && r.MultipartForm != nil {
+			if v, ok := r.MultipartForm.Value["slug"]; ok && len(v) > 0 {
+				slug = v[0]
+			}
+			if color == "" {
+				if v, ok := r.MultipartForm.Value["color"]; ok && len(v) > 0 {
+					color = v[0]
+				}
+			}
+		}
 		if slug == "" {
 			http.Error(w, "slug", 400)
 			return
@@ -775,6 +786,15 @@ func (s *Server) handleCart(w http.ResponseWriter, r *http.Request) {
 		cart := readCart(r)
 		cart.Items = append(cart.Items, cartItem{Slug: slug, Color: color, Qty: 1, Price: p.BasePrice})
 		writeCart(w, cart)
+		accept := r.Header.Get("Accept")
+		if strings.Contains(accept, "application/json") || r.Header.Get("X-Requested-With") == "fetch" {
+			count := 0
+			for _, it := range cart.Items {
+				count += it.Qty
+			}
+			writeJSON(w, 200, map[string]any{"status": "ok", "slug": slug, "items": count})
+			return
+		}
 		http.Redirect(w, r, "/product/"+slug+"?added=1", 302)
 		return
 	}

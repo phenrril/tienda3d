@@ -26,6 +26,24 @@
   <div class="pd-info">
     <h1 class="pd-title">{{.Product.Name}}</h1>
     <div class="pd-price">${{printf "%.2f" .Product.BasePrice}}</div>
+    <div class="pd-share" id="pdShareBar" aria-label="Compartir producto">
+      <div class="pd-share-label">Compartir</div>
+      <div class="pd-share-row">
+        <button type="button" class="share-btn sb-whatsapp" data-share="whatsapp" title="Compartir en WhatsApp" aria-label="Compartir en WhatsApp">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12.04 2c-5.52 0-10 4.46-10 9.97 0 1.76.46 3.48 1.34 5.01L2 22l5.2-1.36a9.96 9.96 0 0 0 4.84 1.23h.01c5.52 0 10-4.46 10-9.97 0-2.67-1.05-5.18-2.95-7.06A9.93 9.93 0 0 0 12.04 2Zm5.83 14.28c-.25.7-1.46 1.33-2.02 1.39-.52.05-1.19.07-1.92-.12-.44-.11-1-.33-1.72-.65-3.03-1.31-5-4.37-5.15-4.58-.15-.21-1.23-1.63-1.23-3.11 0-1.48.78-2.2 1.05-2.5.27-.3.6-.37.8-.37.2 0 .4 0 .57.01.18.01.43-.07.68.52.25.59.85 2.05.92 2.2.07.15.12.33.02.54-.1.21-.15.33-.3.51-.15.18-.31.4-.44.54-.15.15-.3.32-.13.63.18.3.8 1.32 1.72 2.14 1.18 1.05 2.17 1.38 2.49 1.53.32.15.5.13.68-.07.18-.2.78-.9.98-1.21.2-.3.4-.25.68-.15.27.09 1.73.81 2.03.95.3.15.5.22.57.34.07.12.07.72-.18 1.42Z"/></svg>
+          <span>WhatsApp</span>
+        </button>
+        <button type="button" class="share-btn sb-instagram" data-share="instagram" title="Compartir en Instagram" aria-label="Compartir en Instagram">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm0 1.5A4.25 4.25 0 0 0 3.5 7.75v8.5A4.25 4.25 0 0 0 7.75 20.5h8.5a4.25 4.25 0 0 0 4.25-4.25v-8.5A4.25 4.25 0 0 0 16.25 3.5h-8.5ZM12 7.25a4.75 4.75 0 1 1 0 9.5 4.75 4.75 0 0 1 0-9.5Zm0 1.5a3.25 3.25 0 1 0 0 6.5 3.25 3.25 0 0 0 0-6.5Zm5.25-.88a1.12 1.12 0 1 1 0 2.25 1.12 1.12 0 0 1 0-2.25Z"/></svg>
+          <span>Instagram</span>
+        </button>
+        <button type="button" class="share-btn sb-copy" data-share="copy" title="Copiar enlace" aria-label="Copiar enlace">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 3a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3h-2v-2h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v2H8V3Zm-5 5a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V8Zm3-1a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H6Z"/></svg>
+          <span>Copiar</span>
+        </button>
+      </div>
+      <span class="share-msg" id="shareMsg" role="status" aria-live="polite" style="display:none"></span>
+    </div>
     <p class="pd-desc">{{.Product.ShortDesc}}</p>
     <div class="pd-size">Tamaño aprox: {{printf "%.0f" .Product.WidthMM}}x{{printf "%.0f" .Product.HeightMM}}x{{printf "%.0f" .Product.DepthMM}}mm</div>
     <form method="post" action="/cart" class="pd-form">
@@ -46,8 +64,8 @@
       <div class="pd-actions">
         <button class="btn-primary" type="submit">Agregar al carrito</button>
         <a href="/cart" class="btn-secondary">Ver carrito</a>
+        <span id="addedMsg" class="added-msg" {{if ne .Added 1}}hidden{{end}}>{{if eq .Added 1}}Agregado!{{end}}</span>
       </div>
-      {{if eq .Added 1}}<span class="added-msg">Agregado!</span>{{end}}
     </form>
     <div class="pd-meta">
       <div><strong>Categoría:</strong> {{.Product.Category}}</div>
@@ -84,22 +102,105 @@
   const form=inp.closest('form');
   if(form){ form.addEventListener('submit',()=>{ if(inp.value.trim()===''){ inp.value=defaultColor; } }); }
   const root=document.getElementById('pdCarousel');
-  if(!root) return;
-  const slides=[...root.querySelectorAll('.pd-slide')];
-  const thumbs=[...root.querySelectorAll('.pd-thumb')];
-  const total=slides.length; if(total===0) return;
-  let idx=0; let auto=null; const AUTOPLAY=5000;
-  const prevBtn=root.querySelector('.pd-nav.prev');
-  const nextBtn=root.querySelector('.pd-nav.next');
-  if(total===1){ prevBtn.style.display='none'; nextBtn.style.display='none'; const tb=root.querySelector('.pd-thumbs'); if(tb) tb.style.display='none'; return; }
-  function show(n){slides[idx].classList.remove('active');thumbs[idx].classList.remove('active');idx=(n+total)%total;slides[idx].classList.add('active');thumbs[idx].classList.add('active');}
-  function next(){show(idx+1);} function prev(){show(idx-1);} function start(){auto=setInterval(next,AUTOPLAY);} function restart(){clearInterval(auto);start();}
-  thumbs.forEach(t=>t.addEventListener('click',()=>{show(parseInt(t.dataset.index));restart();}));
-  prevBtn.addEventListener('click',()=>{prev();restart();});
-  nextBtn.addEventListener('click',()=>{next();restart();});
-  let sx=null; root.addEventListener('pointerdown',e=>{sx=e.clientX;}); root.addEventListener('pointerup',e=>{ if(sx==null) return; const dx=e.clientX-sx; if(Math.abs(dx)>40){ dx<0?next():prev(); restart(); } sx=null; });
-  root.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){next();restart();} else if(e.key==='ArrowLeft'){prev();restart();} });
-  root.tabIndex=0; start();
+  if(root){
+    const slides=[...root.querySelectorAll('.pd-slide')];
+    const thumbs=[...root.querySelectorAll('.pd-thumb')];
+    const total=slides.length; if(total>0){
+      let idx=0; let auto=null; const AUTOPLAY=5000;
+      const prevBtn=root.querySelector('.pd-nav.prev');
+      const nextBtn=root.querySelector('.pd-nav.next');
+      if(total===1){ prevBtn.style.display='none'; nextBtn.style.display='none'; const tb=root.querySelector('.pd-thumbs'); if(tb) tb.style.display='none'; return; }
+      function show(n){slides[idx].classList.remove('active');thumbs[idx].classList.remove('active');idx=(n+total)%total;slides[idx].classList.add('active');thumbs[idx].classList.add('active');}
+      function next(){show(idx+1);} function prev(){show(idx-1);} function start(){auto=setInterval(next,AUTOPLAY);} function restart(){clearInterval(auto);start();}
+      thumbs.forEach(t=>t.addEventListener('click',()=>{show(parseInt(t.dataset.index));restart();}));
+      prevBtn.addEventListener('click',()=>{prev();restart();});
+      nextBtn.addEventListener('click',()=>{next();restart();});
+      let sx=null; root.addEventListener('pointerdown',e=>{sx=e.clientX;}); root.addEventListener('pointerup',e=>{ if(sx==null) return; const dx=e.clientX-sx; if(Math.abs(dx)>40){ dx<0?next():prev(); restart(); } sx=null; });
+      root.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){next();restart();} else if(e.key==='ArrowLeft'){prev();restart();} });
+      root.tabIndex=0; start();
+    }
+  }
+})();
+// Share buttons logic
+(function(){
+  const bar=document.getElementById('pdShareBar'); if(!bar) return;
+  const msgEl=document.getElementById('shareMsg');
+  const productName=document.querySelector('.pd-title')?.textContent?.trim()||'';
+  const buildURL=()=>window.location.href;
+  function flash(t){ if(!msgEl) return; msgEl.textContent=t; msgEl.style.display='inline'; msgEl.classList.add('show'); setTimeout(()=>{ msgEl.style.display='none'; msgEl.classList.remove('show'); },2500); }
+  bar.addEventListener('click',e=>{
+    const btn=e.target.closest('.share-btn'); if(!btn) return;
+    const url=buildURL();
+    const text=`Mira este producto: ${productName} - ${url}`;
+    const kind=btn.dataset.share;
+    if(kind==='copy'){
+      (navigator.clipboard?navigator.clipboard.writeText(text):Promise.reject()).catch(()=>{ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch{} ta.remove(); }).finally(()=>flash('Enlace copiado'));
+    }else if(kind==='whatsapp'){
+      const wurl='https://wa.me/?text='+encodeURIComponent(text);
+      window.open(wurl,'_blank','noopener');
+    }else if(kind==='instagram'){
+      const shareData={title:productName,text:`Mira este producto: ${productName}`,url};
+      if(navigator.share){
+        navigator.share(shareData).catch(()=>{});
+      }else{
+        (async()=>{
+          const fullText=`Mira este producto: ${productName} - ${url}`;
+          let copied=false;
+          if(navigator.clipboard && window.isSecureContext){
+            try{ await navigator.clipboard.writeText(fullText); copied=true; }catch{}
+          }
+          if(!copied){
+            try{ const ta=document.createElement('textarea'); ta.value=fullText; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); copied=true; }catch{}
+          }
+          window.open('https://www.instagram.com/direct/new/','_blank','noopener');
+          if(copied){ flash('Texto copiado. Pega en Instagram'); } else { flash('No se pudo copiar'); setTimeout(()=>window.prompt('Copia y pega en Instagram:', fullText),450); }
+        })();
+      }
+    }
+  });
+})();
+// Nuevo: interceptar submit para añadir al carrito sin recargar
+(function(){
+  const form=document.querySelector('.pd-form'); if(!form) return;
+  const addedMsg=document.getElementById('addedMsg');
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    const submitBtn=form.querySelector('button[type=submit]');
+    if(submitBtn) submitBtn.disabled=true;
+    const fd=new FormData(form);
+    const usp=new URLSearchParams();
+    fd.forEach((v,k)=>{ if(typeof v==='string') usp.append(k,v); });
+    fetch('/cart',{
+      method:'POST',
+      headers:{
+        'Accept':'application/json',
+        'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',
+        'X-Requested-With':'fetch'
+      },
+      body:usp.toString(),
+      redirect:'manual'
+    }).then(async res=>{
+      if(res.ok){
+        let itemsCount=null; try{ const j=await res.json(); itemsCount=j.items; }catch{}
+        if(addedMsg){
+          addedMsg.hidden=false;
+            addedMsg.textContent='Agregado'+(itemsCount!=null?` (total ${itemsCount})`:'')+'!';
+          addedMsg.classList.add('show');
+          setTimeout(()=>{addedMsg.classList.remove('show');},2500);
+        }
+      }else if(res.status===302){
+        if(addedMsg){ addedMsg.hidden=false; addedMsg.textContent='Agregado!'; addedMsg.classList.add('show'); setTimeout(()=>addedMsg.classList.remove('show'),2500); }
+      }else{
+        throw new Error('status '+res.status);
+      }
+    }).catch(()=>{
+      if(addedMsg){
+        addedMsg.hidden=false;
+        addedMsg.textContent='Error';
+        addedMsg.classList.add('error','show');
+      }
+    }).finally(()=>{ if(submitBtn) submitBtn.disabled=false; });
+  });
 })();
 </script>
 {{template "layout_end" .}}
