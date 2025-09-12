@@ -20,14 +20,14 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load() // best-effort
+	_ = godotenv.Load()
 
 	zerolog.TimeFieldFormat = time.RFC3339
 	zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.Kitchen})
 
 	dsn := os.Getenv("DB_DSN")
 	if dsn == "" {
-		// fallback para desarrollo rápido
+
 		dsn = "host=localhost user=postgres password=postgres dbname=tienda3d port=5432 sslmode=disable"
 	}
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
@@ -50,7 +50,7 @@ func main() {
 
 	ln, err := net.Listen("tcp", ":"+port)
 	if err != nil {
-		// intentar puertos alternativos 8081-8090
+
 		for p := 8081; p <= 8090; p++ {
 			alt := net.JoinHostPort("", fmt.Sprintf("%d", p))
 			l2, err2 := net.Listen("tcp", alt)

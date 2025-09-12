@@ -43,7 +43,7 @@ func (uc *ProductUC) DeleteBySlug(ctx context.Context, slug string) error {
 	if slug == "" {
 		return errors.New("slug vacío")
 	}
-	// acceso directo al repo concreto: asserting interface extendido
+
 	if repo, ok := uc.Products.(interface {
 		DeleteBySlug(context.Context, string) error
 	}); ok {
@@ -61,7 +61,7 @@ func (uc *ProductUC) DeleteFullBySlug(ctx context.Context, slug string) ([]strin
 	}); ok {
 		return repo.DeleteFullBySlug(ctx, slug)
 	}
-	// fallback: simple delete sin paths
+
 	return nil, uc.DeleteBySlug(ctx, slug)
 }
 

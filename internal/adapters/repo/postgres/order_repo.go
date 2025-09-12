@@ -16,22 +16,22 @@ type OrderRepo struct{ db *gorm.DB }
 func NewOrderRepo(db *gorm.DB) *OrderRepo { return &OrderRepo{db: db} }
 
 func (r *OrderRepo) Save(ctx context.Context, o *domain.Order) error {
-	// Tratamos Save como Create mientras no exista (casos actuales: crear orden desde carrito o cotización)
+
 	if o == nil {
 		return errors.New("order nil")
 	}
-	// verificar existencia rápida
+
 	var count int64
 	if err := r.db.WithContext(ctx).Model(&domain.Order{}).Where("id = ?", o.ID).Count(&count).Error; err != nil {
 		return err
 	}
 	if count == 0 {
-		// crear orden sin items primero
+
 		core := domain.Order{ID: o.ID, Status: o.Status, Email: o.Email, Name: o.Name, Phone: o.Phone, DNI: o.DNI, Address: o.Address, PostalCode: o.PostalCode, Province: o.Province, MPPreferenceID: o.MPPreferenceID, MPStatus: o.MPStatus, Total: o.Total, ShippingMethod: o.ShippingMethod, ShippingCost: o.ShippingCost, Notified: o.Notified}
 		if err := r.db.WithContext(ctx).Create(&core).Error; err != nil {
 			return err
 		}
-		// crear items si hay
+
 		if len(o.Items) > 0 {
 			for i := range o.Items {
 				o.Items[i].OrderID = o.ID
@@ -45,7 +45,7 @@ func (r *OrderRepo) Save(ctx context.Context, o *domain.Order) error {
 		}
 		return nil
 	}
-	// Si existe, actualizar campos básicos (sin tocar items aquí)
+
 	return r.db.WithContext(ctx).Model(&domain.Order{}).Where("id = ?", o.ID).Updates(map[string]any{
 		"status":           o.Status,
 		"email":            o.Email,
@@ -116,11 +116,11 @@ func (r *OrderRepo) List(ctx context.Context, status *domain.OrderStatus, mpStat
 }
 
 func (r *OrderRepo) ListInRange(ctx context.Context, from, to time.Time) ([]domain.Order, error) {
-	// NUEVO: trae todas las órdenes (sin paginar) entre from y to (inclusive), precargando items
+
 	if to.Before(from) {
 		from, to = to, from
 	}
-	// normalizar a límites (from 00:00:00, to 23:59:59.999)
+
 	from = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location())
 	to = time.Date(to.Year(), to.Month(), to.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), to.Location())
 	var list []domain.Order

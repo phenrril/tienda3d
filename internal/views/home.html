@@ -28,7 +28,7 @@
     <div class="hc-dots" id="hcDots"></div>
   </div>
 </section>
-<!-- Modal Cómo Comprar -->
+
 <div class="modal-backdrop" id="howBuyBackdrop" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="howBuyTitle">
     <button class="modal-close" id="howBuyClose" aria-label="Cerrar">×</button>
@@ -75,7 +75,7 @@
         {{if .Images}}
           <img src="{{(index .Images 0).URL}}" alt="{{(index .Images 0).Alt}}" loading="lazy" />
         {{else}}<div class="placeholder">IMG</div>{{end}}
-        <!-- Badge "En stock" removido -->
+        
       </div>
       <div class="card-body">
         <h3 class="card-title"><a href="/product/{{.Slug}}">{{.Name}}</a></h3>
