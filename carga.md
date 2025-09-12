@@ -18,6 +18,9 @@ Flujo:
    - `GET /api/products/{slug}`
    - `DELETE /api/products/{slug}`
    - `POST /api/products/delete`
+   - `GET /admin/orders` (listado paginado de órdenes)
+
+Expira aprox. a los 30 minutos: repetir login si recibes 401 por token vencido.
 
 Ejemplo login (curl):
 ```
@@ -167,7 +170,7 @@ Devuelve arrays `deleted` y `errors`. (No borra archivos físicos).
 
 ## 9. Pagos
 - `POST /api/checkout` genera preferencia MP (público, no requiere token admin).
-- Carrito normal: checkout crea orden y llama a MercadoPago; redirección a `/pay/{id}`.
+- Carrito normal: checkout crea orden y llama a MercadoPago; redirección a `/pay/{orderID}`.
 - Webhook: `/webhooks/mp` (configurar en MP apuntando a `PUBLIC_BASE_URL/webhooks/mp`).
 
 ## 10. Notificaciones
@@ -180,7 +183,7 @@ Configurar `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BASE_URL` para habilitar
 
 ## 12. Rutas claves
 Web: `/`, `/products`, `/product/{slug}`, `/cart`, `/checkout`, `/pay/{id}`
-API protegida: `/api/products`, `/api/products/upload`, `/api/products/{slug}`, `/api/products/delete`
+API protegida: `/api/products`, `/api/products/upload`, `/api/products/{slug}`, `/api/products/delete`, `/admin/orders`
 API pública: `/api/quote`, `/api/checkout`, `/webhooks/mp`
 
 ## 13. Errores comunes
@@ -211,6 +214,10 @@ curl -X POST http://localhost:8080/admin/login \
 Listar productos:
 ```
 curl -H "Authorization: Bearer $ADMIN_JWT" http://localhost:8080/api/products
+```
+Listar órdenes:
+```
+curl -H "Authorization: Bearer $ADMIN_JWT" http://localhost:8080/admin/orders
 ```
 Carga multipart:
 ```
