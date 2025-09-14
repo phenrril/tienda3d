@@ -113,8 +113,6 @@
         <img src="{{(index $p.Images 0).URL}}"
              alt="{{if (index $p.Images 0).Alt}}{{(index $p.Images 0).Alt}}{{else}}{{$p.Name}}{{end}}"
              loading="lazy" decoding="async" {{if eq $idx 0}}fetchpriority="high"{{end}}
-             srcset="{{(index $p.Images 0).URL}} 300w, {{(index $p.Images 0).URL}}?w=480 480w, {{(index $p.Images 0).URL}}?w=640 640w"
-             sizes="(max-width:480px) 92vw, (max-width:768px) 44vw, 300px"
              class="card-img" />
       {{else}}
         <div class="placeholder">IMG</div>
