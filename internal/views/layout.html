@@ -11,6 +11,7 @@
 <link rel="icon" type="image/png" href="/public/assets/img/chroma-logo.png" />
 <link rel="apple-touch-icon" href="/public/assets/img/chroma-logo.png" />
 <link rel="stylesheet" href="/public/assets/styles.css?v=dark5" />
+<link rel="preload" as="image" href="/public/assets/img/img1.webp">
 <link rel="manifest" href="/public/manifest.json">
 <meta name="theme-color" content="#6366f1">
 <meta name="description" content="{{if .PageDescription}}{{.PageDescription}}{{else}}Descripción por defecto de Croma 3D: impresión 3D mayorista y minorista{{end}}">
@@ -25,15 +26,8 @@
 <meta name="twitter:description" content="{{if .PageDescription}}{{.PageDescription}}{{else}}Descripción por defecto de Croma 3D: impresión 3D mayorista y minorista{{end}}">
 <meta name="twitter:image" content="{{.OGImage}}">
 {{with .SchemaJSON}}<script type="application/ld+json">{{.}}</script>{{end}}
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/public/sw.js')
-      .then(reg => console.log('SW registrado', reg))
-      .catch(err => console.log('SW error', err));
-  });
-}
-</script>
+<!-- JS unificado de UI -->
+<script type="module" src="/public/assets/app.js?v=1"></script>
 </head>
 <body class="site">
 <header class="topbar">
@@ -83,18 +77,6 @@ if ('serviceWorker' in navigator) {
   <div class="copyright">© 2025 Chroma 3D — <a class="link" href="https://www.roxiumlabs.com/" target="_blank" rel="noopener">Dev by RoxiumLabs</a></div>
 </footer>
 
-<script>
-(function(){
-  const btn=document.querySelector('.nav-toggle');
-  const body=document.body;
-  const backdrop=document.querySelector('.nav-backdrop');
-  if(!btn)return;
-  function close(){body.classList.remove('nav-open');btn.setAttribute('aria-expanded','false');}
-  btn.addEventListener('click',()=>{const open=body.classList.toggle('nav-open');btn.setAttribute('aria-expanded',open);});
-  backdrop.addEventListener('click',close);
-  window.addEventListener('keydown',e=>{if(e.key==='Escape' && body.classList.contains('nav-open')) close();});
-})();
-</script>
 <a href="https://wa.me/5493416219815" class="fab-whatsapp" aria-label="WhatsApp" target="_blank" rel="noopener">
   <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" focusable="false"><path fill="#25D366" d="M19.11 17.61c-.27-.14-1.58-.78-1.83-.87-.25-.09-.43-.14-.62.14-.18.27-.71.87-.87 1.05-.16.18-.32.2-.59.07-.27-.14-1.16-.43-2.21-1.36-.82-.73-1.37-1.62-1.53-1.89-.16-.27-.02-.42.12-.56.12-.12.27-.32.41-.48.14-.16.18-.27.27-.45.09-.18.05-.34-.02-.48-.07-.14-.62-1.49-.85-2.04-.22-.53-.44-.45-.62-.46-.16-.01-.34-.01-.52-.01-.18 0-.48.07-.73.34-.25.27-.96.94-.96 2.29 0 1.35.98 2.65 1.12 2.84.14.18 1.93 2.95 4.7 4.14.66.28 1.18.45 1.58.58.66.21 1.26.18 1.73.11.53-.08 1.58-.65 1.81-1.28.23-.63.23-1.17.16-1.28-.07-.11-.25-.18-.52-.32z"/><path fill="#25D366" d="M16 3C9.37 3 4 8.37 4 15c0 2.1.55 4.07 1.51 5.79L4 29l8.4-1.48C14.27 28.46 15.1 28.5 16 28.5 22.63 28.5 28 23.13 28 16.5S22.63 3 16 3zm0 23c-.8 0-1.58-.1-2.32-.29l-.53-.14-4.98.88.96-4.86-.17-.5C7.66 19.62 7.5 18.58 7.5 17.5 7.5 12.26 11.76 8 17 8s9.5 4.26 9.5 9.5S21.24 26 16 26z"/></svg>
 </a>

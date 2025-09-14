@@ -102,6 +102,31 @@ func NewApp(db *gorm.DB) (*App, error) {
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
+		// img: normaliza URLs de imagen (agrega / si falta y codifica espacios)
+		"img": func(u string) string {
+			s := strings.TrimSpace(u)
+			if s == "" {
+				return s
+			}
+			if !strings.HasPrefix(s, "http://") && !strings.HasPrefix(s, "https://") && !strings.HasPrefix(s, "/") {
+				s = "/" + s
+			}
+			// codificar espacios para atributos src/srcset
+			s = strings.ReplaceAll(s, " ", "%20")
+			return s
+		},
+		// imgw: agrega parámetro ?w= para variantes responsivas
+		"imgw": func(u string, w int) string {
+			base := strings.TrimSpace(u)
+			if base == "" {
+				return base
+			}
+			if !strings.HasPrefix(base, "http://") && !strings.HasPrefix(base, "https://") && !strings.HasPrefix(base, "/") {
+				base = "/" + base
+			}
+			base = strings.ReplaceAll(base, " ", "%20")
+			return fmt.Sprintf("%s?w=%d", base, w)
+		},
 	}
 	tmpl, err := template.New("layout").Funcs(funcMap).ParseFS(views.FS, "*.html", "admin/*.html")
 	if err != nil {
