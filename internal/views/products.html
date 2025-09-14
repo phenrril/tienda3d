@@ -1,6 +1,7 @@
 {{define "products.html"}}
 {{template "layout_start" .}}
 <h1 class="section-title">Productos</h1>
+<h2 class="sr-only">Filtros</h2>
 <form class="filters" method="get" action="/products">
   <div class="filters-row">
     <div class="field grow">
@@ -39,12 +40,12 @@
   </div>
 </form>
 
-<div class="cards">
+<div class="cards cards--products">
   {{range .Products}}
   <div class="card">
     <div class="card-media">
       {{if .Images}}
-        <img src="{{(index .Images 0).URL}}" alt="{{(index .Images 0).Alt}}" loading="lazy" />
+        <img src="{{(index .Images 0).URL}}" alt="{{if (index .Images 0).Alt}}{{(index .Images 0).Alt}}{{else}}{{.Name}}{{end}}" sizes="(max-width: 600px) 100vw, 50vw" loading="lazy" />
       {{else}}
         <div class="placeholder">IMG</div>
       {{end}}
@@ -54,7 +55,7 @@
       <div class="card-meta">{{.Category}}</div>
       <div class="price-row"><span class="price">${{printf "%.0f" .BasePrice}}</span></div>
       <div class="actions">
-        <a href="/product/{{.Slug}}" class="btn-secondary">Ver detalles ›</a>
+        <a href="/product/{{.Slug}}" class="btn-secondary small">Ver detalles ›</a>
       </div>
     </div>
   </div>

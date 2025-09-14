@@ -91,6 +91,10 @@ func (s *Server) routes() {
 
 	s.mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
 
+	// SEO endpoints
+	s.mux.HandleFunc("/robots.txt", s.handleRobots)
+	s.mux.HandleFunc("/sitemap.xml", s.handleSitemap)
+
 	s.mux.HandleFunc("/", s.handleHome)
 	s.mux.HandleFunc("/products", s.handleProducts)
 	s.mux.HandleFunc("/product/", s.handleProduct)
@@ -136,7 +140,8 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "err", 500)
 		return
 	}
-	data := map[string]any{"Products": list}
+	base := s.canonicalBase(r)
+	data := map[string]any{"Products": list, "CanonicalURL": base + "/", "OGImage": base + "/public/assets/img/chroma-logo.png"}
 	if u := readUserSession(w, r); u != nil {
 		data["User"] = u
 	}
@@ -158,22 +163,26 @@ func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
 		b := true
 		readyPtr = &b
 	}
-	list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: page, PageSize: 12, Sort: sort, Query: query, Category: category, ReadyToShip: readyPtr})
-	pages := (int(total) + 11) / 12
+	pageSize := 24
+	list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: page, PageSize: pageSize, Sort: sort, Query: query, Category: category, ReadyToShip: readyPtr})
+	pages := (int(total) + (pageSize - 1)) / pageSize
 	if pages == 0 {
 		pages = 1
 	}
 	cats, _ := s.products.Categories(r.Context())
+	base := s.canonicalBase(r)
 	data := map[string]any{
-		"Products":    list,
-		"Total":       total,
-		"Page":        page,
-		"Pages":       pages,
-		"Query":       query,
-		"Sort":        sort,
-		"Category":    category,
-		"StockFilter": stock,
-		"Categories":  cats,
+		"Products":     list,
+		"Total":        total,
+		"Page":         page,
+		"Pages":        pages,
+		"Query":        query,
+		"Sort":         sort,
+		"Category":     category,
+		"StockFilter":  stock,
+		"Categories":   cats,
+		"CanonicalURL": base + "/products",
+		"OGImage":      base + "/public/assets/img/chroma-logo.png",
 	}
 	if u := readUserSession(w, r); u != nil {
 		data["User"] = u
@@ -250,11 +259,96 @@ func (s *Server) handleProduct(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("added") == "1" {
 		added = 1
 	}
-	data := map[string]any{"Product": p, "Colors": colors, "DefaultColor": colors[0], "Added": added}
+	base := s.canonicalBase(r)
+	og := base + "/public/assets/img/chroma-logo.png"
+	if len(p.Images) > 0 && strings.TrimSpace(p.Images[0].URL) != "" {
+		if strings.HasPrefix(p.Images[0].URL, "http://") || strings.HasPrefix(p.Images[0].URL, "https://") {
+			og = p.Images[0].URL
+		} else {
+			if !strings.HasPrefix(p.Images[0].URL, "/") {
+				og = base + "/" + p.Images[0].URL
+			} else {
+				og = base + p.Images[0].URL
+			}
+		}
+	}
+	data := map[string]any{"Product": p, "Colors": colors, "DefaultColor": colors[0], "Added": added, "CanonicalURL": base + "/product/" + p.Slug, "OGImage": og}
 	if u := readUserSession(w, r); u != nil {
 		data["User"] = u
 	}
 	s.render(w, "product.html", data)
+}
+
+// canonicalBase arma el esquema y host para URLs absolutas
+func (s *Server) canonicalBase(r *http.Request) string {
+	host := r.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = r.Host
+	}
+	scheme := r.Header.Get("X-Forwarded-Proto")
+	if scheme == "" {
+		if r.TLS != nil {
+			scheme = "https"
+		} else {
+			scheme = "http"
+		}
+	}
+	if host == "" {
+		host = "www.chroma3d.com.ar"
+	}
+	return scheme + "://" + host
+}
+
+func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
+	base := s.canonicalBase(r)
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	// listar productos
+	var all []domain.Product
+	page := 1
+	for {
+		list, total, err := s.products.List(r.Context(), domain.ProductFilter{Page: page, PageSize: 200})
+		if err != nil {
+			break
+		}
+		all = append(all, list...)
+		if len(all) >= int(total) || len(list) == 0 {
+			break
+		}
+		page++
+		if page > 10 {
+			break
+		}
+	}
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>`)
+	b.WriteString(`\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`)
+	now := time.Now().Format("2006-01-02")
+	b.WriteString("\n  <url><loc>" + base + "/" + "</loc><lastmod>" + now + "</lastmod></url>")
+	b.WriteString("\n  <url><loc>" + base + "/products" + "</loc><lastmod>" + now + "</lastmod></url>")
+	b.WriteString("\n  <url><loc>" + base + "/cart" + "</loc><lastmod>" + now + "</lastmod></url>")
+	for _, p := range all {
+		lm := p.UpdatedAt
+		if lm.IsZero() {
+			lm = p.CreatedAt
+		}
+		last := now
+		if !lm.IsZero() {
+			last = lm.Format("2006-01-02")
+		}
+		b.WriteString("\n  <url><loc>" + base + "/product/" + template.URLQueryEscaper(p.Slug) + "</loc><lastmod>" + last + "</lastmod></url>")
+	}
+	b.WriteString("\n</urlset>")
+	_, _ = w.Write([]byte(b.String()))
+}
+
+func (s *Server) handleRobots(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	data, err := os.ReadFile("robots.txt")
+	if err == nil {
+		_, _ = w.Write(data)
+		return
+	}
+	_, _ = w.Write([]byte("User-agent: *\nDisallow:\nSitemap: https://www.chroma3d.com.ar/sitemap.xml\n"))
 }
 
 func (s *Server) handleQuoteView(w http.ResponseWriter, r *http.Request) {
