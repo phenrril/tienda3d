@@ -21,10 +21,10 @@
     <p class="hero-hours">Producción diaria • Envíos a todo el país • Soporte personalizado</p>
   </div>
   <div class="hero-carousel" id="heroCarousel">
-    <img class="hc-slide active" src="/public/assets/img/img1.webp" alt="Modelo 3D 1" sizes="100vw" loading="lazy" />
-    <img class="hc-slide" src="/public/assets/img/img2.webp" alt="Modelo 3D 2" sizes="100vw" loading="lazy" />
-    <img class="hc-slide" src="/public/assets/img/img3.webp" alt="Modelo 3D 3" sizes="100vw" loading="lazy" />
-    <img class="hc-slide" src="/public/assets/img/img4.webp" alt="Modelo 3D 4" sizes="100vw" loading="lazy" />
+    <img class="hc-slide active" src="/public/assets/img/img1.webp" alt="Modelo 3D 1" sizes="100vw" fetchpriority="high" decoding="async" />
+    <img class="hc-slide" src="/public/assets/img/img2.webp" alt="Modelo 3D 2" sizes="100vw" loading="lazy" decoding="async" />
+    <img class="hc-slide" src="/public/assets/img/img3.webp" alt="Modelo 3D 3" sizes="100vw" loading="lazy" decoding="async" />
+    <img class="hc-slide" src="/public/assets/img/img4.webp" alt="Modelo 3D 4" sizes="100vw" loading="lazy" decoding="async" />
     <div class="hc-dots" id="hcDots"></div>
   </div>
 </section>
@@ -43,61 +43,7 @@
     <div class="modal-actions"><button class="btn-primary" id="howBuyOk">Entendido</button></div>
   </div>
 </div>
-<script>
-(function(){
-  // Carrusel
-  const slides=[...document.querySelectorAll('#heroCarousel .hc-slide')];
-  const dotsC=document.getElementById('hcDots');
-  slides.forEach((_,i)=>{const d=document.createElement('div');d.className='dot'+(i===0?' active':'');d.dataset.i=i;d.onclick=()=>go(i,true);dotsC.appendChild(d);});
-  let idx=0,timer=null;function go(n,manual){slides[idx].classList.remove('active');dotsC.children[idx].classList.remove('active');idx=(n+slides.length)%slides.length;slides[idx].classList.add('active');dotsC.children[idx].classList.add('active');if(manual){restart();}}
-  // Swipe support for mobile
-  let startX = 0;
-  let isSwiping = false;
-  const carousel = document.getElementById('heroCarousel');
-  if (carousel) {
-    carousel.addEventListener('touchstart', e => {
-      startX = e.touches[0].clientX;
-      isSwiping = true;
-    }, { passive: true });
-    carousel.addEventListener('touchmove', e => {
-      if (!isSwiping) return;
-      const currentX = e.touches[0].clientX;
-      const deltaX = currentX - startX;
-      if (Math.abs(deltaX) > 10) {
-        e.preventDefault(); // Prevent scroll if swiping horizontally
-      }
-    }, { passive: false });
-    carousel.addEventListener('touchend', e => {
-      if (!isSwiping) return;
-      isSwiping = false;
-      const endX = e.changedTouches[0].clientX;
-      const deltaX = endX - startX;
-      if (Math.abs(deltaX) > 50) {
-        if (deltaX > 0) {
-          go(idx - 1, true);
-        } else {
-          go(idx + 1, true);
-        }
-      }
-    }, { passive: true });
-  }
-
-  function next(){go(idx+1);}function start(){timer=setInterval(next,3000);}function restart(){clearInterval(timer);start();}start();
-  // Modal
-  const btn=document.getElementById('btnHowBuy');
-  const bd=document.getElementById('howBuyBackdrop');
-  const modal=bd?bd.querySelector('.modal'):null;
-  const closeBtn=document.getElementById('howBuyClose');
-  const okBtn=document.getElementById('howBuyOk');
-  function open(){ if(!bd||!modal) return; bd.hidden=false; bd.classList.add('show'); modal.classList.add('show'); document.body.style.overflow='hidden'; closeBtn&&closeBtn.focus(); }
-  function close(){ if(!bd||!modal) return; bd.classList.remove('show'); modal.classList.remove('show'); document.body.style.overflow=''; setTimeout(()=>{bd.hidden=true;},140); btn&&btn.focus(); }
-  btn&&btn.addEventListener('click',open);
-  closeBtn&&closeBtn.addEventListener('click',close);
-  okBtn&&okBtn.addEventListener('click',close);
-  bd&&bd.addEventListener('click',e=>{if(e.target===bd) close();});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!bd.hidden) close();});
-})();
-</script>
+<!-- JS movido a /public/assets/app.js -->
 <section style="margin-top:40px">
   <h2 class="title" style="margin-bottom:10px">Destacados</h2>
   <div class="cards cards--home">
@@ -105,7 +51,11 @@
     <div class="card">
       <div class="card-media">
         {{if .Images}}
-          <img src="{{(index .Images 0).URL}}" alt="{{if (index .Images 0).Alt}}{{(index .Images 0).Alt}}{{else}}{{.Name}}{{end}}" sizes="(max-width: 600px) 100vw, 50vw" loading="lazy" />
+          <img src="{{img (index .Images 0).URL}}"
+               alt="{{if (index .Images 0).Alt}}{{(index .Images 0).Alt}}{{else}}{{.Name}}{{end}}"
+               loading="lazy" decoding="async"
+               srcset="{{img (index .Images 0).URL}} 300w, {{imgw (index .Images 0).URL 480}} 480w, {{imgw (index .Images 0).URL 640}} 640w"
+               sizes="(max-width:480px) 92vw, (max-width:768px) 44vw, 300px" />
         {{else}}<div class="placeholder">IMG</div>{{end}}
         
       </div>

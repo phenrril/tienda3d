@@ -78,6 +78,7 @@ func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usec
 			"/webhooks/mp":  30,
 		}),
 		RateLimit(60),
+		SecurityAndStaticCache,
 		Gzip,
 		RequestID,
 		Recovery,
@@ -157,14 +158,8 @@ func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
 	sort := qv.Get("sort")
 	query := qv.Get("q")
 	category := qv.Get("category")
-	stock := qv.Get("stock")
-	var readyPtr *bool
-	if stock == "available" {
-		b := true
-		readyPtr = &b
-	}
 	pageSize := 24
-	list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: page, PageSize: pageSize, Sort: sort, Query: query, Category: category, ReadyToShip: readyPtr})
+	list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: page, PageSize: pageSize, Sort: sort, Query: query, Category: category})
 	pages := (int(total) + (pageSize - 1)) / pageSize
 	if pages == 0 {
 		pages = 1
@@ -179,7 +174,6 @@ func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
 		"Query":        query,
 		"Sort":         sort,
 		"Category":     category,
-		"StockFilter":  stock,
 		"Categories":   cats,
 		"CanonicalURL": base + "/products",
 		"OGImage":      base + "/public/assets/img/chroma-logo.png",

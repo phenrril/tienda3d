@@ -7,6 +7,9 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -81,6 +84,51 @@ type gzipResponseWriter struct {
 
 func (w *gzipResponseWriter) Write(b []byte) (int, error) { return w.Writer.Write(b) }
 
+// SecurityAndStaticCache agrega headers de seguridad y caché fuerte para /public/
+func SecurityAndStaticCache(next http.Handler) http.Handler {
+	const (
+		hsts   = "max-age=31536000; includeSubDomains; preload"
+		xcto   = "nosniff"
+		xfo    = "SAMEORIGIN"
+		refpol = "strict-origin-when-cross-origin"
+		coop   = "same-origin"
+	)
+	// Permite Google Fonts CSS y gstatic para fonts
+	const csp = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self'; font-src 'self' https://fonts.gstatic.com"
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Headers de seguridad globales
+		w.Header().Set("Strict-Transport-Security", hsts)
+		w.Header().Set("X-Content-Type-Options", xcto)
+		w.Header().Set("X-Frame-Options", xfo)
+		w.Header().Set("Referrer-Policy", refpol)
+		w.Header().Set("Cross-Origin-Opener-Policy", coop)
+		w.Header().Set("Content-Security-Policy", csp)
+
+		// Caché estático fuerte para /public/
+		if strings.HasPrefix(r.URL.Path, "/public/") && r.Method == http.MethodGet {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+
+			// ETag/Last-Modified basado en FS local
+			rel := strings.TrimPrefix(r.URL.Path, "/")
+			rel = filepath.Clean(rel)
+			if strings.HasPrefix(rel, "public"+string(filepath.Separator)) || rel == "public" {
+				if fi, err := os.Stat(rel); err == nil && fi.Mode().IsRegular() {
+					w.Header().Set("Last-Modified", fi.ModTime().UTC().Format(http.TimeFormat))
+					etag := "W=\"" + strconv.FormatInt(fi.Size(), 10) + "-" + strconv.FormatInt(fi.ModTime().Unix(), 16) + "\""
+					w.Header().Set("ETag", etag)
+					if inm := r.Header.Get("If-None-Match"); inm != "" && strings.Contains(inm, etag) {
+						w.WriteHeader(http.StatusNotModified)
+						return
+					}
+				}
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func RateLimit(maxPerMin int) func(http.Handler) http.Handler {
 	var mu sync.Mutex
 	buckets := map[string]*bucket{}
@@ -102,7 +150,7 @@ func RateLimit(maxPerMin int) func(http.Handler) http.Handler {
 			}
 			if b.count >= maxPerMin {
 				mu.Unlock()
-				http.Error(w, "rate limit", 429)
+				http.Error(w, "rate limit", http.StatusTooManyRequests)
 				return
 			}
 			b.count++
