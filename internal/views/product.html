@@ -6,7 +6,7 @@
       <div class="pd-carousel" id="pdCarousel" data-count="{{len .Product.Images}}">
         <div class="pd-slides">
           {{range $i,$img := .Product.Images}}
-            <img class="pd-slide {{if eq $i 0}}active{{end}}" src="{{$img.URL}}" alt="{{$img.Alt}}" data-index="{{$i}}" loading="lazy" />
+            <img class="pd-slide {{if eq $i 0}}active{{end}}" src="{{$img.URL}}" alt="{{if $img.Alt}}{{$img.Alt}}{{else}}{{$.Product.Name}}{{end}}" data-index="{{$i}}" loading="lazy" />
           {{end}}
         </div>
         <button type="button" class="pd-nav prev" aria-label="Anterior">‹</button>
@@ -14,7 +14,7 @@
         <div class="pd-thumbs">
           {{range $i,$img := .Product.Images}}
             <button type="button" class="pd-thumb {{if eq $i 0}}active{{end}}" data-index="{{$i}}">
-              <img src="{{$img.URL}}" alt="{{$img.Alt}} miniatura" loading="lazy" />
+              <img src="{{$img.URL}}" alt="{{if $img.Alt}}{{$img.Alt}}{{else}}{{$.Product.Name}}{{end}} miniatura" loading="lazy" />
             </button>
           {{end}}
         </div>
@@ -52,14 +52,15 @@
         <div class="cp-label">Color</div>
         <div class="cp-swatches" id="cpSwatches">
           {{range $i,$c := .Colors}}
-            <button type="button" class="swatch {{if eq $i 0}}active{{end}}" data-color="{{$c}}" style="--c: {{$c}}"></button>
+            <button type="button" class="swatch {{if eq $i 0}}active{{end}}" data-color="{{$c}}" style="--c: {{$c}}" aria-label="Seleccionar color {{$c}}" role="radio" aria-checked="{{if eq $i 0}}true{{else}}false{{end}}" name="color"></button>
           {{end}}
-          <button type="button" class="swatch swatch-other" data-color="" aria-label="Otro color" title="Otro"></button>
+          <button type="button" class="swatch swatch-other" data-color="" aria-label="Seleccionar otro color" title="Otro" role="radio" aria-checked="false" name="color"></button>
         </div>
         <div class="custom-color-row" id="customColorRow" style="display:none">
           <input type="text" id="customColorInput" placeholder="Escribe el color (ej: rojo o #ff0000)" autocomplete="off" />
         </div>
-        <input type="hidden" name="color" id="colorInput" value="{{.DefaultColor}}" />
+        <input type="hidden" name="color" id="colorInput" value="{{.DefaultColor}}" aria-describedby="color-desc" />
+        <p id="color-desc" class="sr-only">Selecciona el color del producto</p>
       </div>
       <div class="pd-actions">
         <button class="btn-primary" type="submit">Agregar al carrito</button>
@@ -115,6 +116,36 @@
       thumbs.forEach(t=>t.addEventListener('click',()=>{show(parseInt(t.dataset.index));restart();}));
       prevBtn.addEventListener('click',()=>{prev();restart();});
       nextBtn.addEventListener('click',()=>{next();restart();});
+      // Swipe support for mobile
+      let startX = 0;
+      let isSwiping = false;
+      root.addEventListener('touchstart', e => {
+        startX = e.touches[0].clientX;
+        isSwiping = true;
+      }, { passive: true });
+      root.addEventListener('touchmove', e => {
+        if (!isSwiping) return;
+        const currentX = e.touches[0].clientX;
+        const deltaX = currentX - startX;
+        if (Math.abs(deltaX) > 10) {
+          e.preventDefault(); // Prevent scroll if swiping horizontally
+        }
+      }, { passive: false });
+      root.addEventListener('touchend', e => {
+        if (!isSwiping) return;
+        isSwiping = false;
+        const endX = e.changedTouches[0].clientX;
+        const deltaX = endX - startX;
+        if (Math.abs(deltaX) > 50) {
+          if (deltaX > 0) {
+            prev();
+          } else {
+            next();
+          }
+          restart();
+        }
+      }, { passive: true });
+
       let sx=null; root.addEventListener('pointerdown',e=>{sx=e.clientX;}); root.addEventListener('pointerup',e=>{ if(sx==null) return; const dx=e.clientX-sx; if(Math.abs(dx)>40){ dx<0?next():prev(); restart(); } sx=null; });
       root.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'){next();restart();} else if(e.key==='ArrowLeft'){prev();restart();} });
       root.tabIndex=0; start();

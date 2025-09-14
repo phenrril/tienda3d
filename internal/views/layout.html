@@ -3,14 +3,37 @@
 <html lang="es">
 <head>
 <meta charset="utf-8" />
-<title>{{block "title" .}}Croma 3D — Venta por mayor y menor{{end}}</title>
+<title>{{if .PageTitle}}{{.PageTitle}}{{else}}Croma 3D — Venta por mayor y menor{{end}}</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="icon" type="image/png" href="/public/assets/img/chroma-logo.png" />
 <link rel="apple-touch-icon" href="/public/assets/img/chroma-logo.png" />
-<link rel="stylesheet" href="/public/assets/styles.css?v=dark4" />
+<link rel="stylesheet" href="/public/assets/styles.css?v=dark5" />
+<link rel="manifest" href="/public/manifest.json">
+<meta name="theme-color" content="#6366f1">
+<meta name="description" content="{{if .PageDescription}}{{.PageDescription}}{{else}}Descripción por defecto de Croma 3D: impresión 3D mayorista y minorista{{end}}">
+<link rel="canonical" href="{{.CanonicalURL}}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{if .PageTitle}}{{.PageTitle}}{{else}}Croma 3D — Venta por mayor y menor{{end}}">
+<meta property="og:description" content="{{if .PageDescription}}{{.PageDescription}}{{else}}Descripción por defecto de Croma 3D: impresión 3D mayorista y minorista{{end}}">
+<meta property="og:url" content="{{.CanonicalURL}}">
+<meta property="og:image" content="{{.OGImage}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{if .PageTitle}}{{.PageTitle}}{{else}}Croma 3D — Venta por mayor y menor{{end}}">
+<meta name="twitter:description" content="{{if .PageDescription}}{{.PageDescription}}{{else}}Descripción por defecto de Croma 3D: impresión 3D mayorista y minorista{{end}}">
+<meta name="twitter:image" content="{{.OGImage}}">
+{{with .SchemaJSON}}<script type="application/ld+json">{{.}}</script>{{end}}
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/public/sw.js')
+      .then(reg => console.log('SW registrado', reg))
+      .catch(err => console.log('SW error', err));
+  });
+}
+</script>
 </head>
 <body class="site">
 <header class="topbar">

@@ -21,10 +21,10 @@
     <p class="hero-hours">Producción diaria • Envíos a todo el país • Soporte personalizado</p>
   </div>
   <div class="hero-carousel" id="heroCarousel">
-    <img class="hc-slide active" src="/public/assets/img/img1.webp" alt="Modelo 3D 1" />
-    <img class="hc-slide" src="/public/assets/img/img2.webp" alt="Modelo 3D 2" loading="lazy" />
-    <img class="hc-slide" src="/public/assets/img/img3.webp" alt="Modelo 3D 3" loading="lazy" />
-    <img class="hc-slide" src="/public/assets/img/img4.webp" alt="Modelo 3D 4" loading="lazy" />
+    <img class="hc-slide active" src="/public/assets/img/img1.webp" alt="Modelo 3D 1" sizes="100vw" loading="lazy" />
+    <img class="hc-slide" src="/public/assets/img/img2.webp" alt="Modelo 3D 2" sizes="100vw" loading="lazy" />
+    <img class="hc-slide" src="/public/assets/img/img3.webp" alt="Modelo 3D 3" sizes="100vw" loading="lazy" />
+    <img class="hc-slide" src="/public/assets/img/img4.webp" alt="Modelo 3D 4" sizes="100vw" loading="lazy" />
     <div class="hc-dots" id="hcDots"></div>
   </div>
 </section>
@@ -50,6 +50,38 @@
   const dotsC=document.getElementById('hcDots');
   slides.forEach((_,i)=>{const d=document.createElement('div');d.className='dot'+(i===0?' active':'');d.dataset.i=i;d.onclick=()=>go(i,true);dotsC.appendChild(d);});
   let idx=0,timer=null;function go(n,manual){slides[idx].classList.remove('active');dotsC.children[idx].classList.remove('active');idx=(n+slides.length)%slides.length;slides[idx].classList.add('active');dotsC.children[idx].classList.add('active');if(manual){restart();}}
+  // Swipe support for mobile
+  let startX = 0;
+  let isSwiping = false;
+  const carousel = document.getElementById('heroCarousel');
+  if (carousel) {
+    carousel.addEventListener('touchstart', e => {
+      startX = e.touches[0].clientX;
+      isSwiping = true;
+    }, { passive: true });
+    carousel.addEventListener('touchmove', e => {
+      if (!isSwiping) return;
+      const currentX = e.touches[0].clientX;
+      const deltaX = currentX - startX;
+      if (Math.abs(deltaX) > 10) {
+        e.preventDefault(); // Prevent scroll if swiping horizontally
+      }
+    }, { passive: false });
+    carousel.addEventListener('touchend', e => {
+      if (!isSwiping) return;
+      isSwiping = false;
+      const endX = e.changedTouches[0].clientX;
+      const deltaX = endX - startX;
+      if (Math.abs(deltaX) > 50) {
+        if (deltaX > 0) {
+          go(idx - 1, true);
+        } else {
+          go(idx + 1, true);
+        }
+      }
+    }, { passive: true });
+  }
+
   function next(){go(idx+1);}function start(){timer=setInterval(next,3000);}function restart(){clearInterval(timer);start();}start();
   // Modal
   const btn=document.getElementById('btnHowBuy');
@@ -73,7 +105,7 @@
     <div class="card">
       <div class="card-media">
         {{if .Images}}
-          <img src="{{(index .Images 0).URL}}" alt="{{(index .Images 0).Alt}}" loading="lazy" />
+          <img src="{{(index .Images 0).URL}}" alt="{{if (index .Images 0).Alt}}{{(index .Images 0).Alt}}{{else}}{{.Name}}{{end}}" sizes="(max-width: 600px) 100vw, 50vw" loading="lazy" />
         {{else}}<div class="placeholder">IMG</div>{{end}}
         
       </div>
