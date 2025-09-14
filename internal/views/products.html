@@ -1,6 +1,7 @@
 {{define "products.html"}}
 {{template "layout_start" .}}
 <h1 class="section-title">Productos</h1>
+<p class="result-count">{{len .Products}} resultados{{if .Query}} para “{{.Query}}”{{end}}</p>
 <h2 class="sr-only">Filtros</h2>
 <form class="filters" method="get" action="/products">
   <div class="filters-row">
@@ -40,22 +41,91 @@
   </div>
 </form>
 
+{{if or .Category .StockFilter}}
+<div class="active-chips">
+  {{if .Category}}
+    <button type="button" class="chip" data-clear="category">Categoría: {{.Category}} ×</button>
+  {{end}}
+  {{if .StockFilter}}
+    <button type="button" class="chip" data-clear="stock">Stock: {{if eq .StockFilter "available"}}Disponibles{{else}}Todos{{end}} ×</button>
+  {{end}}
+</div>
+{{end}}
+
+<div class="mobile-actions">
+  <button class="btn-filter" aria-expanded="false" aria-controls="filterDrawer">Filtrar</button>
+  <button class="btn-sort" aria-expanded="false" aria-controls="sortSheet">Ordenar</button>
+</div>
+
+<aside id="filterDrawer" class="drawer" hidden>
+  <div class="panel">
+    <header><h2>Filtrar</h2><button class="drawer-close" aria-label="Cerrar">×</button></header>
+    <form method="get" action="/products" class="drawer-form">
+      <div class="field">
+        <input type="text" name="q" value="{{.Query}}" placeholder="Buscar por nombre..." />
+      </div>
+      <div class="field">
+        <select name="category">
+          <option value="">Todas las categorías</option>
+          {{range .Categories}}
+            <option value="{{.}}" {{if eq $.Category .}}selected{{end}}>{{.}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div class="field">
+        <select name="sort">
+          <option value="newest" {{if eq .Sort "newest"}}selected{{end}}>Novedades</option>
+          <option value="price_asc" {{if eq .Sort "price_asc"}}selected{{end}}>Precio: menor a mayor</option>
+          <option value="price_desc" {{if eq .Sort "price_desc"}}selected{{end}}>Precio: mayor a menor</option>
+          <option value="name" {{if eq .Sort "name"}}selected{{end}}>Nombre A–Z</option>
+        </select>
+      </div>
+      <div class="toggle-group">
+        <label class="toggle {{if ne .StockFilter "available"}}active{{end}}">
+          <input type="radio" name="stock" value="" {{if ne .StockFilter "available"}}checked{{end}} />
+          <span>Todos</span>
+        </label>
+        <label class="toggle {{if eq .StockFilter "available"}}active{{end}}">
+          <input type="radio" name="stock" value="available" {{if eq .StockFilter "available"}}checked{{end}} />
+          <span>Disponibles</span>
+        </label>
+      </div>
+      <footer><button type="submit" class="btn-primary">Aplicar filtros</button></footer>
+    </form>
+  </div>
+</aside>
+
+<div id="sortSheet" class="sheet" hidden>
+  <h2>Ordenar</h2>
+  <ul class="sort-list">
+    <li><button type="button" data-sort="newest">Novedades</button></li>
+    <li><button type="button" data-sort="price_asc">Precio: menor a mayor</button></li>
+    <li><button type="button" data-sort="price_desc">Precio: mayor a menor</button></li>
+    <li><button type="button" data-sort="name">Nombre A–Z</button></li>
+  </ul>
+</div>
+
 <div class="cards cards--products">
-  {{range .Products}}
+  {{range $idx, $p := .Products}}
   <div class="card">
-    <div class="card-media">
-      {{if .Images}}
-        <img src="{{(index .Images 0).URL}}" alt="{{if (index .Images 0).Alt}}{{(index .Images 0).Alt}}{{else}}{{.Name}}{{end}}" sizes="(max-width: 600px) 100vw, 50vw" loading="lazy" />
+    <div class="card-media ar-1-1">
+      {{if $p.Images}}
+        <img src="{{(index $p.Images 0).URL}}"
+             alt="{{if (index $p.Images 0).Alt}}{{(index $p.Images 0).Alt}}{{else}}{{$p.Name}}{{end}}"
+             loading="lazy" decoding="async" {{if eq $idx 0}}fetchpriority="high"{{end}}
+             srcset="{{(index $p.Images 0).URL}} 300w, {{(index $p.Images 0).URL}}?w=480 480w, {{(index $p.Images 0).URL}}?w=640 640w"
+             sizes="(max-width:480px) 92vw, (max-width:768px) 44vw, 300px"
+             class="card-img" />
       {{else}}
         <div class="placeholder">IMG</div>
       {{end}}
     </div>
     <div class="card-body">
-      <h3 class="card-title"><a href="/product/{{.Slug}}">{{.Name}}</a></h3>
-      <div class="card-meta">{{.Category}}</div>
-      <div class="price-row"><span class="price">${{printf "%.0f" .BasePrice}}</span></div>
+      <h3 class="card-title"><a href="/product/{{$p.Slug}}">{{$p.Name}}</a></h3>
+      <div class="card-meta">{{$p.Category}}</div>
+      <div class="price-row"><span class="price">${{printf "%.0f" $p.BasePrice}}</span></div>
       <div class="actions">
-        <a href="/product/{{.Slug}}" class="btn-secondary small">Ver detalles ›</a>
+        <a href="/product/{{$p.Slug}}" class="btn-secondary btn-full">Ver detalles ›</a>
       </div>
     </div>
   </div>
@@ -65,6 +135,11 @@
   {{end}}
 </div>
 
+<div style="text-align:center;margin:12px 0">
+  <button id="loadMore" class="btn-secondary" data-next="{{if lt .Page .Pages}}?page={{add .Page 1}}&q={{.Query}}&category={{.Category}}&sort={{.Sort}}&stock={{.StockFilter}}{{end}}" {{if not (lt .Page .Pages)}}disabled{{end}}>Cargar más</button>
+  <div id="loadMoreStatus" class="sr-only" aria-live="polite"></div>
+</div>
+
 {{if and .Page .Pages}}
 <div class="pagination">
   {{if gt .Page 1}}<a href="?page={{sub .Page 1}}&q={{.Query}}&category={{.Category}}&sort={{.Sort}}&stock={{.StockFilter}}" class="page-btn">‹ Anterior</a>{{end}}
@@ -72,5 +147,67 @@
   {{if lt .Page .Pages}}<a href="?page={{add .Page 1}}&q={{.Query}}&category={{.Category}}&sort={{.Sort}}&stock={{.StockFilter}}" class="page-btn">Siguiente ›</a>{{end}}
 </div>
 {{end}}
+
+<script>
+(function(){
+  const filterBtn=document.querySelector('.btn-filter');
+  const sortBtn=document.querySelector('.btn-sort');
+  const drawer=document.getElementById('filterDrawer');
+  const drawerClose=drawer?drawer.querySelector('.drawer-close'):null;
+  const sheet=document.getElementById('sortSheet');
+  function open(el,btn){if(!el)return;el.hidden=false;if(btn)btn.setAttribute('aria-expanded','true');}
+  function close(el,btn){if(!el)return;el.hidden=true;if(btn)btn.setAttribute('aria-expanded','false');}
+  filterBtn&&filterBtn.addEventListener('click',()=>open(drawer,filterBtn));
+  drawerClose&&drawerClose.addEventListener('click',()=>close(drawer,filterBtn));
+  sortBtn&&sortBtn.addEventListener('click',()=>{if(sheet.hidden){open(sheet,sortBtn)}else{close(sheet,sortBtn)}});
+  window.addEventListener('keydown',(e)=>{if(e.key==='Escape'){if(drawer&&!drawer.hidden) close(drawer,filterBtn); if(sheet&&!sheet.hidden) close(sheet,sortBtn);}});
+  if(drawer){drawer.addEventListener('click',(e)=>{if(e.target===drawer) close(drawer,filterBtn);});}
+
+  document.querySelectorAll('#sortSheet [data-sort]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const val=btn.getAttribute('data-sort');
+      const url=new URL(window.location.href);
+      if(val) url.searchParams.set('sort',val); else url.searchParams.delete('sort');
+      window.location.href=url.pathname+"?"+url.searchParams.toString();
+    });
+  });
+
+  document.querySelectorAll('.chip[data-clear]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const key=btn.getAttribute('data-clear');
+      const url=new URL(window.location.href);
+      url.searchParams.delete(key);
+      window.location.href=url.pathname+(url.searchParams.toString()?"?"+url.searchParams.toString():"");
+    });
+  });
+
+  const loadBtn=document.getElementById('loadMore');
+  const cards=document.querySelector('.cards');
+  const statusEl=document.getElementById('loadMoreStatus');
+  function announce(msg){if(statusEl){statusEl.textContent=msg;}}
+  if(loadBtn && cards){
+    loadBtn.addEventListener('click',async()=>{
+      const next=loadBtn.getAttribute('data-next');
+      if(!next){loadBtn.disabled=true;return}
+      const oldText=loadBtn.textContent; loadBtn.disabled=true; loadBtn.textContent='Cargando...'; announce('Cargando más productos');
+      try{
+        const res=await fetch(next,{credentials:'same-origin'});
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const html=await res.text();
+        const parser=new DOMParser();
+        const doc=parser.parseFromString(html,'text/html');
+        const newCards=doc.querySelectorAll('.cards > .card');
+        newCards.forEach(n=>cards.appendChild(n));
+        const newBtn=doc.getElementById('loadMore');
+        const newNext=newBtn?newBtn.getAttribute('data-next'):'';
+        if(newNext){loadBtn.setAttribute('data-next',newNext);loadBtn.disabled=false;loadBtn.textContent=oldText;announce('Se cargaron más productos');}
+        else{loadBtn.setAttribute('data-next','');loadBtn.disabled=true;loadBtn.textContent='No hay más';announce('No hay más productos');}
+      }catch(err){
+        loadBtn.disabled=false; loadBtn.textContent=oldText; announce('Error al cargar');
+      }
+    });
+  }
+})();
+</script>
 {{template "layout_end" .}}
 {{end}}
