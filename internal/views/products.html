@@ -10,9 +10,9 @@
 </div>
 
 <aside id="filterDrawer" class="drawer" hidden aria-hidden="true">
-  <form id="filtersForm" class="filters" method="get" action="/products">
+  <form id="filtersForm" method="get" action="/products" class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
     <header class="drawer-head">
-      <h2>Filtrar</h2>
+      <h2 id="drawerTitle">Filtrar</h2>
       <button type="button" class="drawer-close" aria-label="Cerrar">×</button>
     </header>
 
@@ -30,7 +30,6 @@
           {{end}}
         </select>
       </div>
-
       <input type="hidden" id="sortInput" name="sort" value="{{.Sort}}">
     </div>
 
@@ -97,84 +96,6 @@
 </div>
 {{end}}
 
-<script>
-(function(){
-  const $ = s => document.querySelector(s);
-  const filterBtn = $('.btn-filter');
-  const sortBtn   = $('.btn-sort');
-  const drawer    = $('#filterDrawer');
-  const sheet     = $('#sortSheet');
-  const closeD    = drawer?.querySelector('.drawer-close');
-  const closeS    = sheet?.querySelector('.sheet-close');
-  const form      = $('#filtersForm');
-  const sortInput = $('#sortInput');
-
-  function open(el, btn){ el.hidden=false; el.setAttribute('aria-hidden','false'); btn?.setAttribute('aria-expanded','true'); document.body.style.overflow='hidden'; }
-  function close(el, btn){ el.hidden=true;  el.setAttribute('aria-hidden','true');  btn?.setAttribute('aria-expanded','false'); document.body.style.overflow=''; }
-
-  filterBtn?.addEventListener('click', ()=> open(drawer, filterBtn));
-  closeD?.addEventListener('click',   ()=> close(drawer, filterBtn));
-  sortBtn?.addEventListener('click',  ()=> open(sheet, sortBtn));
-  closeS?.addEventListener('click',   ()=> close(sheet, sortBtn));
-
-  drawer?.addEventListener('click', e => { if(e.target===drawer) close(drawer, filterBtn); });
-  sheet?.addEventListener('click',  e => { if(e.target===sheet)  close(sheet,  sortBtn); });
-
-  sheet?.querySelectorAll('[data-sort]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      if(!sortInput || !form) return;
-      sortInput.value = btn.dataset.sort;
-      form.submit();
-    });
-  });
-
-  document.addEventListener('keydown', (e)=>{
-    if(e.key==='Escape'){
-      if(!drawer?.hidden) close(drawer, filterBtn);
-      if(!sheet?.hidden)  close(sheet,  sortBtn);
-    }
-  });
-})();
-</script>
-<script>
-(function(){
-  const $ = s => document.querySelector(s);
-  const filterBtn = $('.btn-filter');
-  const sortBtn   = $('.btn-sort');
-  const drawer    = $('#filterDrawer');
-  const sheet     = $('#sortSheet');
-  const closeD    = drawer?.querySelector('.drawer-close');
-  const closeS    = sheet?.querySelector('.sheet-close');
-  const form      = $('#filtersForm');
-  const sortInput = $('#sortInput');
-
-  function open(el, btn){ el.hidden=false; el.setAttribute('aria-hidden','false'); btn?.setAttribute('aria-expanded','true'); document.body.style.overflow='hidden'; }
-  function close(el, btn){ el.hidden=true;  el.setAttribute('aria-hidden','true');  btn?.setAttribute('aria-expanded','false'); document.body.style.overflow=''; }
-
-  filterBtn?.addEventListener('click', ()=> open(drawer, filterBtn));
-  closeD?.addEventListener('click',   ()=> close(drawer, filterBtn));
-  sortBtn?.addEventListener('click',  ()=> open(sheet, sortBtn));
-  closeS?.addEventListener('click',   ()=> close(sheet, sortBtn));
-
-  drawer?.addEventListener('click', e => { if(e.target===drawer) close(drawer, filterBtn); });
-  sheet?.addEventListener('click',  e => { if(e.target===sheet)  close(sheet,  sortBtn); });
-
-  sheet?.querySelectorAll('[data-sort]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      if(!sortInput || !form) return;
-      sortInput.value = btn.dataset.sort;
-      form.submit();
-    });
-  });
-
-  document.addEventListener('keydown', (e)=>{
-    if(e.key==='Escape'){
-      if(!drawer?.hidden) close(drawer, filterBtn);
-      if(!sheet?.hidden)  close(sheet,  sortBtn);
-    }
-  });
-})();
-</script>
 <!-- JS movido a /public/assets/app.js -->
 {{template "layout_end" .}}
 {{end}}

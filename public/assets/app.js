@@ -52,16 +52,60 @@
   const sortBtn=document.querySelector('.btn-sort');
   const drawer=document.getElementById('filterDrawer');
   const drawerClose=drawer?drawer.querySelector('.drawer-close'):null;
+  const panel=drawer?drawer.querySelector('.drawer-panel'):null;
   const sheet=document.getElementById('sortSheet');
-  function open(el,btn){if(!el)return;el.hidden=false;if(btn)btn.setAttribute('aria-expanded','true');}
-  function close(el,btn){if(!el)return;el.hidden=true;if(btn)btn.setAttribute('aria-expanded','false');}
-  filterBtn&&filterBtn.addEventListener('click',()=>open(drawer,filterBtn));
-  drawerClose&&drawerClose.addEventListener('click',()=>close(drawer,filterBtn));
-  sortBtn&&sortBtn.addEventListener('click',()=>{if(sheet.hidden){open(sheet,sortBtn)}else{close(sheet,sortBtn)}});
-  window.addEventListener('keydown',(e)=>{if(e.key==='Escape'){if(drawer&&!drawer.hidden) close(drawer,filterBtn); if(sheet&&!sheet.hidden) close(sheet,sortBtn);}});
-  if(drawer){drawer.addEventListener('click',(e)=>{if(e.target===drawer) close(drawer,filterBtn);});}
-  document.querySelectorAll('#sortSheet [data-sort]').forEach(btn=>{btn.addEventListener('click',()=>{const val=btn.getAttribute('data-sort');const url=new URL(window.location.href);if(val) url.searchParams.set('sort',val); else url.searchParams.delete('sort'); window.location.href=url.pathname+"?"+url.searchParams.toString();});});
-  document.querySelectorAll('.chip[data-clear]').forEach(btn=>{btn.addEventListener('click',()=>{const key=btn.getAttribute('data-clear');const url=new URL(window.location.href);url.searchParams.delete(key);window.location.href=url.pathname+(url.searchParams.toString()?"?"+url.searchParams.toString():"");});});
+  const form=document.getElementById('filtersForm');
+  const sortInput=document.getElementById('sortInput');
+
+  function openDrawer(){
+    if(!drawer) return;
+    drawer.hidden=false;
+    drawer.setAttribute('aria-hidden','false');
+    filterBtn&&filterBtn.setAttribute('aria-expanded','true');
+    document.body.classList.add('drawer-open');
+    const first=panel&&panel.querySelector('input, select, button');
+    if(first) first.focus();
+  }
+  function closeDrawer(){
+    if(!drawer) return;
+    drawer.hidden=true;
+    drawer.setAttribute('aria-hidden','true');
+    filterBtn&&filterBtn.setAttribute('aria-expanded','false');
+    document.body.classList.remove('drawer-open');
+  }
+  function openSheet(){ if(!sheet) return; sheet.hidden=false; sortBtn&&sortBtn.setAttribute('aria-expanded','true'); }
+  function closeSheet(){ if(!sheet) return; sheet.hidden=true;  sortBtn&&sortBtn.setAttribute('aria-expanded','false'); }
+
+  filterBtn&&filterBtn.addEventListener('click',openDrawer);
+  drawerClose&&drawerClose.addEventListener('click',closeDrawer);
+  sortBtn&&sortBtn.addEventListener('click',()=>{ if(sheet&&sheet.hidden){ openSheet(); } else { closeSheet(); } });
+  window.addEventListener('keydown',(e)=>{
+    if(e.key==='Escape'){
+      if(drawer&&!drawer.hidden) closeDrawer();
+      if(sheet&&!sheet.hidden) closeSheet();
+    }
+  });
+  if(drawer){ drawer.addEventListener('click',(e)=>{ if(e.target===drawer) closeDrawer(); }); }
+
+  // Ordenar: setear hidden input y enviar el form
+  document.querySelectorAll('#sortSheet [data-sort]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      if(!sortInput || !form) return;
+      sortInput.value=btn.getAttribute('data-sort')||'';
+      form.submit();
+    });
+  });
+
+  // Chips limpiar (si existen)
+  document.querySelectorAll('.chip[data-clear]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const key=btn.getAttribute('data-clear');
+      const url=new URL(window.location.href);
+      if(key) url.searchParams.delete(key);
+      window.location.href=url.pathname+(url.searchParams.toString()?"?"+url.searchParams.toString():"");
+    });
+  });
+
   const loadBtn=document.getElementById('loadMore');
   const cards=document.querySelector('.cards');
   const statusEl=document.getElementById('loadMoreStatus');
