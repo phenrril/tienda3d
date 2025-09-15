@@ -1267,6 +1267,16 @@ func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Máximo 6 imágenes por producto: calcular remanente
+	currentCount := 0
+	if rp, err := s.products.GetBySlug(r.Context(), p.Slug); err == nil && rp != nil {
+		currentCount = len(rp.Images)
+	}
+	maxRemaining := 6 - currentCount
+	if maxRemaining < 0 {
+		maxRemaining = 0
+	}
+
 	files := []*multipart.FileHeader{}
 	if r.MultipartForm != nil {
 		if fhArr, ok := r.MultipartForm.File["image"]; ok {
@@ -1275,6 +1285,13 @@ func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 		if fhArr, ok := r.MultipartForm.File["images"]; ok {
 			files = append(files, fhArr...)
 		}
+	}
+	if maxRemaining == 0 {
+		writeJSON(w, 201, map[string]any{"product": p, "added_images": 0, "limit_reached": true})
+		return
+	}
+	if len(files) > maxRemaining {
+		files = files[:maxRemaining]
 	}
 	imgs := []domain.Image{}
 	for _, fh := range files {
