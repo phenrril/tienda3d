@@ -1560,7 +1560,8 @@ func (s *Server) handleAdminAuth(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "token", 500)
 			return
 		}
-		http.SetCookie(w, &http.Cookie{Name: "admin_token", Value: tok, Path: "/", MaxAge: 60 * 60 * 6, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
+		secure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+		http.SetCookie(w, &http.Cookie{Name: "admin_token", Value: tok, Path: "/", MaxAge: 60 * 60 * 6, HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode})
 		http.Redirect(w, r, "/admin/products", 302)
 		return
 	}
@@ -1568,7 +1569,8 @@ func (s *Server) handleAdminAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAdminLogout(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{Name: "admin_token", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
+	secure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+	http.SetCookie(w, &http.Cookie{Name: "admin_token", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode})
 	http.Redirect(w, r, "/admin/auth", 302)
 }
 
