@@ -3,6 +3,7 @@
 // - Carousel home
 // - Modal "Cómo comprar"
 // - Products drawer/sheet + load more
+// - Carrito: cálculo de envío
 // - SW registration (idle)
 
 // Nav drawer
@@ -121,11 +122,52 @@
   }
 })();
 
+// Carrito: cálculo de envío y total (compatible con CSP)
+(function(){
+  const form=document.getElementById('checkoutForm'); if(!form) return;
+  const shipRadios=form.querySelectorAll('input[name="shipping"]');
+  const envioGroup=document.getElementById('envioGroup');
+  const cadeteGroup=document.getElementById('cadeteGroup');
+  const provinceSelect=document.getElementById('provinceSelect');
+  const shipCostEl=document.getElementById('shipCost');
+  const grandEl=document.getElementById('grandTotal');
+  const subtotalEl=document.getElementById('subtotalVal');
+  const base=parseFloat((grandEl?.textContent||'').replace(/[^0-9.,]/g,'').replace(',','.'))||0;
+  const CADETE_COST=5000;
+  const COSTS=(()=>{ const m={}; document.querySelectorAll('#pcData [data-prov]').forEach(n=>{ const k=n.getAttribute('data-prov'); const v=parseFloat(n.getAttribute('data-cost')||'0'); if(k){ m[k]=v; } }); return m; })();
+  const phone = form.querySelector('input[name="phone"]');
+  const addrCadete = form.querySelector('input[name="address_cadete"]');
+  const addrEnvio = form.querySelector('input[name="address_envio"]');
+  const postal = form.querySelector('input[name="postal_code"]');
+  const dni = form.querySelector('input[name="dni"]');
+  function setRequired(el,flag){ if(!el) return; if(flag){el.setAttribute('required','required')} else {el.removeAttribute('required')} }
+  function calcCost(){
+    let method='retiro'; shipRadios.forEach(r=>{ if(r.checked) method=r.value });
+    if(envioGroup) envioGroup.style.display='none'; if(cadeteGroup) cadeteGroup.style.display='none';
+    setRequired(phone,false); setRequired(addrCadete,false); setRequired(addrEnvio,false); setRequired(provinceSelect,false); setRequired(postal,false); setRequired(dni,false);
+    let cost=0;
+    if(method==='envio'){
+      if(envioGroup) envioGroup.style.display='flex';
+      setRequired(phone,true); setRequired(addrEnvio,true); setRequired(provinceSelect,true); setRequired(postal,true); setRequired(dni,true);
+      const prov=provinceSelect?provinceSelect.value:''; if(prov && COSTS[prov]!=null){cost=COSTS[prov];}
+    } else if(method==='cadete') {
+      if(cadeteGroup) cadeteGroup.style.display='flex';
+      setRequired(phone,true); setRequired(addrCadete,true);
+      cost=CADETE_COST;
+    }
+    if(shipCostEl) shipCostEl.textContent='$'+cost.toFixed(2);
+    const withShip=(base+cost).toFixed(2);
+    if(grandEl) grandEl.textContent='$'+withShip;
+    if(subtotalEl) subtotalEl.textContent='$'+withShip;
+  }
+  shipRadios.forEach(r=>r.addEventListener('change',calcCost));
+  provinceSelect && provinceSelect.addEventListener('change',calcCost);
+  calcCost();
+})();
+
 // Registrar Service Worker en idle para no bloquear carga
 if ('serviceWorker' in navigator) {
   const registerSW = () => navigator.serviceWorker.register('/public/sw.js').catch(()=>{});
   if (window.requestIdleCallback) requestIdleCallback(registerSW, {timeout: 2000});
   else window.addEventListener('load', registerSW, {once:true});
 }
-
-
