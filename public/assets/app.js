@@ -241,6 +241,16 @@ if ('serviceWorker' in navigator) {
         window.open('https://www.instagram.com/direct/new/','_blank','noopener');
         flash(copied?'Texto copiado. Pega en Instagram':'No se pudo copiar');
       }
+    } else if(kind==='x'){
+      const u=encodeURIComponent(url);
+      const t=encodeURIComponent(`Mira este producto: ${productName}`);
+      const xUrl=`https://twitter.com/intent/tweet?url=${u}&text=${t}`;
+      window.open(xUrl,'_blank','noopener');
+    } else if(kind==='threads'){
+      const u=encodeURIComponent(url);
+      const t=encodeURIComponent(`Mira este producto: ${productName}`);
+      const thUrl=`https://www.threads.net/intent/post?text=${t}%20${u}`;
+      window.open(thUrl,'_blank','noopener');
     }
   });
 })();
