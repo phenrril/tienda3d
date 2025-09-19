@@ -207,6 +207,44 @@ if ('serviceWorker' in navigator) {
   root.tabIndex=0; start();
 })();
 
+// Producto: compartir (CSP-safe)
+(function(){
+  const bar=document.getElementById('pdShareBar'); if(!bar) return;
+  const msgEl=document.getElementById('shareMsg');
+  const titleEl=document.querySelector('.pd-title');
+  const productName=titleEl?((titleEl.textContent||'').trim()):'';
+  const buildURL=()=>window.location.href.split('#')[0];
+  function flash(t){ if(!msgEl) return; msgEl.textContent=t; msgEl.style.display='inline'; msgEl.classList.add('show'); setTimeout(()=>{ msgEl.style.display='none'; msgEl.classList.remove('show'); },2500); }
+  bar.addEventListener('click', async e=>{
+    const btn=e.target.closest('.share-btn'); if(!btn) return;
+    e.preventDefault();
+    const url=buildURL();
+    const text=`Mira este producto: ${productName} - ${url}`;
+    const kind=btn.getAttribute('data-share');
+    if(kind==='copy'){
+      let copied=false;
+      try{ if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); copied=true; } }catch{}
+      if(!copied){ try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); ta.remove(); copied=true; }catch{} }
+      flash(copied?'Enlace copiado':'No se pudo copiar');
+    } else if(kind==='whatsapp'){
+      const enc=encodeURIComponent(text);
+      const w1=`https://wa.me/?text=${enc}`;
+      const w2=`https://api.whatsapp.com/send?text=${enc}`;
+      const win=window.open(w1,'_blank','noopener');
+      if(!win || win.closed){ setTimeout(()=>{ window.open(w2,'_blank','noopener') || (location.href=w1); },50); }
+    } else if(kind==='instagram'){
+      const shareData={title:productName,text:`Mira este producto: ${productName}`,url};
+      if(navigator.share){ try{ await navigator.share(shareData); }catch{} }
+      else {
+        let copied=false; try{ if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); copied=true; } }catch{}
+        if(!copied){ try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); ta.remove(); copied=true; }catch{} }
+        window.open('https://www.instagram.com/direct/new/','_blank','noopener');
+        flash(copied?'Texto copiado. Pega en Instagram':'No se pudo copiar');
+      }
+    }
+  });
+})();
+
 // Admin: productos (form + tabla + dropzone) sin inline JS
 (function(){
   const form=document.getElementById('prodForm'); if(!form) return;
