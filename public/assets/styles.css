@@ -1,5 +1,5 @@
 *{box-sizing:border-box}html,body{margin:0;padding:0}
-:root{--bg:#0d1117;--text:#e5e7eb;--muted:#94a3b8;--brand:#ffffff;--accent:#6366f1;--accent-2:#10b981;--border:#243044;--panel:#1b2430;--panel-alt:#222f3b;--danger:#ef4444;--topbar-h:56px;--z-topbar:100;--z-fab:200;--z-drawer-backdrop:1100;--z-drawer-panel:1110}
+:root{--bg:#0d1117;--text:#e5e7eb;--muted:#94a3b8;--brand:#ffffff;--accent:#6366f1;--accent-2:#10b981;--border:#243044;--panel:#1b2430;--panel-alt:#222f3b;--danger:#ef4444;--topbar-h:72px;--z-topbar:100;--z-fab:200;--z-drawer-backdrop:1100;--z-drawer-panel:1110}
 body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;color:var(--text);background:var(--bg)}
 .container{max-width:1050px;margin:0 auto;padding:0 16px}
 .row{display:flex;gap:16px}.between{justify-content:space-between}.center{align-items:center}
@@ -8,14 +8,14 @@ body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantar
 .content{flex:1 1 auto}
 
 
-.topbar{background:#111827;color:#fff}
+.topbar{background:#111827;color:#fff;padding:12px 0;box-shadow:0 1px 0 rgba(31,41,55,.8)}
 .brand{display:flex;flex-direction:row;align-items:center;gap:10px;color:#fff;text-decoration:none}
-.brand-logo{background:#f1f5f9;padding:4px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.06),0 2px 4px -2px rgba(0,0,0,.55);display:block;width:40px;height:40px;object-fit:contain}
+.brand-logo{background:#f1f5f9;padding:4px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.06),0 2px 4px -2px rgba(0,0,0,.55);display:block;width:56px;height:56px;object-fit:contain}
 .brand-text{display:flex;flex-direction:column;gap:2px;line-height:1}
-.brand-title{font-weight:700;font-size:18px}
-.brand-sub{font-size:12px;opacity:.8}
-.mainnav{display:flex;gap:14px;align-items:center}
-.mainnav a{color:#fff;text-decoration:underline;text-underline-offset:2px;font-size:14px;opacity:.92}
+.brand-title{font-weight:700;font-size:20px}
+.brand-sub{font-size:13px;opacity:.8}
+.mainnav{display:flex;gap:18px;align-items:center}
+.mainnav a{color:#fff;text-decoration:underline;text-underline-offset:2px;font-size:15px;opacity:.92}
 .mainnav a:hover{opacity:1}
 .mainnav .whatsapp{background:#25D366;color:#111827;border-radius:8px;padding:8px 10px;font-weight:600}
 
@@ -119,6 +119,12 @@ body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantar
 @media (max-width:900px){.product-detail{grid-template-columns:1fr}}
 .pd-media{background:#0f1822;border:1px solid var(--border);border-radius:18px;padding:12px;display:flex;align-items:center;justify-content:center;width:100%;min-height:auto;align-self:start}
 
+.pd-price{font-size:28px;font-weight:800;margin:6px 0 10px}
+
+.pd-desc{margin:10px 0 6px;line-height:1.55}
+.pd-cat{margin:6px 0}
+.pd-size{margin:6px 0 12px}
+
 .pd-carousel{position:relative;display:flex;flex-direction:column;gap:10px;width:100%}
 
 .pd-slides{position:relative;width:100%;height:clamp(220px,40vw,520px);max-height:70vh}
@@ -137,6 +143,11 @@ body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantar
 
 @media (min-width:1600px){.product-detail{grid-template-columns:640px 1fr}}
 
+
+/* Nota informativa en detalle de producto */
+.pd-note{margin:10px 0 12px;padding:10px 12px;border:1px solid #223140;background:linear-gradient(145deg,#13202b,#101a23);border-radius:12px;font-size:13px;color:#e2e8f0}
+.pd-note a{color:#25D366;text-decoration:underline;text-underline-offset:2px}
+.pd-note strong{color:#cbd5e1}
 
 @media (max-width:520px){
   .product-detail{gap:28px}
@@ -229,11 +240,12 @@ body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantar
 @media (max-width:640px){
   .cart-header h1{font-size:20px}
   .hero-copy h1{font-size:26px}
-  .brand-title{font-size:16px}
-  .brand-sub{font-size:11px}
+  .brand-title{font-size:18px}
+  .brand-sub{font-size:12px}
 }
 
 @media (max-width:480px){
+  :root{--topbar-h:64px}
   .mainnav{width:78%}
   .btn-primary,.btn-secondary{padding:9px 12px}
   .cards{gap:10px}

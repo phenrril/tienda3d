@@ -44,8 +44,12 @@
       </div>
       <span class="share-msg" id="shareMsg" role="status" aria-live="polite" style="display:none"></span>
     </div>
-    <p class="pd-desc">{{.Product.ShortDesc}}</p>
-    <div class="pd-size">Tamaño aprox: {{printf "%.0f" .Product.WidthMM}}x{{printf "%.0f" .Product.HeightMM}}x{{printf "%.0f" .Product.DepthMM}}mm</div>
+    <p class="pd-desc"><strong>Descripción:</strong> {{.Product.ShortDesc}}</p>
+    <div class="pd-cat"><strong>Categoría:</strong> {{.Product.Category}}</div>
+    <div class="pd-size"><strong>Tamaño aprox:</strong> {{printf "%.0f" .Product.WidthMM}}x{{printf "%.0f" .Product.HeightMM}}x{{printf "%.0f" .Product.DepthMM}}mm</div>
+    <div class="pd-note" role="note">
+      <strong>Importante:</strong> el tiempo de impresión depende del tamaño de cada pieza. Para cualquier consulta, escribinos por <a href="https://wa.me/5493416219815" target="_blank" rel="noopener">WhatsApp</a>.
+    </div>
     <form method="post" action="/cart" class="pd-form">
       <input type="hidden" name="slug" value="{{.Product.Slug}}" />
       <div class="color-picker">
@@ -68,9 +72,7 @@
         <span id="addedMsg" class="added-msg" {{if ne .Added 1}}hidden{{end}}>{{if eq .Added 1}}Agregado!{{end}}</span>
       </div>
     </form>
-    <div class="pd-meta">
-      <div><strong>Categoría:</strong> {{.Product.Category}}</div>
-    </div>
+    
   </div>
 </article>
 <script>
@@ -156,45 +158,7 @@
     }
   }
 })();
-// Share buttons logic
-(function(){
-  const bar=document.getElementById('pdShareBar'); if(!bar) return;
-  const msgEl=document.getElementById('shareMsg');
-  const titleEl=document.querySelector('.pd-title');
-  const productName=titleEl?((titleEl.textContent||'').trim()):'';
-  const buildURL=()=>window.location.href;
-  function flash(t){ if(!msgEl) return; msgEl.textContent=t; msgEl.style.display='inline'; msgEl.classList.add('show'); setTimeout(()=>{ msgEl.style.display='none'; msgEl.classList.remove('show'); },2500); }
-  bar.addEventListener('click',e=>{
-    const btn=e.target.closest('.share-btn'); if(!btn) return;
-    const url=buildURL();
-    const text=`Mira este producto: ${productName} - ${url}`;
-    const kind=btn.dataset.share;
-    if(kind==='copy'){
-      (navigator.clipboard?navigator.clipboard.writeText(text):Promise.reject()).catch(()=>{ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch{} ta.remove(); }).finally(()=>flash('Enlace copiado'));
-    }else if(kind==='whatsapp'){
-      const wurl='https://wa.me/?text='+encodeURIComponent(text);
-      window.open(wurl,'_blank','noopener');
-    }else if(kind==='instagram'){
-      const shareData={title:productName,text:`Mira este producto: ${productName}`,url};
-      if(navigator.share){
-        navigator.share(shareData).catch(()=>{});
-      }else{
-        (async()=>{
-          const fullText=`Mira este producto: ${productName} - ${url}`;
-          let copied=false;
-          if(navigator.clipboard && window.isSecureContext){
-            try{ await navigator.clipboard.writeText(fullText); copied=true; }catch{}
-          }
-          if(!copied){
-            try{ const ta=document.createElement('textarea'); ta.value=fullText; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); copied=true; }catch{}
-          }
-          window.open('https://www.instagram.com/direct/new/','_blank','noopener');
-          if(copied){ flash('Texto copiado. Pega en Instagram'); } else { flash('No se pudo copiar'); setTimeout(()=>window.prompt('Copia y pega en Instagram:', fullText),450); }
-        })();
-      }
-    }
-  });
-})();
+// Share buttons logic movido a /public/assets/app.js por CSP
 // Nuevo: interceptar submit para añadir al carrito sin recargar
 (function(){
   const form=document.querySelector('.pd-form'); if(!form) return;
