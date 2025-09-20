@@ -28,7 +28,7 @@
         {{if .Image}}<img src="{{.Image}}" alt="{{.Name}}" class="thumb" loading="lazy" />{{end}}
         <span>{{.Name}}</span>
       </td>
-      <td><div class="color-dot" style="background: {{.Color}};"></div></td>
+      <td><div class="color-dot" style="background: {{colorhex .Color}};"></div></td>
       <td>
         <form method="post" action="/cart/update" class="qty-form">
           <input type="hidden" name="slug" value="{{.Slug}}" />
