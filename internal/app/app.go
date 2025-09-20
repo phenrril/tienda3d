@@ -213,7 +213,7 @@ func seedProducts(db *gorm.DB) {
 }
 
 func seedPages(db *gorm.DB) {
-	pages := []domain.Page{{Slug: "about", Title: "Sobre Croma 3D", BodyMD: "Somos un taller de impresión 3D."}, {Slug: "contact", Title: "Contacto", BodyMD: "Escribinos a hola@example.com"}}
+	pages := []domain.Page{{Slug: "about", Title: "Sobre Chroma3D", BodyMD: "Somos un taller de impresión 3D."}, {Slug: "contact", Title: "Contacto", BodyMD: "Escribinos a hola@example.com"}}
 	for _, p := range pages {
 		db.Create(&p)
 	}
