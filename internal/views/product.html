@@ -64,7 +64,7 @@
         <div class="cp-label">Color <span id="colorPreview" class="color-dot" style="vertical-align:middle;margin-left:8px"></span></div>
         <div class="cp-swatches" id="cpSwatches">
           {{range $i,$c := .Colors}}
-            <button type="button" class="swatch {{if eq $i 0}}active{{end}}" data-color="{{$c}}" style="--c: {{$c}}" aria-label="Seleccionar color {{$c}}" role="radio" aria-checked="{{if eq $i 0}}true{{else}}false{{end}}"></button>
+            <button type="button" class="swatch {{if eq $i 0}}active{{end}}" data-color="{{$c}}" style="--c: {{colorhex $c}}" aria-label="Seleccionar color {{$c}}" role="radio" aria-checked="{{if eq $i 0}}true{{else}}false{{end}}"></button>
           {{end}}
           <button type="button" class="swatch swatch-other" data-color="" aria-label="Seleccionar otro color" title="Otro" role="radio" aria-checked="false"></button>
         </div>
