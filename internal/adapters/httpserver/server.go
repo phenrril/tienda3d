@@ -1672,8 +1672,12 @@ func sendOrderEmail(o *domain.Order, success bool) error {
 
 func sendOrderTelegram(o *domain.Order, success bool) error {
 	token := os.Getenv("TELEGRAM_BOT_TOKEN")
-	chatID := os.Getenv("TELEGRAM_CHAT_ID")
-	if token == "" || chatID == "" {
+	// Soportar múltiples IDs: TELEGRAM_CHAT_IDS (coma-separado) o fallback TELEGRAM_CHAT_ID
+	rawIDs := os.Getenv("TELEGRAM_CHAT_IDS")
+	if strings.TrimSpace(rawIDs) == "" {
+		rawIDs = os.Getenv("TELEGRAM_CHAT_ID")
+	}
+	if token == "" || strings.TrimSpace(rawIDs) == "" {
 		return fmt.Errorf("telegram vars faltantes")
 	}
 	statusTxt := "PAGO FALLIDO"
@@ -1698,20 +1702,37 @@ func sendOrderTelegram(o *domain.Order, success bool) error {
 	}
 	fmt.Fprintf(&b, "Total: $%.2f (Envio: $%.2f)\n", o.Total, o.ShippingCost)
 	apiURL := "https://api.telegram.org/bot" + token + "/sendMessage"
-	form := url.Values{}
-	form.Set("chat_id", chatID)
-	form.Set("text", b.String())
-	form.Set("disable_web_page_preview", "1")
-	resp, err := http.PostForm(apiURL, form)
-	if err != nil {
-		return err
+	// Separar por coma y enviar a cada destino
+	ids := []string{}
+	for _, part := range strings.Split(rawIDs, ",") {
+		id := strings.TrimSpace(part)
+		if id != "" {
+			ids = append(ids, id)
+		}
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("telegram status %d: %s", resp.StatusCode, string(body))
+	if len(ids) == 0 {
+		return fmt.Errorf("telegram chat ids vacios")
 	}
-	return nil
+	var lastErr error
+	for _, id := range ids {
+		form := url.Values{}
+		form.Set("chat_id", id)
+		form.Set("text", b.String())
+		form.Set("disable_web_page_preview", "1")
+		resp, err := http.PostForm(apiURL, form)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		func() {
+			defer resp.Body.Close()
+			if resp.StatusCode >= 300 {
+				body, _ := io.ReadAll(resp.Body)
+				lastErr = fmt.Errorf("telegram status %d: %s", resp.StatusCode, string(body))
+			}
+		}()
+	}
+	return lastErr
 }
 
 func sendOrderNotify(o *domain.Order, success bool) {

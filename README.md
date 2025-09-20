@@ -72,7 +72,7 @@ Recomendadas / adicionales:
 - `JWT_ADMIN_SECRET` secreto dedicado para firmar JWT admin (si no, usa `SECRET_KEY`)
 - `STORAGE_DIR` carpeta para archivos subidos (default `uploads`)
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `ORDER_NOTIFY_EMAIL` (notificación email)
-- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` (notificación Telegram)
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` o `TELEGRAM_CHAT_IDS` (notificación Telegram). `TELEGRAM_CHAT_IDS` permite múltiples destinos separados por coma, p. ej.: `-1001234567890,@SoyCanalla`.
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (OAuth Google)
 
 Docker / DB:

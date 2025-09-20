@@ -56,7 +56,7 @@ docker compose up -d --build
 Asegurate de tener `.env` basado en `.env.example`.
 
 Variables mínimas: `DB_DSN` (o POSTGRES_*) , `MP_ACCESS_TOKEN` (TEST-...), `SESSION_KEY`.
-Opcionales: `PUBLIC_BASE_URL`, `APP_ENV`, `PROD_ACCESS_TOKEN`, `STORAGE_DIR`, `GOOGLE_CLIENT_ID/SECRET`, `TELEGRAM_BOT_TOKEN/CHAT_ID`, SMTP_*, `ADMIN_API_KEY`, `ADMIN_ALLOWED_EMAILS`, `JWT_ADMIN_SECRET`.
+Opcionales: `PUBLIC_BASE_URL`, `APP_ENV`, `PROD_ACCESS_TOKEN`, `STORAGE_DIR`, `GOOGLE_CLIENT_ID/SECRET`, `TELEGRAM_BOT_TOKEN/CHAT_ID` o `TELEGRAM_CHAT_IDS` (coma-separado para múltiples destinos), SMTP_*, `ADMIN_API_KEY`, `ADMIN_ALLOWED_EMAILS`, `JWT_ADMIN_SECRET`.
 
 ## 2. Carga de imágenes / productos
 (Requiere header `Authorization: Bearer <token>` obtenido en sección 0.)
@@ -174,8 +174,10 @@ Devuelve arrays `deleted` y `errors`. (No borra archivos físicos).
 - Webhook: `/webhooks/mp` (configurar en MP apuntando a `PUBLIC_BASE_URL/webhooks/mp`).
 
 ## 10. Notificaciones
-- Telegram: requiere `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID`.
-- Email (SMTP): requiere SMTP_* variables y `ORDER_NOTIFY_EMAIL`.
+- **Telegram**: requiere `TELEGRAM_BOT_TOKEN` y uno de:
+  - `TELEGRAM_CHAT_ID` (un único destino), o
+  - `TELEGRAM_CHAT_IDS` con varios destinos separados por coma (ej.: `-1001234567890,@SoyCanalla`).
+- **Email (SMTP)**: requiere SMTP_* variables y `ORDER_NOTIFY_EMAIL`.
 - Se envían cuando el pago se marca aprobado (MP webhook o callback simulado).
 
 ## 11. OAuth Google (opcional)
