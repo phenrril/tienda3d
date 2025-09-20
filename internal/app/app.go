@@ -102,6 +102,35 @@ func NewApp(db *gorm.DB) (*App, error) {
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
+		// colorhex: convierte un nombre genérico (es) o cualquier string a un hex de swatch
+		"colorhex": func(s string) string {
+			v := strings.TrimSpace(strings.ToLower(s))
+			if v == "" {
+				return "#334155"
+			}
+			if strings.HasPrefix(v, "#") {
+				return v
+			}
+			m := map[string]string{
+				"negro":       "#111827",
+				"blanco":      "#ffffff",
+				"azul":        "#3b82f6",
+				"verde":       "#10b981",
+				"amarillo":    "#f59e0b",
+				"rojo":        "#ef4444",
+				"violeta":     "#6366f1",
+				"lila":        "#8b5cf6",
+				"rosa":        "#ec4899",
+				"turquesa":    "#14b8a6",
+				"lima":        "#a3e635",
+				"gris":        "#64748b",
+				"gris oscuro": "#334155",
+			}
+			if hex, ok := m[v]; ok {
+				return hex
+			}
+			return "#334155"
+		},
 		// img: normaliza URLs de imagen (agrega / si falta y codifica espacios)
 		"img": func(u string) string {
 			s := strings.TrimSpace(u)

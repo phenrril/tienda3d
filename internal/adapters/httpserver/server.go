@@ -890,8 +890,9 @@ func (s *Server) handleCart(w http.ResponseWriter, r *http.Request) {
 				color = "#111827"
 			}
 		}
+		// Convertir SIEMPRE a nombre genérico cuando sea hex conocido
 		cart := readCart(r)
-		cart.Items = append(cart.Items, cartItem{Slug: slug, Color: color, Qty: 1, Price: p.BasePrice})
+		cart.Items = append(cart.Items, cartItem{Slug: slug, Color: normalizeColorName(color), Qty: 1, Price: p.BasePrice})
 		writeCart(w, cart)
 		accept := r.Header.Get("Accept")
 		if strings.Contains(accept, "application/json") || r.Header.Get("X-Requested-With") == "fetch" {
@@ -956,7 +957,7 @@ func (s *Server) handleCartUpdate(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		parts := strings.SplitN(k, "|", 2)
-		newCart.Items = append(newCart.Items, cartItem{Slug: parts[0], Color: parts[1], Qty: q})
+		newCart.Items = append(newCart.Items, cartItem{Slug: parts[0], Color: normalizeColorName(parts[1]), Qty: q})
 	}
 
 	for i := range newCart.Items {
@@ -990,6 +991,53 @@ func (s *Server) handleCartRemove(w http.ResponseWriter, r *http.Request) {
 	cart.Items = newItems
 	writeCart(w, cart)
 	http.Redirect(w, r, "/cart", 302)
+}
+
+// normalizeColorName transforma códigos hex válidos en nombres simples si hay match
+// y limpia espacios. Para hex que no matchean, deja el valor original.
+func normalizeColorName(c string) string {
+	s := strings.TrimSpace(c)
+	if s == "" {
+		return s
+	}
+	lower := strings.ToLower(s)
+	// Map comunes
+	m := map[string]string{
+		"#111827": "Negro",
+		"#000000": "Negro",
+		"#ffffff": "Blanco",
+		"#ff0000": "Rojo",
+		"#dc2626": "Rojo",
+		"#10b981": "Verde",
+		"#3b82f6": "Azul",
+		"#6366f1": "Violeta",
+		"#f59e0b": "Amarillo",
+		"#ef4444": "Rojo",
+		"#8b5cf6": "Violeta",
+		"#ec4899": "Rosa",
+		"#14b8a6": "Turquesa",
+		"#f472b6": "Rosa",
+		"#fcd34d": "Amarillo",
+		"#a3e635": "Lima",
+		"#334155": "Gris oscuro",
+		"#64748b": "Gris",
+	}
+	if name, ok := m[lower]; ok {
+		return name
+	}
+	return s
+}
+
+func formatColorES(c string) string {
+	s := strings.TrimSpace(c)
+	if s == "" {
+		return ""
+	}
+	// Si es hex, devolver nombre si lo conocemos
+	if strings.HasPrefix(s, "#") && (len(s) == 7 || len(s) == 4) {
+		return normalizeColorName(s)
+	}
+	return s
 }
 
 func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
@@ -1071,7 +1119,7 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 		} else {
 			title = "Producto"
 		}
-		o.Items = append(o.Items, domain.OrderItem{ID: uuid.New(), ProductID: pid, Qty: l.Qty, UnitPrice: l.UnitPrice, Title: title, Color: l.Color})
+		o.Items = append(o.Items, domain.OrderItem{ID: uuid.New(), ProductID: pid, Qty: l.Qty, UnitPrice: l.UnitPrice, Title: title, Color: normalizeColorName(l.Color)})
 		itemsTotal += l.UnitPrice * float64(l.Qty)
 	}
 	shippingCost := 0.0
@@ -1678,7 +1726,12 @@ func sendOrderEmail(o *domain.Order, success bool) error {
 	}
 	buf.WriteString("Items:\n")
 	for _, it := range o.Items {
-		_, _ = fmt.Fprintf(&buf, "- %s x%d $%.2f Color:%s\n", it.Title, it.Qty, it.UnitPrice, it.Color)
+		col := formatColorES(it.Color)
+		if col != "" {
+			_, _ = fmt.Fprintf(&buf, "- %s x%d $%.2f Color: %s\n", it.Title, it.Qty, it.UnitPrice, col)
+		} else {
+			_, _ = fmt.Fprintf(&buf, "- %s x%d $%.2f\n", it.Title, it.Qty, it.UnitPrice)
+		}
 	}
 	_, _ = fmt.Fprintf(&buf, "Total: $%.2f (Envío: $%.2f)\n", o.Total, o.ShippingCost)
 	auth := smtp.PlainAuth("", user, pass, host)
@@ -1717,7 +1770,12 @@ func sendOrderTelegram(o *domain.Order, success bool) error {
 	}
 	b.WriteString("Items:\n")
 	for _, it := range o.Items {
-		fmt.Fprintf(&b, "- %s x%d $%.2f %s\n", it.Title, it.Qty, it.UnitPrice, it.Color)
+		col := formatColorES(it.Color)
+		if col != "" {
+			fmt.Fprintf(&b, "- %s x%d — $%.2f  Color: %s\n", it.Title, it.Qty, it.UnitPrice, col)
+		} else {
+			fmt.Fprintf(&b, "- %s x%d — $%.2f\n", it.Title, it.Qty, it.UnitPrice)
+		}
 	}
 	fmt.Fprintf(&b, "Total: $%.2f (Envio: $%.2f)\n", o.Total, o.ShippingCost)
 	apiURL := "https://api.telegram.org/bot" + token + "/sendMessage"
