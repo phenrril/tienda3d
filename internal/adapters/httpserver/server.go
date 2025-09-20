@@ -871,6 +871,25 @@ func (s *Server) handleCart(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "prod", 404)
 			return
 		}
+		// Fallback de color: si llega vacío, usar el primer color disponible o #111827
+		if strings.TrimSpace(color) == "" {
+			// intentar deducir de variantes del producto
+			seen := map[string]struct{}{}
+			for _, v := range p.Variants {
+				c := strings.TrimSpace(v.Color)
+				if c == "" {
+					continue
+				}
+				if _, ok := seen[c]; ok {
+					continue
+				}
+				color = c
+				break
+			}
+			if strings.TrimSpace(color) == "" {
+				color = "#111827"
+			}
+		}
 		cart := readCart(r)
 		cart.Items = append(cart.Items, cartItem{Slug: slug, Color: color, Qty: 1, Price: p.BasePrice})
 		writeCart(w, cart)

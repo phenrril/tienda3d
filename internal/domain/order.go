@@ -46,7 +46,7 @@ type OrderItem struct {
 	ProductID *uuid.UUID `gorm:"type:uuid;index"`
 	QuoteID   *uuid.UUID `gorm:"type:uuid;index"`
 	Title     string     `gorm:"size:180"`
-	Color     string     `gorm:"size:20"`
+	Color     string     `gorm:"size:60"`
 	Qty       int        `gorm:"not null"`
 	UnitPrice float64    `gorm:"type:decimal(12,2)"`
 }

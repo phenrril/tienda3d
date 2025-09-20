@@ -61,12 +61,12 @@
     <form method="post" action="/cart" class="pd-form">
       <input type="hidden" name="slug" value="{{.Product.Slug}}" />
       <div class="color-picker">
-        <div class="cp-label">Color</div>
+        <div class="cp-label">Color <span id="colorPreview" class="color-dot" style="vertical-align:middle;margin-left:8px"></span></div>
         <div class="cp-swatches" id="cpSwatches">
           {{range $i,$c := .Colors}}
-            <button type="button" class="swatch {{if eq $i 0}}active{{end}}" data-color="{{$c}}" style="--c: {{$c}}" aria-label="Seleccionar color {{$c}}" role="radio" aria-checked="{{if eq $i 0}}true{{else}}false{{end}}" name="color"></button>
+            <button type="button" class="swatch {{if eq $i 0}}active{{end}}" data-color="{{$c}}" style="--c: {{$c}}" aria-label="Seleccionar color {{$c}}" role="radio" aria-checked="{{if eq $i 0}}true{{else}}false{{end}}"></button>
           {{end}}
-          <button type="button" class="swatch swatch-other" data-color="" aria-label="Seleccionar otro color" title="Otro" role="radio" aria-checked="false" name="color"></button>
+          <button type="button" class="swatch swatch-other" data-color="" aria-label="Seleccionar otro color" title="Otro" role="radio" aria-checked="false"></button>
         </div>
         <div class="custom-color-row" id="customColorRow" style="display:none">
           <input type="text" id="customColorInput" placeholder="Escribe el color (ej: rojo o #ff0000)" autocomplete="off" />
@@ -91,9 +91,12 @@
   const customRow=document.getElementById('customColorRow');
   const customInput=document.getElementById('customColorInput');
   const defaultColor=inp.value;
+  const preview=document.getElementById('colorPreview');
+  if(preview){ preview.style.background = defaultColor; }
   sw.forEach(b=>b.addEventListener('click',()=>{
-    sw.forEach(x=>x.classList.remove('active'));
+    sw.forEach(x=>{ x.classList.remove('active'); x.setAttribute('aria-checked','false'); });
     b.classList.add('active');
+    b.setAttribute('aria-checked','true');
     if(b.classList.contains('swatch-other')){
       customRow.style.display='';
       customInput.focus();
@@ -102,12 +105,14 @@
       customRow.style.display='none';
       inp.value=b.dataset.color;
     }
+    if(preview){ preview.style.background = inp.value || defaultColor; }
   }));
   if(customInput){
     customInput.addEventListener('input',()=>{
       const val=customInput.value.trim();
       inp.value=val;
       if(otherBtn && val){ otherBtn.style.setProperty('--c', val); }
+      if(preview){ preview.style.background = val || defaultColor; }
     });
   }
   const form=inp.closest('form');
@@ -176,6 +181,12 @@
     const submitBtn=form.querySelector('button[type=submit]');
     if(submitBtn) submitBtn.disabled=true;
     const fd=new FormData(form);
+    // Forzar el valor de color a lo actualmente seleccionado
+    try{
+      const cur=(inp && typeof inp.value==='string')?inp.value.trim():'';
+      const finalCol=cur||defaultColor||'';
+      if(fd.has('color')) fd.set('color', finalCol); else fd.append('color', finalCol);
+    }catch{}
     const usp=new URLSearchParams();
     fd.forEach((v,k)=>{ if(typeof v==='string') usp.append(k,v); });
     fetch('/cart',{
