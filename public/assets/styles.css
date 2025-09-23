@@ -8,7 +8,7 @@ body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantar
 .content{flex:1 1 auto}
 
 
-.topbar{background:#111827;color:#fff;padding:12px 0;box-shadow:0 1px 0 rgba(31,41,55,.8)}
+.topbar{background:#111827;color:#fff;padding:12px 0;box-shadow:0 1px 0 rgba(31,41,55,.8);position:sticky;top:0;z-index:var(--z-topbar)}
 .brand{display:flex;flex-direction:row;align-items:center;gap:10px;color:#fff;text-decoration:none}
 .brand-logo{background:#f1f5f9;padding:4px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.06),0 2px 4px -2px rgba(0,0,0,.55);display:block;width:56px;height:56px;object-fit:contain}
 .brand-text{display:flex;flex-direction:column;gap:2px;line-height:1}
