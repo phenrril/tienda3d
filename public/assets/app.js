@@ -368,3 +368,85 @@ if ('serviceWorker' in navigator) {
   if(imagesInput) imagesInput.addEventListener('change', refreshPreview);
   if(dropZone){ ['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault(); dropZone.classList.add('drag');})); ['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault(); dropZone.classList.remove('drag');})); dropZone.addEventListener('drop', e=>{ const files=[...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')); if(files.length){ const dt=new DataTransfer(); files.forEach(f=>dt.items.add(f)); if(imagesInput) imagesInput.files=dt.files; refreshPreview(); }}); }
 })();
+
+// Admin: calculadora de costos
+(function(){
+  const form=document.getElementById('costCalcForm'); if(!form) return;
+  const statusEl=document.getElementById('ccStatus');
+  const resultEl=document.getElementById('costCalcResult');
+  // Tooltips ayuda (click toggle)
+  form.addEventListener('click',e=>{
+    const ico=e.target.closest('.help-icon');
+    if(!ico) return;
+    e.preventDefault();
+    const msg=ico.getAttribute('data-help')||'';
+    if(!msg) return;
+    let tip=ico.nextElementSibling && ico.nextElementSibling.classList && ico.nextElementSibling.classList.contains('help-tip') ? ico.nextElementSibling : null;
+    if(tip){ tip.remove(); return; }
+    tip=document.createElement('div');
+    tip.className='help-tip';
+    tip.textContent=msg;
+    tip.style.position='absolute';
+    tip.style.zIndex='20';
+    tip.style.background='#0F1B2D';
+    tip.style.color='#E5F0FF';
+    tip.style.border='1px solid #223140';
+    tip.style.borderRadius='8px';
+    tip.style.padding='8px 10px';
+    tip.style.fontSize='12px';
+    tip.style.maxWidth='320px';
+    tip.style.boxShadow='0 6px 18px rgba(0,0,0,.3)';
+    tip.style.marginLeft='8px';
+    tip.style.display='inline-block';
+    ico.after(tip);
+    // Cerrar al clic afuera
+    const close=(ev)=>{ if(!tip.contains(ev.target) && ev.target!==ico){ tip.remove(); document.removeEventListener('click',close,true); } };
+    setTimeout(()=>document.addEventListener('click',close,true),0);
+  });
+  function getNum(id){ const el=document.getElementById(id); const v=parseFloat((el&&el.value)||'0'); return isNaN(v)?0:v; }
+  function getInt(id){ const el=document.getElementById(id); const v=parseInt((el&&el.value)||'0',10); return isNaN(v)?0:v; }
+  function getChk(id){ const el=document.getElementById(id); return !!(el&&el.checked); }
+  form.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const payload={
+      price_per_kg: getNum('ccPricePerKg'),
+      price_per_kwh: getNum('ccPricePerKwh'),
+      power_watts: getNum('ccPowerWatts'),
+      machine_wear_hours: 0,
+      spare_parts_price: 0,
+      error_percent: getNum('ccErrorPct'),
+      time_hours: getInt('ccTimeH'),
+      time_minutes: getInt('ccTimeM'),
+      filament_grams: getNum('ccGrams'),
+      supplies_ars: getNum('ccSupplies'),
+      margin_multiplier: getNum('ccMarginMult'),
+      ml_gross_up: getChk('ccMLGross'),
+      ml_fee_percent: getNum('ccMLFeePct'),
+      ml_fixed_fee: getNum('ccMLFixed')
+    };
+    if(statusEl){ statusEl.textContent='Calculando...'; }
+    try{
+      const res=await fetch('/admin/costs/calculate',{method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(payload)});
+      if(!res.ok){ const msg=await res.text(); throw new Error(msg||('HTTP '+res.status)); }
+      const out=await res.json();
+      if(resultEl){
+        const rows=[
+          ['Material', `$${out.precio_material.toFixed(2)}`],
+          ['Luz', `$${out.precio_luz.toFixed(2)}`],
+          ['Error', `$${out.margen_de_error.toFixed(2)}`],
+          ['Subtotal s/ins.', `$${out.subtotal_sin_insumos.toFixed(2)}`],
+          ['Total s/ins.', `$${out.total_sin_insumos.toFixed(2)}`],
+          ['Insumos', `$${out.insumos.toFixed(2)}`],
+          ['Total a cobrar', `$${out.total_a_cobrar.toFixed(2)}`],
+          ['Precio ML', `$${out.precio_mercadolibre.toFixed(2)}`],
+          ['Horas', `${out.horas.toFixed(2)} h`],
+          ['Filamento', `${out.filamento_kg.toFixed(2)} kg`],
+        ];
+        resultEl.innerHTML = '<div class="table clean"></div><div style="margin-top:10px;font-size:13px;color:var(--muted)">Multiplicador usado: '+out.margin_multiplier_used+'</div>';
+        const tbl=resultEl.querySelector('.table');
+        if(tbl){ rows.forEach(([k,v])=>{ const row=document.createElement('div'); row.className='row between'; row.style.padding='6px 0'; row.innerHTML=`<div>${k}</div><div><strong>${v}</strong></div>`; tbl.appendChild(row); }); }
+      }
+      if(statusEl){ statusEl.textContent='Listo'; setTimeout(()=>{statusEl.textContent='';},1500); }
+    }catch(err){ if(statusEl){ statusEl.textContent='Error: '+(err&&err.message||''); } }
+  });
+})();
