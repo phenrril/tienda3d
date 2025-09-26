@@ -1,0 +1,60 @@
+{{define "admin_costs.html"}}
+{{template "layout_start" .}}
+<h1>Calculadora de costos</h1>
+<nav class="admin-nav"><a href="/admin/products">Productos</a> | <a href="/admin/orders">Órdenes</a> | <a href="/admin/sales">Ventas</a> | <a href="/admin/costs" class="active">Calculadora</a> | <a href="/admin/logout">Salir</a></nav>
+
+<section class="grid" style="margin-top:1rem;grid-template-columns:420px 1fr;gap:2rem;align-items:start">
+  <div class="admin-card" style="padding:18px 20px 24px">
+    <h2 style="margin:0 0 10px;font-size:18px">Parámetros</h2>
+    <form id="costCalcForm" class="form-card" autocomplete="off">
+      <fieldset>
+        <legend>Gastos fijos</legend>
+        <label>Precio material (ARS/kg)<input type="number" step="0.01" min="0" id="ccPricePerKg" value="16200" required /></label>
+        <label>Precio electricidad (ARS/kWh)<input type="number" step="0.01" min="0" id="ccPricePerKwh" value="136.65" required /></label>
+        <label>Consumo promedio (W)<input type="number" step="0.1" min="0" id="ccPowerWatts" value="95" required /></label>
+        <label>Margen de error (%)<input type="number" step="0.1" min="0" id="ccErrorPct" value="0" /></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Pieza</legend>
+        <div class="row" style="gap:.5rem">
+          <label style="flex:1">Horas<input type="number" step="1" min="0" id="ccTimeH" required /></label>
+          <label style="flex:1">Minutos<input type="number" step="1" min="0" max="59" id="ccTimeM" value="0" required /></label>
+        </div>
+        <label>Filamento (g)<input type="number" step="0.01" min="0" id="ccGrams" required /></label>
+        <label>Insumos extra (ARS)<input type="number" step="0.01" min="0" id="ccSupplies" value="0" /></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Ganancia</legend>
+        <label>Multiplicador de margen<input type="number" step="0.01" min="0.01" id="ccMarginMult" value="4" required /></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>MercadoLibre (opcional)</legend>
+        <label class="row center" style="gap:.5rem" title="Activá para calcular qué precio publicar en ML para que, tras restar comisión y costo fijo, el neto sea igual al 'Total a cobrar'."><input type="checkbox" id="ccMLGross" /> Calcular precio bruto ML <span class="help-icon" aria-label="Ayuda" data-help="Calcula el precio a publicar en ML para que, descontando comisión y costo fijo, el neto sea igual al 'Total a cobrar'." style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#223140;color:#E5F0FF;font-weight:700;font-size:12px;line-height:1;cursor:pointer;margin-left:6px">i</span></label>
+        <div class="row" style="gap:.5rem">
+          <label style="flex:1">Comisión total (%) <span class="help-icon" aria-label="Ayuda" data-help="Porcentaje total que descuenta ML sobre el precio publicado. Ej: 15 = 15% sobre el precio." style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#223140;color:#E5F0FF;font-weight:700;font-size:12px;line-height:1;cursor:pointer;margin-left:6px">i</span><input type="number" step="0.1" min="0" id="ccMLFeePct" value="0" title="Porcentaje total que descuenta ML sobre el precio publicado." /></label>
+          <label style="flex:1">Costo fijo (ARS) <span class="help-icon" aria-label="Ayuda" data-help="Importe fijo descontado del neto (envíos/promos). Fórmula del bruto: (Total a cobrar + costo fijo) / (1 - comisión)." style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#223140;color:#E5F0FF;font-weight:700;font-size:12px;line-height:1;cursor:pointer;margin-left:6px">i</span><input type="number" step="0.01" min="0" id="ccMLFixed" value="0" title="Importe fijo descontado del neto (envíos/promos)." /></label>
+        </div>
+      </fieldset>
+
+      <div class="row" style="gap:.5rem; margin-top:8px">
+        <button class="btn-primary" type="submit" id="ccSubmit">Calcular</button>
+        <span id="ccStatus" style="font-size:13px;color:var(--muted)"></span>
+      </div>
+    </form>
+  </div>
+
+  <div class="admin-card" style="padding:18px 20px 24px">
+    <h2 style="margin:0 0 10px;font-size:18px">Resultados</h2>
+    <div id="costCalcResult" class="result" style="font-family:system-ui,Segoe UI,Roboto,Arial">
+      <p style="color:var(--muted);margin:0">Completá el formulario y presioná Calcular.</p>
+    </div>
+  </div>
+</section>
+
+{{template "layout_end" .}}
+{{end}}
+
+

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"net/smtp"
@@ -129,6 +130,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/admin/products", s.handleAdminProducts)
 
 	s.mux.HandleFunc("/admin/sales", s.handleAdminSales)
+
+	// Admin: Calculadora de costos
+	s.mux.HandleFunc("/admin/costs", s.handleAdminCosts)
+	s.mux.HandleFunc("/admin/costs/calculate", s.handleAdminCostsCalculate)
 }
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
@@ -1656,6 +1661,129 @@ func (s *Server) handleAdminLogout(w http.ResponseWriter, r *http.Request) {
 	secure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 	http.SetCookie(w, &http.Cookie{Name: "admin_token", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode})
 	http.Redirect(w, r, "/admin/auth", 302)
+}
+
+// ===== Admin: Calculadora de costos =====
+type costInput struct {
+	PricePerKg       float64 `json:"price_per_kg"`
+	PricePerKWh      float64 `json:"price_per_kwh"`
+	PowerWatts       float64 `json:"power_watts"`
+	MachineWearHours float64 `json:"machine_wear_hours"`
+	SparePartsPrice  float64 `json:"spare_parts_price"`
+	ErrorPercent     float64 `json:"error_percent"`
+
+	TimeHours     int     `json:"time_hours"`
+	TimeMinutes   int     `json:"time_minutes"`
+	FilamentGrams float64 `json:"filament_grams"`
+	SuppliesARS   float64 `json:"supplies_ars"`
+
+	MarginMultiplier float64 `json:"margin_multiplier"`
+
+	MLGrossUp    bool    `json:"ml_gross_up"`
+	MLFeePercent float64 `json:"ml_fee_percent"`
+	MLFixedFee   float64 `json:"ml_fixed_fee"`
+}
+
+type costOutput struct {
+	PrecioMaterial       float64 `json:"precio_material"`
+	PrecioLuz            float64 `json:"precio_luz"`
+	DesgasteMaquina      float64 `json:"desgaste_maquina"`
+	MargenDeError        float64 `json:"margen_de_error"`
+	Insumos              float64 `json:"insumos"`
+	SubtotalSinInsumos   float64 `json:"subtotal_sin_insumos"`
+	TotalSinInsumos      float64 `json:"total_sin_insumos"`
+	TotalACobrar         float64 `json:"total_a_cobrar"`
+	PrecioMercadoLibre   float64 `json:"precio_mercadolibre"`
+	Horas                float64 `json:"horas"`
+	FilamentoKg          float64 `json:"filamento_kg"`
+	MarginMultiplierUsed float64 `json:"margin_multiplier_used"`
+}
+
+func round2(v float64) float64 { return math.Round(v*100) / 100 }
+
+func calcCost(in costInput) (costOutput, error) {
+	if in.PricePerKg < 0 || in.PricePerKWh < 0 || in.PowerWatts < 0 ||
+		in.MachineWearHours < 0 || in.SparePartsPrice < 0 || in.ErrorPercent < 0 ||
+		in.FilamentGrams < 0 || in.SuppliesARS < 0 || in.MarginMultiplier <= 0 {
+		return costOutput{}, errors.New("valores inválidos: no negativos y margin_multiplier > 0")
+	}
+	h := float64(in.TimeHours) + float64(in.TimeMinutes)/60.0
+	if h < 0 {
+		return costOutput{}, errors.New("tiempo inválido")
+	}
+
+	kg := in.FilamentGrams / 1000.0
+	precioMaterial := kg * in.PricePerKg
+	precioLuz := in.PricePerKWh * (in.PowerWatts / 1000.0) * h
+
+	// Desgaste de máquina y amortización se omiten según requerimiento
+	desgasteMaquina := 0.0
+
+	baseSinInsumos := precioMaterial + precioLuz + desgasteMaquina
+	margenError := baseSinInsumos * (in.ErrorPercent / 100.0)
+	subtotalSinInsumos := baseSinInsumos + margenError
+
+	totalSinInsumos := subtotalSinInsumos * in.MarginMultiplier
+	totalACobrar := totalSinInsumos + in.SuppliesARS
+
+	var precioML float64
+	if in.MLGrossUp {
+		fee := in.MLFeePercent / 100.0
+		den := (1.0 - fee)
+		if den <= 0 {
+			return costOutput{}, errors.New("ml_fee_percent demasiado alto; deja den>0")
+		}
+		precioML = (totalACobrar + in.MLFixedFee) / den
+	} else {
+		precioML = totalACobrar
+	}
+
+	out := costOutput{
+		PrecioMaterial:       round2(precioMaterial),
+		PrecioLuz:            round2(precioLuz),
+		DesgasteMaquina:      round2(desgasteMaquina),
+		MargenDeError:        round2(margenError),
+		Insumos:              round2(in.SuppliesARS),
+		SubtotalSinInsumos:   round2(subtotalSinInsumos),
+		TotalSinInsumos:      round2(totalSinInsumos),
+		TotalACobrar:         round2(totalACobrar),
+		PrecioMercadoLibre:   round2(precioML),
+		Horas:                round2(h),
+		FilamentoKg:          round2(kg),
+		MarginMultiplierUsed: in.MarginMultiplier,
+	}
+	return out, nil
+}
+
+func (s *Server) handleAdminCosts(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", 302)
+		return
+	}
+	data := map[string]any{"AdminToken": s.readAdminToken(r)}
+	s.render(w, "admin_costs.html", data)
+}
+
+func (s *Server) handleAdminCostsCalculate(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method", 405)
+		return
+	}
+	defer r.Body.Close()
+	var in costInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, "json", 400)
+		return
+	}
+	out, err := calcCost(in)
+	if err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	writeJSON(w, 200, out)
 }
 
 func (s *Server) isAdminSession(r *http.Request) bool {
