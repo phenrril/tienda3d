@@ -31,3 +31,5 @@ Caddyfile
 # Editor/IDE
 # .idea/
 # .vscode/
+
+/uploads

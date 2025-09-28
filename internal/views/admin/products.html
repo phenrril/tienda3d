@@ -33,9 +33,41 @@
       <div class="inline-btns" style="margin-top:4px">
         <button class="btn-primary" type="submit" id="pfSubmit">Crear</button>
         <button class="btn-secondary" type="button" id="pfReset">Nuevo</button>
+        <button class="btn-secondary" type="button" id="pfManageImages" style="display:none">Imágenes…</button>
         <button class="btn-danger" type="button" id="pfDelete" style="display:none">Eliminar</button>
       </div>
+      <div style="margin-top:10px">
+        <div class="row between center" style="margin:0 0 6px">
+          <div style="font-size:12px;color:var(--muted)">Imágenes actuales</div>
+          <a href="#" id="pfManageImagesAlt" class="btn-secondary" style="padding:6px 10px;font-size:12px">Gestionar…</a>
+        </div>
+        <div id="imgGallery" class="row wrap" style="gap:8px"></div>
+        <div class="row" style="gap:8px;margin-top:8px">
+          <button type="button" id="btnDelSelected" class="btn-danger" style="display:none">Eliminar seleccionadas</button>
+          <span id="selCount" style="font-size:12px;color:var(--muted)"></span>
+        </div>
+      </div>
     </form>
+    <!-- Modal gestor de imágenes -->
+    <div id="imgMgrOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center">
+      <div style="background:#0b1520;border:1px solid #223140;border-radius:12px;width:min(760px,92vw);max-height:84vh;display:flex;flex-direction:column">
+        <div class="row between center" style="padding:10px 12px;border-bottom:1px solid #223140">
+          <h3 style="margin:0;font-size:16px">Imágenes del producto</h3>
+          <button id="imgMgrClose" class="icon-btn" aria-label="Cerrar">✕</button>
+        </div>
+        <div id="imgMgrBody" style="padding:12px;overflow:auto">
+          <div id="imgMgrGrid" class="row wrap" style="gap:10px"></div>
+          <div id="imgMgrEmpty" style="display:none;color:var(--muted);font-size:13px">Sin imágenes.</div>
+        </div>
+        <div class="row between center" style="padding:10px 12px;border-top:1px solid #223140">
+          <span id="imgMgrSelCount" style="font-size:12px;color:var(--muted)"></span>
+          <div class="row" style="gap:8px">
+            <button id="imgMgrDelSelected" class="btn-danger" style="display:none">Eliminar seleccionadas</button>
+            <button id="imgMgrClose2" class="btn-secondary">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <p style="margin:14px 0 0;font-size:11px;color:var(--muted);line-height:1.4">Flujo: completar datos y (opcional) elegir imágenes. Al guardar, si es creación primero se crea el producto y luego se suben las imágenes seleccionadas. En edición podés cambiar datos y agregar nuevas imágenes (no reemplaza las existentes). Para remover imágenes viejas usar futura gestión de galería.</p>
   </div>
   <div>
@@ -56,6 +88,7 @@
             <td>{{len .Images}}</td>
             <td style="text-align:right">
               <div class="table-actions">
+                <a class="icon-btn" href="/admin/product_images?slug={{.Slug}}" title="Imágenes" target="_blank" rel="noopener">🖼️</a>
                 <button class="icon-btn action-edit" data-act="edit" title="Editar">✏️</button>
                 <button class="icon-btn danger action-del" data-act="del" title="Eliminar">🗑️</button>
               </div>
@@ -89,6 +122,11 @@
   const dropZone=document.getElementById('dropZone');
   const preview=document.getElementById('preview');
   const dzCount=document.querySelector('.dz-count');
+  const btnManage=document.getElementById('pfManageImages');
+  const btnManageAlt=document.getElementById('pfManageImagesAlt');
+  const btnDelSelected=document.getElementById('btnDelSelected');
+  const selCount=document.getElementById('selCount');
+  const selectedIDs=new Set();
 
   function setModeEdit(edit){
     if(edit){
@@ -96,17 +134,68 @@
       modeBadge.classList.remove('create');
       modeBadge.classList.add('edit');
       btnSubmit.textContent='Actualizar';
+      if(btnManage) btnManage.style.display='';
     } else {
       modeBadge.textContent='Creación';
       modeBadge.classList.remove('edit');
       modeBadge.classList.add('create');
       btnSubmit.textContent='Crear';
+      if(btnManage) btnManage.style.display='none';
     }
   }
   function fill(p){
     fSlug.value=p.Slug; fName.value=p.Name; fCat.value=p.Category||''; fDesc.value=p.ShortDesc||''; fPrice.value=p.BasePrice; fReady.checked=!!p.ReadyToShip; fWidth.value=p.WidthMM||0; fHeight.value=p.HeightMM||0; fDepth.value=p.DepthMM||0; btnDel.style.display=''; setModeEdit(true);
+    renderGallery(p.Images||[]);
   }
-  function clear(){ form.reset(); fSlug.value=''; btnDel.style.display='none'; fWidth.value=fHeight.value=fDepth.value=''; imagesInput.value=''; preview.innerHTML=''; dzCount.textContent='0 archivos'; setModeEdit(false); }
+  function clear(){ form.reset(); fSlug.value=''; btnDel.style.display='none'; if(btnManage) btnManage.style.display='none'; fWidth.value=fHeight.value=fDepth.value=''; imagesInput.value=''; preview.innerHTML=''; dzCount.textContent='0 archivos'; setModeEdit(false); selectedIDs.clear(); updateSelectionUI(); renderGallery([]); }
+  function renderGallery(imgs){
+    const g=document.getElementById('imgGallery');
+    if(!g) return;
+    g.innerHTML='';
+    selectedIDs.clear(); updateSelectionUI();
+    (imgs||[]).forEach(im=>{
+      if(!im || !im.URL || !im.ID) return;
+      const card=document.createElement('div'); card.className='img-card'; card.dataset.id=im.ID;
+      card.style.position='relative'; card.style.width='80px'; card.style.height='80px'; card.style.cursor='pointer';
+      const img=document.createElement('img'); img.src=im.URL; img.alt=im.Alt||''; img.loading='lazy'; img.style.width='100%'; img.style.height='100%'; img.style.objectFit='cover'; img.style.borderRadius='10px'; img.style.border='1px solid #223140'; img.onerror=()=>{ card.remove(); };
+      const del=document.createElement('button'); del.textContent='✖'; del.title='Eliminar'; del.className='icon-btn danger'; del.style.position='absolute'; del.style.top='-6px'; del.style.right='-6px'; del.style.background='#ef4444'; del.style.color='#fff'; del.style.borderRadius='50%'; del.style.width='22px'; del.style.height='22px'; del.style.display='grid'; del.style.placeItems='center'; del.style.fontSize='12px'; del.style.cursor='pointer';
+      const sel=document.createElement('div'); sel.textContent='✓'; sel.setAttribute('aria-hidden','true'); sel.style.position='absolute'; sel.style.left='-6px'; sel.style.top='-6px'; sel.style.width='20px'; sel.style.height='20px'; sel.style.borderRadius='50%'; sel.style.display='grid'; sel.style.placeItems='center'; sel.style.fontSize='12px'; sel.style.background='#10b981'; sel.style.color='#0b1520'; sel.style.border='1px solid #0f2b3d'; sel.style.boxShadow='0 0 0 2px #0b1520'; sel.style.opacity='0'; sel.style.transition='opacity .15s ease';
+      del.addEventListener('click', async ()=>{
+        if(!confirm('Eliminar esta imagen?')) return;
+        const res=await fetch('/api/product_images/'+encodeURIComponent(im.ID), {method:'DELETE', headers:{Authorization:'Bearer '+token}});
+        if(res.ok){ selectedIDs.delete(im.ID); updateSelectionUI(); card.remove(); } else { alert('Error eliminando imagen'); }
+      });
+      del.addEventListener('click', e=>e.stopPropagation());
+      card.appendChild(img); card.appendChild(del); card.appendChild(sel); g.appendChild(card);
+    });
+    g.onclick = (e)=>{
+      const card=e.target.closest('.img-card'); if(!card) return;
+      if(e.target.closest('button')) return; // no interferir con botón borrar individual
+      const id=card.dataset.id; if(!id) return;
+      if(selectedIDs.has(id)){
+        selectedIDs.delete(id); card.style.outline=''; card.querySelector('div[aria-hidden]')?.style && (card.querySelector('div[aria-hidden]').style.opacity='0');
+      }else{
+        selectedIDs.add(id); card.style.outline='2px solid #10b981'; const badge=card.querySelector('div[aria-hidden]'); if(badge) badge.style.opacity='1';
+      }
+      updateSelectionUI();
+    };
+  }
+
+  function updateSelectionUI(){
+    const n=selectedIDs.size; if(selCount) selCount.textContent = n>0? (n===1? '1 imagen seleccionada':''+n+' imágenes seleccionadas') : '';
+    if(btnDelSelected) btnDelSelected.style.display = n>0? '': 'none';
+  }
+
+  if(btnDelSelected){
+    btnDelSelected.addEventListener('click', async ()=>{
+      if(selectedIDs.size===0) return; if(!confirm('Eliminar imágenes seleccionadas?')) return;
+      const ids=[...selectedIDs];
+      await Promise.all(ids.map(id=>fetch('/api/product_images/'+encodeURIComponent(id),{method:'DELETE', headers:{Authorization:'Bearer '+token}})));
+      // eliminar visualmente
+      ids.forEach(id=>{ const el=document.querySelector('.img-card[data-id="'+CSS.escape(id)+'"]'); if(el) el.remove(); });
+      selectedIDs.clear(); updateSelectionUI();
+    });
+  }
 
   // Row actions
   if(tbl){
@@ -169,6 +258,50 @@
   ;['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault(); dropZone.classList.add('drag');}));
   ;['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault(); dropZone.classList.remove('drag');}));
   dropZone.addEventListener('drop', e=>{ const files=[...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')); if(files.length){ const dt=new DataTransfer(); files.forEach(f=>dt.items.add(f)); imagesInput.files=dt.files; refreshPreview(); }});
+
+  // ===== Modal gestor de imágenes =====
+  const overlay=document.getElementById('imgMgrOverlay');
+  const grid=document.getElementById('imgMgrGrid');
+  const emptyLbl=document.getElementById('imgMgrEmpty');
+  const mgrSelCount=document.getElementById('imgMgrSelCount');
+  const mgrDelBtn=document.getElementById('imgMgrDelSelected');
+  const mgrClose=document.getElementById('imgMgrClose');
+  const mgrClose2=document.getElementById('imgMgrClose2');
+  const mgrSelected=new Set();
+
+  function mgrUpdateSel(){ const n=mgrSelected.size; if(mgrSelCount) mgrSelCount.textContent=n? (n===1?'1 imagen seleccionada':n+' imágenes seleccionadas') : ''; if(mgrDelBtn) mgrDelBtn.style.display=n? '':'none'; }
+  function mgrOpen(){ if(!overlay) return; overlay.style.display='flex'; }
+  function mgrCloseFn(){ if(!overlay) return; overlay.style.display='none'; mgrSelected.clear(); mgrUpdateSel(); }
+  async function mgrLoad(){
+    const slug=fSlug.value.trim(); if(!slug) return;
+    grid.innerHTML=''; mgrSelected.clear(); mgrUpdateSel(); if(emptyLbl) emptyLbl.style.display='none';
+    const res=await fetch('/api/products/'+encodeURIComponent(slug),{headers:{Authorization:'Bearer '+token}});
+    if(!res.ok){ grid.innerHTML='<div style="color:#ef4444">Error cargando imágenes</div>'; return; }
+    const p=await res.json(); const imgs=(p && p.Images)||[];
+    if(!imgs.length){ if(emptyLbl) emptyLbl.style.display=''; return; }
+    imgs.forEach(im=>{
+      if(!im || !im.URL || !im.ID) return;
+      const card=document.createElement('div'); card.className='img-card'; card.dataset.id=im.ID; card.style.position='relative'; card.style.width='92px'; card.style.height='92px'; card.style.cursor='pointer';
+      const img=document.createElement('img'); img.src=im.URL; img.alt=im.Alt||''; img.loading='lazy'; img.style.width='100%'; img.style.height='100%'; img.style.objectFit='cover'; img.style.borderRadius='10px'; img.style.border='1px solid #223140'; img.onerror=()=>{ card.remove(); };
+      const del=document.createElement('button'); del.textContent='✖'; del.className='icon-btn danger'; del.title='Eliminar'; del.style.position='absolute'; del.style.top='-6px'; del.style.right='-6px'; del.style.background='#ef4444'; del.style.color='#fff'; del.style.borderRadius='50%'; del.style.width='22px'; del.style.height='22px'; del.style.display='grid'; del.style.placeItems='center'; del.style.fontSize='12px'; del.style.cursor='pointer';
+      const sel=document.createElement('div'); sel.textContent='✓'; sel.setAttribute('aria-hidden','true'); sel.style.position='absolute'; sel.style.left='-6px'; sel.style.top='-6px'; sel.style.width='20px'; sel.style.height='20px'; sel.style.borderRadius='50%'; sel.style.display='grid'; sel.style.placeItems='center'; sel.style.fontSize='12px'; sel.style.background='#10b981'; sel.style.color='#0b1520'; sel.style.border='1px solid #0f2b3d'; sel.style.boxShadow='0 0 0 2px #0b1520'; sel.style.opacity='0'; sel.style.transition='opacity .15s ease';
+      del.addEventListener('click', async (ev)=>{ ev.stopPropagation(); if(!confirm('Eliminar esta imagen?')) return; const res=await fetch('/api/product_images/'+encodeURIComponent(im.ID),{method:'DELETE', headers:{Authorization:'Bearer '+token}}); if(res.ok){ mgrSelected.delete(im.ID); mgrUpdateSel(); card.remove(); } else { alert('Error eliminando'); } });
+      card.addEventListener('click', ()=>{ const id=im.ID; if(mgrSelected.has(id)){ mgrSelected.delete(id); card.style.outline=''; sel.style.opacity='0'; } else { mgrSelected.add(id); card.style.outline='2px solid #10b981'; sel.style.opacity='1'; } mgrUpdateSel(); });
+      card.appendChild(img); card.appendChild(del); card.appendChild(sel); grid.appendChild(card);
+    });
+  }
+  function openMgr(){
+    const slug=fSlug.value.trim();
+    if(!slug){ alert('Seleccioná un producto primero'); return; }
+    // Fallback sin JS inline/CSP: abrir nueva pestaña del gestor sin scripts
+    const url='/admin/product_images?slug='+encodeURIComponent(slug);
+    window.open(url,'_blank','noopener');
+  }
+  if(btnManage){ btnManage.addEventListener('click', e=>{ e.preventDefault(); openMgr(); }); }
+  if(btnManageAlt){ btnManageAlt.addEventListener('click', e=>{ e.preventDefault(); openMgr(); }); }
+  if(mgrClose) mgrClose.addEventListener('click', mgrCloseFn);
+  if(mgrClose2) mgrClose2.addEventListener('click', mgrCloseFn);
+  if(mgrDelBtn){ mgrDelBtn.addEventListener('click', async ()=>{ if(mgrSelected.size===0) return; if(!confirm('Eliminar imágenes seleccionadas?')) return; const ids=[...mgrSelected]; await Promise.all(ids.map(id=>fetch('/api/product_images/'+encodeURIComponent(id),{method:'DELETE', headers:{Authorization:'Bearer '+token}}))); ids.forEach(id=>{ const el=grid.querySelector('.img-card[data-id="'+CSS.escape(id)+'"]'); if(el) el.remove(); }); mgrSelected.clear(); mgrUpdateSel(); }); }
 
 })();
 </script>

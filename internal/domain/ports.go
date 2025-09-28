@@ -12,6 +12,8 @@ type ProductRepo interface {
 	FindBySlug(ctx context.Context, slug string) (*Product, error)
 	List(ctx context.Context, filter ProductFilter) ([]Product, int64, error)
 	AddImages(ctx context.Context, productID uuid.UUID, imgs []Image) error
+    FindImageByID(ctx context.Context, id uuid.UUID) (*Image, error)
+    DeleteImageByID(ctx context.Context, id uuid.UUID) error
 	DistinctCategories(ctx context.Context) ([]string, error)
 }
 
