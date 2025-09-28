@@ -1,0 +1,2 @@
+# Ejecutar cada día a las 02:10 hora de Buenos Aires (establecer TZ en el contenedor)
+10 2 * * * /bin/sh /scripts/backup_uploads.sh >> /var/log/backup_uploads.log 2>&1
