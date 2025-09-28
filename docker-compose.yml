@@ -79,7 +79,8 @@ services:
       - ./tools/backup_uploads.sh:/scripts/backup_uploads.sh:ro
       - ./tools/restore_uploads.sh:/scripts/restore_uploads.sh:ro
       - ./tools/crontabs:/etc/crontabs:ro
-    entrypoint: sh -lc "apk add --no-cache tzdata bash coreutils findutils && chmod +x /scripts/*.sh && echo 'Iniciando crond' && crond -f -L /var/log/cron.log"
+    entrypoint: sh -lc "apk add --no-cache tzdata bash coreutils findutils && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && echo 'Iniciando crond' && crond -f -L /var/log/cron.log"
+
     restart: unless-stopped
 
   caddy:
