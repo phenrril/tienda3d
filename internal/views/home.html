@@ -1,7 +1,6 @@
 {{define "home.html"}}
 {{template "layout_start" .}}
 <style>
-/* Fallback modal (evita problemas de caché) */
 #howBuyBackdrop{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:20px;z-index:110;opacity:0;pointer-events:none;transition:opacity .25s ease}
 #howBuyBackdrop.show{opacity:1;pointer-events:auto}
 #howBuyBackdrop .modal{background:#1a2430;border:1px solid #243044;border-radius:22px;padding:24px 24px 28px;max-width:560px;width:100%;color:#e5e7eb;font-family:Poppins,sans-serif;opacity:0;transform:translateY(20px) scale(.94);transition:opacity .28s ease,transform .35s cubic-bezier(.4,0,.2,1)}
@@ -43,7 +42,6 @@
     <div class="modal-actions"><button class="btn-primary" id="howBuyOk">Entendido</button></div>
   </div>
 </div>
-<!-- JS movido a /public/assets/app.js -->
 <section style="margin-top:40px">
   <h2 class="title" style="margin-bottom:10px">Destacados</h2>
   <div class="cards cards--home">
