@@ -29,9 +29,6 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
-    security_opt: ["no-new-privileges:true"]
-    cap_drop: [ALL]
-    read_only: true
     tmpfs: [/tmp, /var/run/postgresql]
 
   # ----- PROD -----
@@ -68,6 +65,23 @@ services:
     read_only: true
     tmpfs: [/tmp]
 
+  # ----- BACKUP -----
+  backup:
+    profiles: ["prod", "dev"]
+    image: alpine:3.20
+    container_name: tienda3d_backup
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+    volumes:
+      # Montamos uploads y backups en /data
+      - ./uploads:/data/uploads:ro
+      - ./backups:/data/backups
+      - ./tools/backup_uploads.sh:/scripts/backup_uploads.sh:ro
+      - ./tools/restore_uploads.sh:/scripts/restore_uploads.sh:ro
+      - ./tools/backup.cron:/etc/crontabs/root:ro
+    entrypoint: sh -lc "apk add --no-cache tzdata bash coreutils findutils && chmod +x /scripts/*.sh && echo 'Iniciando crond' && crond -f -L /var/log/cron.log"
+    restart: unless-stopped
+
   caddy:
     profiles: ["prod"]
     image: caddy:2.7
@@ -88,10 +102,6 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
-    user: "1000:1000"
-    security_opt: ["no-new-privileges:true"]
-    cap_drop: [ALL]
-    read_only: true
     tmpfs: [/tmp]
 
   # ----- DEV -----
@@ -122,10 +132,6 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8080 || exit 1"]
     restart: unless-stopped
-    user: "1000:1000"
-    security_opt: ["no-new-privileges:true"]
-    cap_drop: [ALL]
-    read_only: true
     tmpfs: [/tmp]
 
   caddy_dev:
@@ -144,7 +150,4 @@ services:
     networks: [edge_net]
     restart: unless-stopped
     user: "1000:1000"
-    security_opt: ["no-new-privileges:true"]
-    cap_drop: [ALL]
-    read_only: true
     tmpfs: [/tmp]
