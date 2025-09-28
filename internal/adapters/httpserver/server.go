@@ -113,6 +113,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/products/", s.apiProductByID)
 
 	s.mux.HandleFunc("/api/products/upload", s.apiProductUpload)
+	s.mux.HandleFunc("/api/product_images/", s.apiProductImageByID)
 	s.mux.HandleFunc("/api/quote", s.apiQuote)
 	s.mux.HandleFunc("/api/checkout", s.apiCheckout)
 	s.mux.HandleFunc("/webhooks/mp", s.webhookMP)
@@ -130,6 +131,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/admin/products", s.handleAdminProducts)
 
 	s.mux.HandleFunc("/admin/sales", s.handleAdminSales)
+
+	// Admin: gestor de imágenes sin JS inline (popup simple)
+	s.mux.HandleFunc("/admin/product_images", s.handleAdminProductImages)
+	s.mux.HandleFunc("/admin/product_images/delete", s.handleAdminProductImagesDelete)
 
 	// Admin: Calculadora de costos
 	s.mux.HandleFunc("/admin/costs", s.handleAdminCosts)
@@ -199,6 +204,35 @@ func (s *Server) handleProduct(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.NotFound(w, r)
 		return
+	}
+
+	// Filtrar imágenes que no existan físicamente (si son locales)
+	if len(p.Images) > 0 {
+		filtered := make([]domain.Image, 0, len(p.Images))
+		for _, im := range p.Images {
+			u := strings.TrimSpace(im.URL)
+			if u == "" {
+				continue
+			}
+			low := strings.ToLower(u)
+			if strings.HasPrefix(low, "http://") || strings.HasPrefix(low, "https://") {
+				filtered = append(filtered, im)
+				continue
+			}
+			sp := u
+			if strings.HasPrefix(sp, "/") {
+				sp = sp[1:]
+			}
+			// Sólo chequeamos archivos bajo uploads
+			if !strings.Contains(sp, "uploads") {
+				filtered = append(filtered, im)
+				continue
+			}
+			if _, err := os.Stat(sp); err == nil {
+				filtered = append(filtered, im)
+			}
+		}
+		p.Images = filtered
 	}
 
 	seen := map[string]struct{}{}
@@ -1400,6 +1434,46 @@ func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 201, map[string]any{"product": p, "added_images": len(imgs)})
 }
 
+func (s *Server) apiProductImageByID(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	if r.Method != http.MethodDelete {
+		http.Error(w, "method", 405)
+		return
+	}
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/product_images/")
+	uid, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "id", 400)
+		return
+	}
+	img, err := s.products.GetImageByID(r.Context(), uid)
+	if err != nil || img == nil {
+		http.Error(w, "not found", 404)
+		return
+	}
+	if err := s.products.DeleteImageByID(r.Context(), uid); err != nil {
+		http.Error(w, "delete", 500)
+		return
+	}
+	removedFile := ""
+	sp := strings.TrimSpace(img.URL)
+	if sp != "" {
+		if strings.HasPrefix(sp, "/") {
+			sp = sp[1:]
+		}
+		if strings.Contains(sp, "uploads") {
+			if _, err := os.Stat(sp); err == nil {
+				if err2 := os.Remove(sp); err2 == nil {
+					removedFile = sp
+				}
+			}
+		}
+	}
+	writeJSON(w, 200, map[string]any{"status": "ok", "id": uid.String(), "removed_file": removedFile})
+}
+
 func (s *Server) handleAdminProducts(w http.ResponseWriter, r *http.Request) {
 	if !s.isAdminSession(r) {
 		http.Redirect(w, r, "/admin/auth", 302)
@@ -1410,6 +1484,89 @@ func (s *Server) handleAdminProducts(w http.ResponseWriter, r *http.Request) {
 	tok := s.readAdminToken(r)
 	data := map[string]any{"Products": list, "Total": total, "AdminToken": tok}
 	s.render(w, "admin_products.html", data)
+}
+
+// handleAdminProductImages renderiza una página simple con la galería y opciones de borrado
+func (s *Server) handleAdminProductImages(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", 302)
+		return
+	}
+	slug := strings.TrimSpace(r.URL.Query().Get("slug"))
+	if slug == "" {
+		http.Redirect(w, r, "/admin/products", 302)
+		return
+	}
+	p, err := s.products.GetBySlug(r.Context(), slug)
+	if err != nil || p == nil {
+		http.Redirect(w, r, "/admin/products", 302)
+		return
+	}
+	// Render inline HTML minimal para evitar CSP inline scripts
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(200)
+	var b strings.Builder
+	b.WriteString("<html><head><title>Imágenes ")
+	b.WriteString(template.HTMLEscapeString(p.Name))
+	b.WriteString("</title><meta name=viewport content=\"width=device-width,initial-scale=1\"><link rel=\"stylesheet\" href=\"/public/assets/styles.css\"></head><body style=\"padding:16px\">")
+	b.WriteString("<h2 style=\"margin:0 0 10px\">Imágenes de ")
+	b.WriteString(template.HTMLEscapeString(p.Name))
+	b.WriteString("</h2><p style=\"margin:0 0 12px;color:#8da2b8\">Slug: ")
+	b.WriteString(template.HTMLEscapeString(p.Slug))
+	b.WriteString("</p>")
+	b.WriteString("<div style=\"display:flex;flex-wrap:wrap;gap:10px\">")
+	for _, im := range p.Images {
+		u := strings.TrimSpace(im.URL)
+		if u == "" {
+			continue
+		}
+		b.WriteString("<div style=\"position:relative;width:120px;height:120px\">")
+		b.WriteString("<img src=\"")
+		b.WriteString(template.HTMLEscapeString(u))
+		b.WriteString("\" alt=\"\" style=\"width:100%;height:100%;object-fit:cover;border-radius:10px;border:1px solid #223140\">")
+		b.WriteString("<form method=\"post\" action=\"/admin/product_images/delete\" style=\"position:absolute;top:-8px;right:-8px\">")
+		b.WriteString("<input type=\"hidden\" name=\"id\" value=\"")
+		b.WriteString(template.HTMLEscapeString(im.ID.String()))
+		b.WriteString("\"><button class=\"btn-danger\" style=\"padding:4px 8px;border-radius:999px\" onclick=\"return confirm('Eliminar imagen?')\">✖</button></form>")
+		b.WriteString("</div>")
+	}
+	if len(p.Images) == 0 {
+		b.WriteString("<p style=\"color:#8da2b8\">Sin imágenes.</p>")
+	}
+	b.WriteString("</div><p style=\"margin-top:16px\"><a class=\"btn-secondary\" href=\"/admin/products\">Volver</a></p>")
+	b.WriteString("</body></html>")
+	_, _ = w.Write([]byte(b.String()))
+}
+
+func (s *Server) handleAdminProductImagesDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", 302)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/admin/products", 302)
+		return
+	}
+	idStr := strings.TrimSpace(r.FormValue("id"))
+	uid, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Redirect(w, r, "/admin/products", 302)
+		return
+	}
+	img, err := s.products.GetImageByID(r.Context(), uid)
+	if err == nil && img != nil {
+		_ = s.products.DeleteImageByID(r.Context(), uid)
+		sp := strings.TrimSpace(img.URL)
+		if strings.HasPrefix(sp, "/") {
+			sp = sp[1:]
+		}
+		if strings.Contains(sp, "uploads") {
+			if _, err := os.Stat(sp); err == nil {
+				_ = os.Remove(sp)
+			}
+		}
+	}
+	http.Redirect(w, r, "/admin/products", 302)
 }
 
 func (s *Server) handleAdminOrders(w http.ResponseWriter, r *http.Request) {

@@ -39,6 +39,30 @@ func (uc *ProductUC) AddImages(ctx context.Context, productID uuid.UUID, imgs []
 	return uc.Products.AddImages(ctx, productID, imgs)
 }
 
+func (uc *ProductUC) GetImageByID(ctx context.Context, id uuid.UUID) (*domain.Image, error) {
+	if id == uuid.Nil {
+		return nil, errors.New("id vacío")
+	}
+	if repo, ok := uc.Products.(interface {
+		FindImageByID(context.Context, uuid.UUID) (*domain.Image, error)
+	}); ok {
+		return repo.FindImageByID(ctx, id)
+	}
+	return nil, errors.New("repo no soporta find image")
+}
+
+func (uc *ProductUC) DeleteImageByID(ctx context.Context, id uuid.UUID) error {
+	if id == uuid.Nil {
+		return errors.New("id vacío")
+	}
+	if repo, ok := uc.Products.(interface {
+		DeleteImageByID(context.Context, uuid.UUID) error
+	}); ok {
+		return repo.DeleteImageByID(ctx, id)
+	}
+	return errors.New("repo no soporta delete image")
+}
+
 func (uc *ProductUC) DeleteBySlug(ctx context.Context, slug string) error {
 	if slug == "" {
 		return errors.New("slug vacío")

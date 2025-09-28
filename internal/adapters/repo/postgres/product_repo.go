@@ -46,6 +46,21 @@ func (r *ProductRepo) FindBySlug(ctx context.Context, slug string) (*domain.Prod
 	return &p, nil
 }
 
+func (r *ProductRepo) FindImageByID(ctx context.Context, id uuid.UUID) (*domain.Image, error) {
+	var img domain.Image
+	if err := r.db.WithContext(ctx).First(&img, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, err
+	}
+	return &img, nil
+}
+
+func (r *ProductRepo) DeleteImageByID(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&domain.Image{}, "id = ?", id).Error
+}
+
 func (r *ProductRepo) List(ctx context.Context, f domain.ProductFilter) ([]domain.Product, int64, error) {
 	var list []domain.Product
 	q := r.db.WithContext(ctx).Model(&domain.Product{})
