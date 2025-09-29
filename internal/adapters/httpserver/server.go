@@ -132,6 +132,9 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("/admin/sales", s.handleAdminSales)
 
+	// Admin: reparación de imágenes huérfanas
+	s.mux.HandleFunc("/admin/repair_images", s.handleAdminRepairImages)
+
 	// Admin: gestor de imágenes sin JS inline (popup simple)
 	s.mux.HandleFunc("/admin/product_images", s.handleAdminProductImages)
 	s.mux.HandleFunc("/admin/product_images/delete", s.handleAdminProductImagesDelete)
@@ -139,6 +142,103 @@ func (s *Server) routes() {
 	// Admin: Calculadora de costos
 	s.mux.HandleFunc("/admin/costs", s.handleAdminCosts)
 	s.mux.HandleFunc("/admin/costs/calculate", s.handleAdminCostsCalculate)
+}
+
+// handleAdminRepairImages recorre los productos y elimina de la DB imágenes cuyo archivo físico falta.
+// Soporta dry-run con ?dry=1
+func (s *Server) handleAdminRepairImages(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", http.StatusFound)
+		return
+	}
+	dry := r.URL.Query().Get("dry") == "1"
+	type result struct {
+		TotalProducts int   `json:"total_products"`
+		TotalImages   int   `json:"total_images"`
+		MissingFiles  int   `json:"missing_files"`
+		DeletedImages int   `json:"deleted_images"`
+		DryRun        bool  `json:"dry_run"`
+		DurationMS    int64 `json:"duration_ms"`
+	}
+	start := time.Now()
+	out := result{DryRun: dry}
+	page := 1
+	for {
+		list, _, err := s.products.List(r.Context(), domain.ProductFilter{Page: page, PageSize: 500})
+		if err != nil {
+			http.Error(w, "list", http.StatusInternalServerError)
+			return
+		}
+		if len(list) == 0 {
+			break
+		}
+		out.TotalProducts += len(list)
+		for i := range list {
+			p := &list[i]
+			for _, im := range p.Images {
+				out.TotalImages++
+				u := strings.TrimSpace(im.URL)
+				if u == "" {
+					continue
+				}
+				low := strings.ToLower(u)
+				if strings.HasPrefix(low, "http://") || strings.HasPrefix(low, "https://") {
+					continue
+				}
+				sp := u
+				if strings.HasPrefix(sp, "/") {
+					sp = sp[1:]
+				}
+				if !strings.Contains(sp, "uploads") {
+					continue
+				}
+				if _, err := os.Stat(sp); err != nil {
+					out.MissingFiles++
+					if !dry {
+						_ = s.products.DeleteImageByID(r.Context(), im.ID)
+						out.DeletedImages++
+					}
+				}
+			}
+		}
+		page++
+		if page > 1000 {
+			break
+		}
+	}
+	out.DurationMS = time.Since(start).Milliseconds()
+	writeJSON(w, 200, out)
+}
+
+// filterExistingProductImages devuelve sólo imágenes con URL válida o archivo local existente.
+func filterExistingProductImages(imgs []domain.Image) []domain.Image {
+	if len(imgs) == 0 {
+		return imgs
+	}
+	filtered := make([]domain.Image, 0, len(imgs))
+	for _, im := range imgs {
+		u := strings.TrimSpace(im.URL)
+		if u == "" {
+			continue
+		}
+		low := strings.ToLower(u)
+		if strings.HasPrefix(low, "http://") || strings.HasPrefix(low, "https://") {
+			filtered = append(filtered, im)
+			continue
+		}
+		sp := u
+		if strings.HasPrefix(sp, "/") {
+			sp = sp[1:]
+		}
+		if !strings.Contains(sp, "uploads") {
+			filtered = append(filtered, im)
+			continue
+		}
+		if _, err := os.Stat(sp); err == nil {
+			filtered = append(filtered, im)
+		}
+	}
+	return filtered
 }
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
@@ -170,6 +270,17 @@ func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
 	category := qv.Get("category")
 	pageSize := 24
 	list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: page, PageSize: pageSize, Sort: sort, Query: query, Category: category})
+	// Filtrar imágenes inexistentes y descartar productos sin imágenes válidas
+	filteredProducts := make([]domain.Product, 0, len(list))
+	for i := range list {
+		p := &list[i]
+		p.Images = filterExistingProductImages(p.Images)
+		if len(p.Images) > 0 {
+			filteredProducts = append(filteredProducts, *p)
+		}
+	}
+	list = filteredProducts
+	total = int64(len(list))
 	pages := (int(total) + (pageSize - 1)) / pageSize
 	if pages == 0 {
 		pages = 1
@@ -206,34 +317,8 @@ func (s *Server) handleProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Filtrar imágenes que no existan físicamente (si son locales)
-	if len(p.Images) > 0 {
-		filtered := make([]domain.Image, 0, len(p.Images))
-		for _, im := range p.Images {
-			u := strings.TrimSpace(im.URL)
-			if u == "" {
-				continue
-			}
-			low := strings.ToLower(u)
-			if strings.HasPrefix(low, "http://") || strings.HasPrefix(low, "https://") {
-				filtered = append(filtered, im)
-				continue
-			}
-			sp := u
-			if strings.HasPrefix(sp, "/") {
-				sp = sp[1:]
-			}
-			// Sólo chequeamos archivos bajo uploads
-			if !strings.Contains(sp, "uploads") {
-				filtered = append(filtered, im)
-				continue
-			}
-			if _, err := os.Stat(sp); err == nil {
-				filtered = append(filtered, im)
-			}
-		}
-		p.Images = filtered
-	}
+	// Filtrar imágenes inexistentes
+	p.Images = filterExistingProductImages(p.Images)
 
 	seen := map[string]struct{}{}
 	colors := []string{}
@@ -460,6 +545,10 @@ func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.NotFound(w, r)
 			return
+		}
+		// Filtrar imágenes inexistentes para que el admin no cuente huérfanas
+		if p != nil {
+			p.Images = filterExistingProductImages(p.Images)
 		}
 		writeJSON(w, 200, p)
 		return
@@ -1480,6 +1569,10 @@ func (s *Server) handleAdminProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 200})
+	// Normalizar imágenes mostradas en admin (evita contadores inflados por huérfanas)
+	for i := range list {
+		list[i].Images = filterExistingProductImages(list[i].Images)
+	}
 
 	tok := s.readAdminToken(r)
 	data := map[string]any{"Products": list, "Total": total, "AdminToken": tok}

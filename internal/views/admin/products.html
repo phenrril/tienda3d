@@ -72,6 +72,9 @@
   </div>
   <div>
     <h2 style="margin:0 0 10px;font-size:18px">Listado ({{.Total}})</h2>
+    <div class="row" style="margin:0 0 8px">
+      <input type="text" id="prodSearch" placeholder="Buscar por nombre o slug..." aria-label="Buscar productos" style="width:260px;padding:8px 10px;border-radius:8px;border:1px solid #223140;background:#0b1520;color:#e5f0ff" />
+    </div>
     <div style="overflow:auto">
       <table class="table" id="prodTable" style="font-size:0.8rem;min-width:880px">
         <thead><tr><th>Nombre</th><th>Slug</th><th>Precio</th><th>W</th><th>H</th><th>D</th><th>Stock</th><th>Imgs</th><th style="text-align:right">Acciones</th></tr></thead>
@@ -97,6 +100,10 @@
           {{end}}
         </tbody>
       </table>
+      <div class="row" style="margin-top:10px;gap:8px">
+        <button type="button" id="btnRepairImages" class="btn-secondary">Refresh images</button>
+        <span id="repStatus" style="font-size:12px;color:var(--muted)"></span>
+      </div>
     </div>
   </div>
 </section>
