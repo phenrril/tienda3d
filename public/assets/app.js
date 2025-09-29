@@ -110,13 +110,33 @@
   const loadBtn=document.getElementById('loadMore');
   const cards=document.querySelector('.cards');
   const statusEl=document.getElementById('loadMoreStatus');
+  
+  // Validación/rehuso de imágenes rotas en tarjetas de productos
+  function chooseNextValidImage(imgEl){
+    if(!imgEl) return false;
+    const srcset=imgEl.getAttribute('srcset')||'';
+    const urls=[imgEl.getAttribute('src')||''];
+    // intentar extraer URLs del srcset
+    srcset.split(',').forEach(part=>{ const url=(part||'').trim().split(' ')[0]; if(url) urls.push(url); });
+    let idx=0;
+    function tryNext(){
+      idx++;
+      // no hay más: remover la card
+      if(idx>=urls.length){ const card=imgEl.closest('.card'); if(card) card.remove(); return; }
+      imgEl.src=urls[idx];
+    }
+    imgEl.addEventListener('error', tryNext, {once:false});
+    return true;
+  }
+  // Aplicar a imágenes existentes
+  document.querySelectorAll('.cards .card-img').forEach(img=>chooseNextValidImage(img));
   function announce(msg){if(statusEl){statusEl.textContent=msg;}}
   if(loadBtn && cards){
     loadBtn.addEventListener('click',async()=>{
       const next=loadBtn.getAttribute('data-next');
       if(!next){loadBtn.disabled=true;return}
       const oldText=loadBtn.textContent; loadBtn.disabled=true; loadBtn.textContent='Cargando...'; announce('Cargando más productos');
-      try{const res=await fetch(next,{credentials:'same-origin'}); if(!res.ok) throw new Error('HTTP '+res.status); const html=await res.text(); const parser=new DOMParser(); const doc=parser.parseFromString(html,'text/html'); const newCards=doc.querySelectorAll('.cards > .card'); newCards.forEach(n=>cards.appendChild(n)); const newBtn=doc.getElementById('loadMore'); const newNext=newBtn?newBtn.getAttribute('data-next'):''; if(newNext){loadBtn.setAttribute('data-next',newNext);loadBtn.disabled=false;loadBtn.textContent=oldText;announce('Se cargaron más productos');} else {loadBtn.setAttribute('data-next','');loadBtn.disabled=true;loadBtn.textContent='No hay más';announce('No hay más productos');}}
+      try{const res=await fetch(next,{credentials:'same-origin'}); if(!res.ok) throw new Error('HTTP '+res.status); const html=await res.text(); const parser=new DOMParser(); const doc=parser.parseFromString(html,'text/html'); const newCards=doc.querySelectorAll('.cards > .card'); newCards.forEach(n=>{ cards.appendChild(n); const img=n.querySelector('.card-img'); if(img) chooseNextValidImage(img); }); const newBtn=doc.getElementById('loadMore'); const newNext=newBtn?newBtn.getAttribute('data-next'):''; if(newNext){loadBtn.setAttribute('data-next',newNext);loadBtn.disabled=false;loadBtn.textContent=oldText;announce('Se cargaron más productos');} else {loadBtn.setAttribute('data-next','');loadBtn.disabled=true;loadBtn.textContent='No hay más';announce('No hay más productos');}}
       catch(err){loadBtn.disabled=false; loadBtn.textContent=oldText; announce('Error al cargar');}
     });
   }
@@ -303,6 +323,7 @@ if ('serviceWorker' in navigator) {
 (function(){
   const form=document.getElementById('prodForm'); if(!form) return;
   const tbl=document.getElementById('prodTable');
+  const searchInput=document.getElementById('prodSearch');
   const token=(form.getAttribute('data-token')||'').trim();
   const fSlug=document.getElementById('pfSlug');
   const fName=document.getElementById('pfName');
@@ -327,6 +348,38 @@ if ('serviceWorker' in navigator) {
   const selCount=document.getElementById('selCount');
   const selectedIDs=new Set();
   const topbar=document.querySelector('.topbar');
+  const btnRepair=document.getElementById('btnRepairImages');
+  const repStatus=document.getElementById('repStatus');
+
+  function getCurrentSlug(){ return (fSlug && fSlug.value.trim()) || ''; }
+  function updateImgsCountForSlug(slug, count){
+    if(!slug) return;
+    const tr=document.querySelector('tr[data-slug="'+CSS.escape(slug)+'"]');
+    if(!tr) return;
+    const tds=tr.querySelectorAll('td');
+    if(tds && tds[7]){ tds[7].textContent = String(count|0); }
+  }
+  async function reloadProductAndSync(){
+    const slug=getCurrentSlug(); if(!slug) return;
+    try{
+      const res=await fetch('/api/products/'+encodeURIComponent(slug),{headers: token? {Authorization:'Bearer '+token}:{}});
+      if(!res.ok) return;
+      const p=await res.json();
+      const imgs=(p && Array.isArray(p.Images))? p.Images: [];
+      renderGallery(imgs);
+      updateImgsCountForSlug(slug, imgs.length|0);
+    }catch{}
+  }
+  async function syncImgsCountFromFormGallery(){
+    const slug=getCurrentSlug(); if(!slug) return;
+    // Preferir el valor real desde API (ya filtrado por el servidor)
+    try{
+      const res=await fetch('/api/products/'+encodeURIComponent(slug),{headers: token? {Authorization:'Bearer '+token}:{}});
+      if(res.ok){ const p=await res.json(); const count=(p && Array.isArray(p.Images))? p.Images.length : 0; updateImgsCountForSlug(slug, count); return; }
+    }catch{}
+    // Fallback al conteo del DOM
+    const count=document.querySelectorAll('#imgGallery .img-card').length; updateImgsCountForSlug(slug, count);
+  }
 
   function scrollToForm(){
     const offset=(topbar && topbar.getBoundingClientRect().height)||72;
@@ -365,11 +418,13 @@ if ('serviceWorker' in navigator) {
         if(!token){ alert('Sesión no válida'); return; }
         if(!confirm('Eliminar esta imagen?')) return;
         const res=await fetch('/api/product_images/'+encodeURIComponent(im.ID), {method:'DELETE', headers:{Authorization:'Bearer '+token}});
-        if(res.ok){ selectedIDs.delete(im.ID); updateSelectionUI(); card.remove(); } else { alert('Error eliminando imagen'); }
+        if(res.ok){ selectedIDs.delete(im.ID); updateSelectionUI(); card.remove(); const modalCard=document.querySelector('#imgMgrGrid .img-card[data-id="'+CSS.escape(im.ID)+'"]'); if(modalCard) modalCard.remove(); await reloadProductAndSync(); } else { alert('Error eliminando imagen'); }
       });
       del.addEventListener('click', e=>e.stopPropagation());
       card.appendChild(img); card.appendChild(del); card.appendChild(sel); g.appendChild(card);
     });
+    // Sincronizar contador al render
+    syncImgsCountFromFormGallery();
     g.onclick=(e)=>{
       const card=e.target.closest('.img-card'); if(!card) return;
       if(e.target.closest('button')) return;
@@ -398,6 +453,21 @@ if ('serviceWorker' in navigator) {
     }
   }); }
 
+  // Filtro local por nombre o slug
+  if(searchInput && tbl){
+    const tbody=tbl.tBodies && tbl.tBodies[0];
+    const rows=()=>tbody? Array.from(tbody.rows): [];
+    function applyFilter(){
+      const q=(searchInput.value||'').trim().toLowerCase();
+      rows().forEach(tr=>{
+        const name=(tr.cells[0] && tr.cells[0].textContent||'').toLowerCase();
+        const slug=(tr.cells[1] && tr.cells[1].textContent||'').toLowerCase();
+        tr.style.display = (!q || name.includes(q) || slug.includes(q)) ? '' : 'none';
+      });
+    }
+    searchInput.addEventListener('input', applyFilter);
+  }
+
   form.addEventListener('submit', async e=>{
     e.preventDefault();
     const slug=(fSlug&&fSlug.value.trim())||'';
@@ -423,6 +493,20 @@ if ('serviceWorker' in navigator) {
   function refreshPreview(){ if(!preview||!imagesInput||!dzCount) return; preview.innerHTML=''; const files=Array.from(imagesInput.files||[]); dzCount.textContent=files.length+(files.length===1?' archivo':' archivos'); files.slice(0,6).forEach(f=>{ const r=new FileReader(); r.onload=ev=>{ const img=document.createElement('img'); img.src=ev.target.result; img.alt=f.name; img.style.width='52px'; img.style.height='52px'; img.style.objectFit='cover'; img.style.borderRadius='10px'; img.style.border='1px solid #223140'; preview.appendChild(img); }; r.readAsDataURL(f); }); }
   if(imagesInput) imagesInput.addEventListener('change', refreshPreview);
   if(dropZone){ ['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault(); dropZone.classList.add('drag');})); ['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault(); dropZone.classList.remove('drag');})); dropZone.addEventListener('drop', e=>{ const files=[...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')); if(files.length){ const dt=new DataTransfer(); files.forEach(f=>dt.items.add(f)); if(imagesInput) imagesInput.files=dt.files; refreshPreview(); }}); }
+
+  // Botón: Refresh images (repara imágenes huérfanas en server y recarga la página)
+  if(btnRepair){
+    btnRepair.addEventListener('click', async ()=>{
+      if(repStatus) repStatus.textContent='Revisando...';
+      try{
+        const res=await fetch('/admin/repair_images',{credentials:'same-origin'});
+        const txt=await res.text();
+        if(!res.ok){ throw new Error('HTTP '+res.status+': '+txt); }
+        if(repStatus) repStatus.textContent='Listo. Recargando...';
+        setTimeout(()=>location.reload(), 600);
+      }catch(err){ if(repStatus) repStatus.textContent='Error: '+(err&&err.message||''); }
+    });
+  }
 
   // ===== Modal gestor de imágenes =====
   const overlay=document.getElementById('imgMgrOverlay');
@@ -465,7 +549,7 @@ if ('serviceWorker' in navigator) {
   if(btnManageAlt){ btnManageAlt.addEventListener('click', e=>{ e.preventDefault(); openMgr(); }); }
   if(mgrClose) mgrClose.addEventListener('click', mgrCloseFn);
   if(mgrClose2) mgrClose2.addEventListener('click', mgrCloseFn);
-  if(mgrDelBtn){ mgrDelBtn.addEventListener('click', async (e)=>{ e.preventDefault(); if(mgrSelected.size===0) return; if(!token){ alert('Sesión no válida'); return; } if(!confirm('Eliminar imágenes seleccionadas?')) return; const ids=[...mgrSelected]; await Promise.all(ids.map(id=>fetch('/api/product_images/'+encodeURIComponent(id),{method:'DELETE', headers:{Authorization:'Bearer '+token}}))); ids.forEach(id=>{ const el=grid && grid.querySelector('.img-card[data-id="'+CSS.escape(id)+'"]'); if(el) el.remove(); }); mgrSelected.clear(); mgrUpdateSel(); }); }
+  if(mgrDelBtn){ mgrDelBtn.addEventListener('click', async (e)=>{ e.preventDefault(); if(mgrSelected.size===0) return; if(!token){ alert('Sesión no válida'); return; } if(!confirm('Eliminar imágenes seleccionadas?')) return; const ids=[...mgrSelected]; await Promise.all(ids.map(id=>fetch('/api/product_images/'+encodeURIComponent(id),{method:'DELETE', headers:{Authorization:'Bearer '+token}}))); ids.forEach(id=>{ const el=grid && grid.querySelector('.img-card[data-id="'+CSS.escape(id)+'"]'); if(el) el.remove(); }); mgrSelected.clear(); mgrUpdateSel(); await reloadProductAndSync(); }); }
 })();
 
 // Admin: calculadora de costos
