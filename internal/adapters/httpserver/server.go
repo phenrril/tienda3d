@@ -280,7 +280,7 @@ func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	list = filteredProducts
-	total = int64(len(list))
+	// No sobrescribir total - mantener el total original de la DB para paginación correcta
 	pages := (int(total) + (pageSize - 1)) / pageSize
 	if pages == 0 {
 		pages = 1
