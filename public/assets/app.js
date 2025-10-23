@@ -136,7 +136,7 @@
       const next=loadBtn.getAttribute('data-next');
       if(!next){loadBtn.disabled=true;return}
       const oldText=loadBtn.textContent; loadBtn.disabled=true; loadBtn.textContent='Cargando...'; announce('Cargando más productos');
-      try{const res=await fetch(next,{credentials:'same-origin'}); if(!res.ok) throw new Error('HTTP '+res.status); const html=await res.text(); const parser=new DOMParser(); const doc=parser.parseFromString(html,'text/html'); const newCards=doc.querySelectorAll('.cards > .card'); newCards.forEach(n=>{ cards.appendChild(n); const img=n.querySelector('.card-img'); if(img) chooseNextValidImage(img); }); const newBtn=doc.getElementById('loadMore'); const newNext=newBtn?newBtn.getAttribute('data-next'):''; if(newNext){loadBtn.setAttribute('data-next',newNext);loadBtn.disabled=false;loadBtn.textContent=oldText;announce('Se cargaron más productos');} else {loadBtn.setAttribute('data-next','');loadBtn.disabled=true;loadBtn.textContent='No hay más';announce('No hay más productos');}}
+      try{const res=await fetch(next,{credentials:'same-origin'}); if(!res.ok) throw new Error('HTTP '+res.status); const html=await res.text(); const parser=new DOMParser(); const doc=parser.parseFromString(html,'text/html'); const newCards=doc.querySelectorAll('.cards > .card'); newCards.forEach(n=>{ cards.appendChild(n); const img=n.querySelector('.card-img'); if(img) chooseNextValidImage(img); }); const newBtn=doc.getElementById('loadMore'); const newNext=newBtn?newBtn.getAttribute('data-next'):''; const resultCount=document.querySelector('.result-count'); if(resultCount){ const currentCards=document.querySelectorAll('.cards > .card').length; const totalMatch=resultCount.textContent.match(/de (\d+)/); const total=totalMatch?totalMatch[1]:currentCards; resultCount.textContent=currentCards+' resultados de '+total; } if(newNext){loadBtn.setAttribute('data-next',newNext);loadBtn.disabled=false;loadBtn.textContent=oldText;announce('Se cargaron más productos');} else {loadBtn.setAttribute('data-next','');loadBtn.disabled=true;loadBtn.textContent='No hay más';announce('No hay más productos');}}
       catch(err){loadBtn.disabled=false; loadBtn.textContent=oldText; announce('Error al cargar');}
     });
   }
@@ -453,19 +453,41 @@ if ('serviceWorker' in navigator) {
     }
   }); }
 
-  // Filtro local por nombre o slug
+  // Filtro local por nombre, slug y categoría
   if(searchInput && tbl){
     const tbody=tbl.tBodies && tbl.tBodies[0];
+    const categoryFilter=document.getElementById('categoryFilter');
     const rows=()=>tbody? Array.from(tbody.rows): [];
+    
+    // Poblar select de categorías
+    if(categoryFilter){
+      const cats=new Set();
+      rows().forEach(tr=>{
+        const cat=(tr.getAttribute('data-category')||'').trim();
+        if(cat) cats.add(cat);
+      });
+      [...cats].sort().forEach(cat=>{
+        const opt=document.createElement('option');
+        opt.value=cat;
+        opt.textContent=cat;
+        categoryFilter.appendChild(opt);
+      });
+    }
+    
     function applyFilter(){
       const q=(searchInput.value||'').trim().toLowerCase();
+      const selCat=(categoryFilter && categoryFilter.value||'').trim();
       rows().forEach(tr=>{
         const name=(tr.cells[0] && tr.cells[0].textContent||'').toLowerCase();
         const slug=(tr.cells[1] && tr.cells[1].textContent||'').toLowerCase();
-        tr.style.display = (!q || name.includes(q) || slug.includes(q)) ? '' : 'none';
+        const cat=(tr.getAttribute('data-category')||'').trim();
+        const matchText = !q || name.includes(q) || slug.includes(q);
+        const matchCat = !selCat || cat === selCat;
+        tr.style.display = (matchText && matchCat) ? '' : 'none';
       });
     }
     searchInput.addEventListener('input', applyFilter);
+    if(categoryFilter) categoryFilter.addEventListener('change', applyFilter);
   }
 
   form.addEventListener('submit', async e=>{
