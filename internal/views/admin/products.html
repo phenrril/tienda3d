@@ -76,6 +76,9 @@
       <input type="text" id="prodSearch" placeholder="Buscar por nombre o slug..." aria-label="Buscar productos" style="width:260px;padding:8px 10px;border-radius:8px;border:1px solid #223140;background:#0b1520;color:#e5f0ff" />
       <select id="categoryFilter" aria-label="Filtrar por categoría" style="padding:8px 10px;border-radius:8px;border:1px solid #223140;background:#0b1520;color:#e5f0ff">
         <option value="">Todas las categorías</option>
+        {{range .Categories}}
+          <option value="{{.}}">{{.}}</option>
+        {{end}}
       </select>
     </div>
     <div style="overflow:auto">
