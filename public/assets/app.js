@@ -459,21 +459,6 @@ if ('serviceWorker' in navigator) {
     const categoryFilter=document.getElementById('categoryFilter');
     const rows=()=>tbody? Array.from(tbody.rows): [];
     
-    // Poblar select de categorías
-    if(categoryFilter){
-      const cats=new Set();
-      rows().forEach(tr=>{
-        const cat=(tr.getAttribute('data-category')||'').trim();
-        if(cat) cats.add(cat);
-      });
-      [...cats].sort().forEach(cat=>{
-        const opt=document.createElement('option');
-        opt.value=cat;
-        opt.textContent=cat;
-        categoryFilter.appendChild(opt);
-      });
-    }
-    
     function applyFilter(){
       const q=(searchInput.value||'').trim().toLowerCase();
       const selCat=(categoryFilter && categoryFilter.value||'').trim();

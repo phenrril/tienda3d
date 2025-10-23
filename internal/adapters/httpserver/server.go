@@ -1574,8 +1574,9 @@ func (s *Server) handleAdminProducts(w http.ResponseWriter, r *http.Request) {
 		list[i].Images = filterExistingProductImages(list[i].Images)
 	}
 
+	cats, _ := s.products.Categories(r.Context())
 	tok := s.readAdminToken(r)
-	data := map[string]any{"Products": list, "Total": total, "AdminToken": tok}
+	data := map[string]any{"Products": list, "Total": total, "Categories": cats, "AdminToken": tok}
 	s.render(w, "admin_products.html", data)
 }
 
