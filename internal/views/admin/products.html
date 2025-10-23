@@ -72,18 +72,22 @@
   </div>
   <div>
     <h2 style="margin:0 0 10px;font-size:18px">Listado ({{.Total}})</h2>
-    <div class="row" style="margin:0 0 8px">
+    <div class="row" style="margin:0 0 8px;gap:8px">
       <input type="text" id="prodSearch" placeholder="Buscar por nombre o slug..." aria-label="Buscar productos" style="width:260px;padding:8px 10px;border-radius:8px;border:1px solid #223140;background:#0b1520;color:#e5f0ff" />
+      <select id="categoryFilter" aria-label="Filtrar por categoría" style="padding:8px 10px;border-radius:8px;border:1px solid #223140;background:#0b1520;color:#e5f0ff">
+        <option value="">Todas las categorías</option>
+      </select>
     </div>
     <div style="overflow:auto">
       <table class="table" id="prodTable" style="font-size:0.8rem;min-width:880px">
-        <thead><tr><th>Nombre</th><th>Slug</th><th>Precio</th><th>W</th><th>H</th><th>D</th><th>Stock</th><th>Imgs</th><th style="text-align:right">Acciones</th></tr></thead>
+        <thead><tr><th>Nombre</th><th>Slug</th><th>Precio</th><th>Categoría</th><th>W</th><th>H</th><th>D</th><th>Stock</th><th>Imgs</th><th style="text-align:right">Acciones</th></tr></thead>
         <tbody>
           {{range .Products}}
-          <tr data-slug="{{.Slug}}">
+          <tr data-slug="{{.Slug}}" data-category="{{.Category}}">
             <td>{{.Name}}</td>
             <td style="font-family:monospace">{{.Slug}}</td>
             <td>${{printf "%.2f" .BasePrice}}</td>
+            <td>{{.Category}}</td>
             <td>{{printf "%.0f" .WidthMM}}</td>
             <td>{{printf "%.0f" .HeightMM}}</td>
             <td>{{printf "%.0f" .DepthMM}}</td>

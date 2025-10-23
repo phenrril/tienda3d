@@ -1,7 +1,7 @@
 {{define "products.html"}}
 {{template "layout_start" .}}
 <h1 class="section-title">Productos</h1>
-<p class="result-count">{{len .Products}} resultados{{if .Query}} para “{{.Query}}”{{end}}</p>
+<p class="result-count">{{len .Products}} resultados de {{.Total}}{{if .Query}} para "{{.Query}}"{{end}}</p>
 <h2 class="sr-only">Filtros</h2>
 <div class="mobile-actions">
   <button class="btn-filter" aria-expanded="false" aria-controls="filterDrawer">Filtrar</button>
