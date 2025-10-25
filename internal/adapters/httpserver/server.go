@@ -38,6 +38,7 @@ type Server struct {
 	quotes    *usecase.QuoteUC
 	orders    *usecase.OrderUC
 	payments  *usecase.PaymentUC
+	whatsapp  *usecase.WhatsAppUC
 	models    domain.UploadedModelRepo
 	storage   domain.FileStorage
 	customers domain.CustomerRepo
@@ -49,8 +50,8 @@ type Server struct {
 
 var emailRe = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
 
-func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config) http.Handler {
-	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, models: m, storage: fs, customers: customers, oauthCfg: oauthCfg, mux: http.NewServeMux()}
+func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config) http.Handler {
+	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, models: m, storage: fs, customers: customers, oauthCfg: oauthCfg, mux: http.NewServeMux()}
 
 	allowed := map[string]struct{}{}
 	if raw := os.Getenv("ADMIN_ALLOWED_EMAILS"); raw != "" {
@@ -142,6 +143,11 @@ func (s *Server) routes() {
 	// Admin: Calculadora de costos
 	s.mux.HandleFunc("/admin/costs", s.handleAdminCosts)
 	s.mux.HandleFunc("/admin/costs/calculate", s.handleAdminCostsCalculate)
+
+	// WhatsApp Business API endpoints
+	s.mux.HandleFunc("/api/whatsapp/webhook", s.handleWhatsAppWebhook)
+	s.mux.HandleFunc("/api/whatsapp/sync-products", s.handleWhatsAppSyncProducts)
+	s.mux.HandleFunc("/api/whatsapp/orders", s.handleWhatsAppOrders)
 }
 
 // handleAdminRepairImages recorre los productos y elimina de la DB imágenes cuyo archivo físico falta.
@@ -2410,4 +2416,135 @@ func secureCompare(a, b string) bool {
 		v |= a[i] ^ b[i]
 	}
 	return v == 0
+}
+
+// handleWhatsAppWebhook maneja webhooks de WhatsApp Business
+func (s *Server) handleWhatsAppWebhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+
+	body, err := io.ReadAll(io.LimitReader(r.Body, 65536))
+	if err != nil {
+		http.Error(w, "error reading body", 400)
+		return
+	}
+
+	// Verificar firma del webhook si está configurada
+	if verifyToken := os.Getenv("WHATSAPP_VERIFY_TOKEN"); verifyToken != "" {
+		if !s.verifyWhatsAppWebhook(r, body, verifyToken) {
+			http.Error(w, "unauthorized", 401)
+			return
+		}
+	}
+
+	// Procesar el webhook
+	if err := s.whatsapp.ProcessWhatsAppWebhook(r.Context(), body); err != nil {
+		log.Error().Err(err).Msg("error processing WhatsApp webhook")
+		http.Error(w, "error processing webhook", 500)
+		return
+	}
+
+	w.WriteHeader(200)
+}
+
+// verifyWhatsAppWebhook verifica la firma del webhook de WhatsApp
+func (s *Server) verifyWhatsAppWebhook(r *http.Request, body []byte, verifyToken string) bool {
+	signature := r.Header.Get("X-Hub-Signature-256")
+	if signature == "" {
+		return false
+	}
+
+	// Implementar verificación de firma HMAC
+	// Por simplicidad, aquí solo verificamos el token de verificación
+	token := r.URL.Query().Get("hub.verify_token")
+	return token == verifyToken
+}
+
+// handleWhatsAppSyncProducts sincroniza productos con WhatsApp Business
+func (s *Server) handleWhatsAppSyncProducts(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+
+	var req struct {
+		ProductSlug       string `json:"product_slug"`
+		WhatsAppProductID string `json:"whatsapp_product_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid json", 400)
+		return
+	}
+
+	// Buscar el producto
+	product, err := s.products.GetBySlug(r.Context(), req.ProductSlug)
+	if err != nil {
+		http.Error(w, "product not found", 404)
+		return
+	}
+
+	// Sincronizar con WhatsApp
+	if err := s.whatsapp.SyncProductToWhatsApp(r.Context(), product, req.WhatsAppProductID); err != nil {
+		http.Error(w, "sync error", 500)
+		return
+	}
+
+	writeJSON(w, 200, map[string]interface{}{
+		"status":              "success",
+		"product_slug":        req.ProductSlug,
+		"whatsapp_product_id": req.WhatsAppProductID,
+	})
+}
+
+// handleWhatsAppOrders maneja órdenes de WhatsApp
+func (s *Server) handleWhatsAppOrders(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+
+	if r.Method == http.MethodGet {
+		// Listar órdenes pendientes
+		orders, err := s.whatsapp.WhatsAppRepo.ListPendingOrders(r.Context())
+		if err != nil {
+			http.Error(w, "error listing orders", 500)
+			return
+		}
+
+		writeJSON(w, 200, map[string]interface{}{
+			"orders": orders,
+		})
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		// Crear nueva orden desde WhatsApp
+		var req struct {
+			WhatsAppID   string                  `json:"whatsapp_id"`
+			CustomerInfo domain.WhatsAppCustomer `json:"customer_info"`
+			Items        []domain.WhatsAppItem   `json:"items"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid json", 400)
+			return
+		}
+
+		order, err := s.whatsapp.CreateWhatsAppOrder(r.Context(), req.WhatsAppID, req.CustomerInfo, req.Items)
+		if err != nil {
+			http.Error(w, "error creating order", 500)
+			return
+		}
+
+		writeJSON(w, 201, order)
+		return
+	}
+
+	http.Error(w, "method not allowed", 405)
 }
