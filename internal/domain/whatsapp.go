@@ -2,6 +2,9 @@ package domain
 
 import (
 	"context"
+	"database/sql/driver"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,16 +12,16 @@ import (
 
 // WhatsAppOrder representa una orden recibida desde WhatsApp Business
 type WhatsAppOrder struct {
-	ID           uuid.UUID        `json:"id"`
-	WhatsAppID   string           `json:"whatsapp_id"` // ID del mensaje/orden en WhatsApp
-	CustomerInfo WhatsAppCustomer `json:"customer_info"`
-	Items        []WhatsAppItem   `json:"items"`
-	Status       string           `json:"status"` // pending, processed, failed
-	Total        float64          `json:"total"`
-	Notes        string           `json:"notes"`
+	ID           uuid.UUID        `gorm:"type:uuid;primaryKey" json:"id"`
+	WhatsAppID   string           `gorm:"size:100;uniqueIndex" json:"whatsapp_id"` // ID del mensaje/orden en WhatsApp
+	CustomerInfo WhatsAppCustomer `gorm:"type:jsonb" json:"customer_info"`
+	Items        WhatsAppItems    `gorm:"type:jsonb" json:"items"`
+	Status       string           `gorm:"size:50;index" json:"status"` // pending, processed, failed
+	Total        float64          `gorm:"type:decimal(12,2)" json:"total"`
+	Notes        string           `gorm:"type:text" json:"notes"`
 	CreatedAt    time.Time        `json:"created_at"`
 	ProcessedAt  *time.Time       `json:"processed_at,omitempty"`
-	OrderID      *uuid.UUID       `json:"order_id,omitempty"` // ID de la orden creada en Chroma3D
+	OrderID      *uuid.UUID       `gorm:"type:uuid;index" json:"order_id,omitempty"` // ID de la orden creada en Chroma3D
 }
 
 // WhatsAppCustomer información del cliente desde WhatsApp
@@ -31,6 +34,25 @@ type WhatsAppCustomer struct {
 	PostalCode string `json:"postal_code,omitempty"`
 }
 
+// Value implementa driver.Valuer para GORM
+func (wc WhatsAppCustomer) Value() (driver.Value, error) {
+	return json.Marshal(wc)
+}
+
+// Scan implementa sql.Scanner para GORM
+func (wc *WhatsAppCustomer) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("cannot scan %T into WhatsAppCustomer", value)
+	}
+
+	return json.Unmarshal(bytes, wc)
+}
+
 // WhatsAppItem representa un producto en la orden de WhatsApp
 type WhatsAppItem struct {
 	ProductID   string  `json:"product_id"`   // ID del producto en WhatsApp
@@ -40,6 +62,28 @@ type WhatsAppItem struct {
 	Price       float64 `json:"price"`
 	Color       string  `json:"color,omitempty"`
 	Image       string  `json:"image,omitempty"`
+}
+
+// WhatsAppItems es un slice de WhatsAppItem con métodos para GORM
+type WhatsAppItems []WhatsAppItem
+
+// Value implementa driver.Valuer para GORM
+func (wi WhatsAppItems) Value() (driver.Value, error) {
+	return json.Marshal(wi)
+}
+
+// Scan implementa sql.Scanner para GORM
+func (wi *WhatsAppItems) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("cannot scan %T into WhatsAppItems", value)
+	}
+
+	return json.Unmarshal(bytes, wi)
 }
 
 // WhatsAppProductSync representa un producto sincronizado con WhatsApp

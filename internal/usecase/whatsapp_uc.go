@@ -90,7 +90,7 @@ func (uc *WhatsAppUC) ProcessWhatsAppOrder(ctx context.Context, whatsappOrder *d
 }
 
 // CreateWhatsAppOrder crea una nueva orden de WhatsApp
-func (uc *WhatsAppUC) CreateWhatsAppOrder(ctx context.Context, whatsappID string, customerInfo domain.WhatsAppCustomer, items []domain.WhatsAppItem) (*domain.WhatsAppOrder, error) {
+func (uc *WhatsAppUC) CreateWhatsAppOrder(ctx context.Context, whatsappID string, customerInfo domain.WhatsAppCustomer, items domain.WhatsAppItems) (*domain.WhatsAppOrder, error) {
 	total := 0.0
 	for _, item := range items {
 		total += item.Price * float64(item.Quantity)

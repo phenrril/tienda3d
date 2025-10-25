@@ -2528,7 +2528,7 @@ func (s *Server) handleWhatsAppOrders(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			WhatsAppID   string                  `json:"whatsapp_id"`
 			CustomerInfo domain.WhatsAppCustomer `json:"customer_info"`
-			Items        []domain.WhatsAppItem   `json:"items"`
+			Items        domain.WhatsAppItems    `json:"items"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
