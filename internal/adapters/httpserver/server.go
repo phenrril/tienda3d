@@ -2420,6 +2420,13 @@ func secureCompare(a, b string) bool {
 
 // handleWhatsAppWebhook maneja webhooks de WhatsApp Business
 func (s *Server) handleWhatsAppWebhook(w http.ResponseWriter, r *http.Request) {
+	// Manejar validación inicial (GET)
+	if r.Method == http.MethodGet {
+		s.handleWhatsAppVerification(w, r)
+		return
+	}
+
+	// Manejar mensajes de webhook (POST)
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", 405)
 		return
@@ -2447,6 +2454,33 @@ func (s *Server) handleWhatsAppWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(200)
+}
+
+// handleWhatsAppVerification maneja la validación inicial del webhook de WhatsApp
+func (s *Server) handleWhatsAppVerification(w http.ResponseWriter, r *http.Request) {
+	// Obtener parámetros de la URL
+	mode := r.URL.Query().Get("hub.mode")
+	token := r.URL.Query().Get("hub.verify_token")
+	challenge := r.URL.Query().Get("hub.challenge")
+
+	// Verificar que sea una solicitud de suscripción
+	if mode != "subscribe" {
+		http.Error(w, "invalid mode", 400)
+		return
+	}
+
+	// Verificar el token
+	expectedToken := os.Getenv("WHATSAPP_VERIFY_TOKEN")
+	if token != expectedToken {
+		log.Warn().Str("received_token", token).Str("expected_token", expectedToken).Msg("invalid verification token")
+		http.Error(w, "invalid token", 403)
+		return
+	}
+
+	// Responder con el challenge
+	log.Info().Str("challenge", challenge).Msg("WhatsApp webhook verification successful")
+	w.WriteHeader(200)
+	w.Write([]byte(challenge))
 }
 
 // verifyWhatsAppWebhook verifica la firma del webhook de WhatsApp
