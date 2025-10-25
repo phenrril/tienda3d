@@ -29,6 +29,7 @@ type App struct {
 	QuoteUC        *usecase.QuoteUC
 	OrderUC        *usecase.OrderUC
 	PaymentUC      *usecase.PaymentUC
+	WhatsAppUC     *usecase.WhatsAppUC
 	ModelRepo      domain.UploadedModelRepo
 	ShippingMethod string  `gorm:"size:30"`
 	ShippingCost   float64 `gorm:"type:decimal(12,2)"`
@@ -89,10 +90,19 @@ func NewApp(db *gorm.DB) (*App, error) {
 		log.Warn().Msg("Google OAuth no configurado (faltan GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)")
 	}
 
+	// Crear repositorio de WhatsApp
+	whatsappRepo := postgres.NewWhatsAppRepo(db)
+
 	app := &App{}
 	app.ProductUC = &usecase.ProductUC{Products: prodRepo}
 	app.OrderUC = &usecase.OrderUC{Orders: orderRepo, Products: prodRepo}
 	app.PaymentUC = &usecase.PaymentUC{Orders: orderRepo, Gateway: payment}
+	app.WhatsAppUC = &usecase.WhatsAppUC{
+		WhatsAppRepo: whatsappRepo,
+		Products:     prodRepo,
+		Orders:       orderRepo,
+		Payments:     &usecase.PaymentUC{Orders: orderRepo, Gateway: payment},
+	}
 	app.DB = db
 	app.ModelRepo = modelRepo
 	app.Storage = storage
@@ -167,12 +177,12 @@ func NewApp(db *gorm.DB) (*App, error) {
 }
 
 func (a *App) HTTPHandler() http.Handler {
-	return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.ModelRepo, a.Storage, a.Customers, a.OAuthConfig)
+	return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.WhatsAppUC, a.ModelRepo, a.Storage, a.Customers, a.OAuthConfig)
 }
 
 func (a *App) MigrateAndSeed() error {
 	if err := a.DB.AutoMigrate(
-		&domain.Product{}, &domain.Variant{}, &domain.Image{}, &domain.Order{}, &domain.OrderItem{}, &domain.UploadedModel{}, &domain.Quote{}, &domain.Page{}, &domain.Customer{},
+		&domain.Product{}, &domain.Variant{}, &domain.Image{}, &domain.Order{}, &domain.OrderItem{}, &domain.UploadedModel{}, &domain.Quote{}, &domain.Page{}, &domain.Customer{}, &domain.WhatsAppOrder{}, &domain.WhatsAppProductSync{},
 	); err != nil {
 		return err
 	}
