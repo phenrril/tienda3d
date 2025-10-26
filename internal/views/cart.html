@@ -18,7 +18,7 @@
   </div>
   {{else}}
   
-  <div style="display:grid;grid-template-columns:1fr 440px;gap:24px;align-items:start">
+  <div class="cart-grid" style="display:grid;grid-template-columns:1fr;gap:24px;align-items:start">
     <!-- Items del carrito -->
     <div>
       <div style="background:var(--panel);border-radius:20px;border:1px solid var(--border);overflow:hidden;margin-bottom:20px">
@@ -66,7 +66,7 @@
     </div>
 
     <!-- Formulario de checkout -->
-    <div style="position:sticky;top:20px">
+    <div class="cart-form-sticky">
       <form method="post" action="/cart/checkout" id="checkoutForm" style="background:var(--panel);border-radius:20px;border:1px solid var(--border);padding:24px;display:flex;flex-direction:column;gap:24px">
         <h2 style="margin:0;font-size:22px;font-weight:700">Finalizar pedido</h2>
         

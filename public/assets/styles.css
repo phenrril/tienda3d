@@ -273,6 +273,10 @@ body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantar
 .mobile-actions .btn-filter,.mobile-actions .btn-sort{height:48px;border-radius:12px;font-weight:600;background:#12202c;color:#fff;border:1px solid var(--border);padding:10px 12px;cursor:pointer}
 .mobile-actions .btn-filter[aria-expanded=true],.mobile-actions .btn-sort[aria-expanded=true]{background:#1b2a38}
 @media (max-width: 380px){.mobile-actions{grid-template-columns:1fr}}
+.cart-grid{display:grid;grid-template-columns:1fr;gap:24px}
+@media (min-width:900px){.cart-grid{grid-template-columns:1fr 440px}}
+.cart-form-sticky{position:static}
+@media (min-width:900px){.cart-form-sticky{position:sticky;top:20px}}
 
 /* Drawer overlay + panel full-height */
 .drawer{position:fixed;inset:0;z-index:var(--z-drawer-backdrop);background:rgba(2,6,23,.60);backdrop-filter:blur(2px)}
