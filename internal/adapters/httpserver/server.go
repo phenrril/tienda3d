@@ -1443,7 +1443,8 @@ func (s *Server) handlePaySimulated(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	isTransferenciaPending := o.PaymentMethod == "transferencia" || o.MPStatus == "transferencia_pending" || (status == "pending" && o.MPStatus != "approved")
+	// Solo mostrar instrucciones de transferencia cuando el método de pago es transferencia
+	isTransferenciaPending := (o.PaymentMethod == "transferencia" || o.MPStatus == "transferencia_pending") && !success
 	whatsappPhone := os.Getenv("WHATSAPP_PHONE")
 	if whatsappPhone == "" {
 		whatsappPhone = "543416000000" // fallback por compatibilidad
