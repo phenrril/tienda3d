@@ -7,12 +7,19 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Preload de fuentes críticas -->
+<link rel="preload" as="font" type="font/woff2" crossorigin href="https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJfecnFHGPc.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="https://fonts.gstatic.com/s/poppins/v21/pxiByp8kv8JHgFVrLGT9Z1JlFd2JQEl8qw.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="https://fonts.gstatic.com/s/poppins/v21/pxiByp8kv8JHgFVrLBuFFlOCKE.woff2">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 <link rel="icon" type="image/png" href="/public/assets/img/chroma-logo.png" />
 <link rel="apple-touch-icon" href="/public/assets/img/chroma-logo.png" />
 <link rel="stylesheet" href="/public/assets/styles.css?v=dark5" />
 <link rel="preload" as="image" href="/public/assets/img/img1.webp">
-<link rel="manifest" href="/public/manifest.json">
+<!-- Manifest diferido para no bloquear LCP -->
+<link rel="manifest" href="/public/manifest.json" media="none" onload="this.media='all'">
+<noscript><link rel="manifest" href="/public/manifest.json"></noscript>
 <meta name="theme-color" content="#6366f1">
 <meta name="description" content="{{if .PageDescription}}{{.PageDescription}}{{else}}Descripción por defecto de Chroma3D: impresión 3D mayorista y minorista{{end}}">
 <link rel="canonical" href="{{.CanonicalURL}}">
@@ -26,8 +33,8 @@
 <meta name="twitter:description" content="{{if .PageDescription}}{{.PageDescription}}{{else}}Descripción por defecto de Chroma3D: impresión 3D mayorista y minorista{{end}}">
 <meta name="twitter:image" content="{{.OGImage}}">
 {{with .SchemaJSON}}<script type="application/ld+json">{{.}}</script>{{end}}
-<!-- JS unificado de UI -->
-<script type="module" src="/public/assets/app.js?v=3"></script>
+<!-- JS unificado de UI - deferido para no bloquear render -->
+<script type="module" src="/public/assets/app.js?v=3" defer></script>
 </head>
 <body class="site">
 <header class="topbar">
