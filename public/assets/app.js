@@ -640,3 +640,77 @@ if ('serviceWorker' in navigator) {
     }catch(err){ if(statusEl){ statusEl.textContent='Error: '+(err&&err.message||''); } }
   });
 })();
+
+// Búsqueda con autocompletado
+(function(){
+  const searchInput=document.getElementById('searchInput');
+  const mobileSearchInput=document.getElementById('mobileSearchInput');
+  const searchResults=document.getElementById('searchResults');
+  const mobileSearchResults=document.getElementById('mobileSearchResults');
+  let debounceTimer=null;
+  let currentQuery='';
+  function showResults(input,resultsEl,suggestions){
+    if(!resultsEl) return;
+    if(!suggestions || suggestions.length===0){
+      resultsEl.style.display='none';
+      return;
+    }
+    resultsEl.innerHTML='';
+    suggestions.forEach(item=>{
+      const div=document.createElement('div');
+      div.className='search-result-item';
+      div.style.cssText='display:flex;align-items:center;gap:10px;padding:10px;cursor:pointer;background:#12202c;border-bottom:1px solid #223140;transition:background .15s';
+      div.onmouseenter=()=>{div.style.background='#1b2a38'};
+      div.onmouseleave=()=>{div.style.background='#12202c'};
+      div.onclick=()=>{window.location.href='/product/'+item.slug};
+      if(item.image){
+        const img=document.createElement('img');
+        img.src=item.image;
+        img.alt='';
+        img.style.cssText='width:48px;height:48px;object-fit:contain;border-radius:8px;border:1px solid #223140';
+        div.appendChild(img);
+      }
+      const info=document.createElement('div');
+      info.style.cssText='flex:1';
+      const name=document.createElement('div');
+      name.textContent=item.name;
+      name.style.cssText='font-weight:600;margin-bottom:2px';
+      const meta=document.createElement('div');
+      meta.textContent=item.category+' • $'+item.price.toFixed(0);
+      meta.style.cssText='font-size:12px;color:#94a3b8';
+      info.appendChild(name);
+      info.appendChild(meta);
+      div.appendChild(info);
+      resultsEl.appendChild(div);
+    });
+    resultsEl.style.display='block';
+  }
+  function fetchSuggestions(query,targetInput,resultsEl){
+    if(!query || query.length<3){
+      if(resultsEl) resultsEl.style.display='none';
+      return;
+    }
+    if(query===currentQuery) return;
+    currentQuery=query;
+    fetch('/api/search/suggestions?q='+encodeURIComponent(query),{credentials:'same-origin'})
+      .then(res=>res.json())
+      .then(data=>showResults(targetInput,resultsEl,data))
+      .catch(()=>{});
+  }
+  function handleInput(input,resultsEl){
+    if(!input || !resultsEl) return;
+    input.addEventListener('input',()=>{
+      const q=input.value.trim();
+      clearTimeout(debounceTimer);
+      debounceTimer=setTimeout(()=>fetchSuggestions(q,input,resultsEl),300);
+    });
+    // Cerrar resultados al hacer clic fuera
+    document.addEventListener('click',(e)=>{
+      if(!input.contains(e.target) && !resultsEl.contains(e.target)){
+        resultsEl.style.display='none';
+      }
+    });
+  }
+  handleInput(searchInput,searchResults);
+  handleInput(mobileSearchInput,mobileSearchResults);
+})();

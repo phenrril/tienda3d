@@ -113,6 +113,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/products", s.apiProducts)
 	s.mux.HandleFunc("/api/products/", s.apiProductByID)
 
+	s.mux.HandleFunc("/api/search/suggestions", s.apiSearchSuggestions)
+
 	s.mux.HandleFunc("/api/products/upload", s.apiProductUpload)
 	s.mux.HandleFunc("/api/product_images/", s.apiProductImageByID)
 	s.mux.HandleFunc("/api/quote", s.apiQuote)
@@ -1289,6 +1291,48 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 	writeCart(w, cartPayload{})
 	http.Redirect(w, r, redirURL, 302)
+}
+
+// apiSearchSuggestions retorna sugerencias de productos para autocompletado
+func (s *Server) apiSearchSuggestions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len(query) < 3 {
+		writeJSON(w, 200, []map[string]any{})
+		return
+	}
+	// Buscar sin límite de página, pero limitar a 10 resultados
+	list, _, err := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 10, Query: query})
+	if err != nil {
+		http.Error(w, "error", 500)
+		return
+	}
+	// Filtrar imágenes inexistentes
+	for i := range list {
+		list[i].Images = filterExistingProductImages(list[i].Images)
+	}
+	suggestions := []map[string]any{}
+	for _, p := range list {
+		// Solo incluir productos que tengan al menos una imagen válida
+		if len(p.Images) == 0 {
+			continue
+		}
+		imageURL := ""
+		if len(p.Images) > 0 {
+			imageURL = p.Images[0].URL
+		}
+		suggestions = append(suggestions, map[string]any{
+			"slug":     p.Slug,
+			"name":     p.Name,
+			"category": p.Category,
+			"price":    p.BasePrice,
+			"image":    imageURL,
+		})
+	}
+	writeJSON(w, 200, suggestions)
 }
 
 func (s *Server) handlePaySimulated(w http.ResponseWriter, r *http.Request) {
