@@ -189,14 +189,15 @@
     }
     if(shipCostEl) shipCostEl.textContent='$'+cost.toFixed(2);
     const withShip=(base+cost);
-    if(subtotalEl) subtotalEl.textContent='$'+withShip.toFixed(2);
     const discount=((paymentMethod==='efectivo'||paymentMethod==='transferencia')? withShip*0.1 : 0);
-    if(discount>0){
-      if(discountRow) discountRow.style.display='flex';
-      if(discountEl) discountEl.textContent='-$'+discount.toFixed(2);
-    } else {
-      if(discountRow) discountRow.style.display='none';
-      if(discountEl) discountEl.textContent='$0.00';
+    if(discountRow){
+      if(discount>0){
+        discountRow.style.display='flex';
+        if(discountEl) discountEl.textContent='-$'+discount.toFixed(2);
+      } else {
+        discountRow.style.display='none';
+        if(discountEl) discountEl.textContent='$0.00';
+      }
     }
     const final=(withShip-discount);
     if(finalTotalEl) finalTotalEl.textContent='$'+final.toFixed(2);
