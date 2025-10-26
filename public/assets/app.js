@@ -343,6 +343,42 @@ if ('serviceWorker' in navigator) {
   setPreview(defaultColor);
 })();
 
+// Producto: sticky mobile CTA
+(function(){
+  const stickyBar=document.getElementById('pdMobileSticky');
+  const formSection=document.querySelector('.pd-form');
+  if(!stickyBar || !formSection) return;
+  
+  let lastScroll=0;
+  const observerOptions={root:null,threshold:0,rootMargin:'-100px 0px 0px 0px'};
+  
+  const observer=new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      const currentScroll=window.pageYOffset;
+      const scrollingDown=currentScroll>lastScroll;
+      if(!entry.isIntersecting && scrollingDown){
+        stickyBar.style.display='block';
+      }else{
+        stickyBar.style.display='none';
+      }
+      lastScroll=currentScroll;
+    });
+  },observerOptions);
+  
+  if(window.innerWidth<768){
+    observer.observe(formSection);
+  }
+  
+  window.addEventListener('resize',()=>{
+    if(window.innerWidth>=768){
+      stickyBar.style.display='none';
+      observer.disconnect();
+    }else{
+      observer.observe(formSection);
+    }
+  });
+})();
+
 // Admin: productos (form + tabla + dropzone) sin inline JS
 (function(){
   const form=document.getElementById('prodForm'); if(!form) return;
