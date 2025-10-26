@@ -392,8 +392,9 @@ body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantar
 @media (min-width:900px){.cart-form-sticky{position:sticky;top:20px}}
 
 /* Drawer overlay + panel full-height */
-.drawer{position:fixed;inset:0;z-index:var(--z-drawer-backdrop);background:rgba(2,6,23,.60);backdrop-filter:blur(2px)}
+.drawer{position:fixed;inset:0;z-index:var(--z-drawer-backdrop);background:rgba(2,6,23,.60);backdrop-filter:blur(2px);pointer-events:none;opacity:0;transition:opacity .25s}
 .drawer[hidden]{display:none}
+body.drawer-open .drawer{pointer-events:auto;opacity:1}
 .drawer-panel{position:absolute;right:0;top:0;height:100dvh;width:min(92vw,480px);z-index:var(--z-drawer-panel);background:#0f172a;border-left:1px solid #1e293b;border-radius:16px 0 0 16px;display:grid;grid-template-rows:auto 1fr auto;padding:max(12px, env(safe-area-inset-top)) 16px 16px 16px;overflow:hidden}
 .drawer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .drawer-foot{display:flex;align-items:center;gap:12px;margin-top:8px}
@@ -404,8 +405,9 @@ body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantar
 .drawer .field input,.drawer .field select{height:44px}
 
 /* Sheet bottom */
-.sheet{position:fixed;left:0;right:0;bottom:0;background:#0f172a;border-top-left-radius:18px;border-top-right-radius:18px;border:1px solid #1e293b;padding:12px;z-index:120}
+.sheet{position:fixed;left:0;right:0;bottom:0;background:#0f172a;border-top-left-radius:18px;border-top-right-radius:18px;border:1px solid #1e293b;padding:12px;z-index:120;pointer-events:none;opacity:0;transition:opacity .25s}
 .sheet[hidden]{display:none}
+.sheet:not([hidden]){pointer-events:auto;opacity:1}
 .sheet-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .sort-list{display:grid;gap:8px;list-style:none;margin:8px 0 0;padding:0}
 .sort-list li{border-bottom:1px solid #223140}
@@ -510,8 +512,9 @@ body.nav-open{overflow:hidden}
 body.drawer-open{overflow:hidden}
 
 
-.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:110;opacity:0;transition:opacity .22s ease}
-.modal-backdrop.show{opacity:1}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:110;opacity:0;pointer-events:none;transition:opacity .22s ease}
+.modal-backdrop.show{opacity:1;pointer-events:auto}
+.modal-backdrop[hidden]{display:none}
 .modal{background:linear-gradient(150deg,#1a2430,#141c25 60%);border:1px solid var(--border);border-radius:22px;padding:26px 26px 30px;max-width:560px;width:100%;position:relative;box-shadow:0 10px 40px -8px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.04);opacity:0;transform:translateY(18px) scale(.94);transition:opacity .25s ease,transform .32s cubic-bezier(.4,0,.2,1)}
 .modal.show{opacity:1;transform:translateY(0) scale(1)}
 .modal-title{margin:0 0 14px;font-size:24px;font-weight:700;letter-spacing:.5px}

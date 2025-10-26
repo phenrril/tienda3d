@@ -1301,13 +1301,13 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 	// Manejar según método de pago
 	switch paymentMethod {
 	case "efectivo":
-		// Finalizar transacción y enviar mensaje por Telegram
-		o.Status = domain.OrderStatusFinished
-		o.MPStatus = "efectivo_approved"
+		// Orden pendiente de pago en efectivo
+		o.Status = domain.OrderStatusAwaitingPay
+		o.MPStatus = "efectivo_pending"
 		_ = s.orders.Orders.Save(r.Context(), o)
-		sendOrderNotify(o, true)
+		sendOrderNotify(o, false) // Enviar con success=false para mostrar PENDIENTE
 		writeCart(w, cartPayload{})
-		http.Redirect(w, r, "/pay/"+o.ID.String()+"?status=approved", 302)
+		http.Redirect(w, r, "/pay/"+o.ID.String()+"?status=pending", 302)
 	case "transferencia":
 		// Orden con pago pendiente
 		o.Status = domain.OrderStatusAwaitingPay
@@ -1404,7 +1404,7 @@ func (s *Server) handlePaySimulated(w http.ResponseWriter, r *http.Request) {
 	// Determinar mensaje según método de pago
 	if o.PaymentMethod == "efectivo" {
 		msg = "¡Gracias por tu compra! El pago en efectivo se confirmará al retirar el pedido. Recibirás una notificación con los detalles."
-		success = true
+		success = false // Cambiar a false para mostrar estado pendiente
 	} else if o.PaymentMethod == "transferencia" || o.MPStatus == "transferencia_pending" || (o.MPStatus == "transferencia_pending" && status == "pending") {
 		msg = "Pago pendiente de confirmación. Por favor, realiza la transferencia y envía el comprobante por WhatsApp."
 		success = false
@@ -2269,11 +2269,24 @@ func sendOrderTelegram(o *domain.Order, success bool) error {
 	if token == "" || strings.TrimSpace(rawIDs) == "" {
 		return fmt.Errorf("telegram vars faltantes")
 	}
-	statusTxt := "PAGO FALLIDO"
-	if success {
+
+	// Determinar el texto del estado según método de pago
+	var statusTxt string
+	if !success {
+		// Determinar tipo de pendiente según método de pago
+		if o.PaymentMethod == "efectivo" {
+			statusTxt = "PENDIENTE"
+		} else if o.PaymentMethod == "transferencia" {
+			statusTxt = "PENDIENTE TRANSFERENCIA"
+		} else {
+			statusTxt = "PAGO FALLIDO"
+		}
+	} else {
 		statusTxt = "PAGO APROBADO"
 	}
+
 	var b strings.Builder
+
 	b.WriteString("Orden ")
 	b.WriteString(o.ID.String())
 	b.WriteString(" - ")
