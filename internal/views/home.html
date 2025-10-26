@@ -1,23 +1,44 @@
 {{define "home.html"}}
 {{template "layout_start" .}}
-<style>
-#howBuyBackdrop{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:20px;z-index:110;opacity:0;pointer-events:none;transition:opacity .25s ease}
-#howBuyBackdrop.show{opacity:1;pointer-events:auto}
-#howBuyBackdrop .modal{background:#1a2430;border:1px solid #243044;border-radius:22px;padding:24px 24px 28px;max-width:560px;width:100%;color:#e5e7eb;font-family:Poppins,sans-serif;opacity:0;transform:translateY(20px) scale(.94);transition:opacity .28s ease,transform .35s cubic-bezier(.4,0,.2,1)}
-#howBuyBackdrop.show .modal{opacity:1;transform:translateY(0) scale(1)}
-#howBuyBackdrop .modal-title{margin:0 0 14px;font-size:24px}
-#howBuyBackdrop .modal-close{position:absolute;top:10px;right:10px;background:#12202c;border:1px solid #243044;color:#e5e7eb;width:36px;height:36px;border-radius:12px;cursor:pointer;font-size:20px;font-weight:600}
-#howBuyBackdrop .modal-close:hover{background:#1f2c39}
-</style>
 <section class="hero hero-split">
   <div class="hero-copy">
+    <div class="hero-badge">✨ Impresión 3D profesional</div>
     <h1 class="mega">Dale vida a tus ideas en 3D</h1>
     <p class="hero-lead">Modelos impresos de alta calidad listos para enviar o fabricar bajo demanda. Personalizá materiales, colores y terminaciones.</p>
     <div class="hero-actions">
-      <a href="/products" class="btn-primary">Ver catálogo</a>
-      <button type="button" class="btn-secondary" id="btnHowBuy">Cómo comprar</button>
+      <a href="/products" class="btn-primary btn-hero">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        <span>Ver catálogo</span>
+      </a>
+      <button type="button" class="btn-secondary btn-hero-secondary" id="btnHowBuy">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+        </svg>
+        <span>Cómo comprar</span>
+      </button>
     </div>
-    <p class="hero-hours">Producción diaria • Envíos a todo el país • Soporte personalizado</p>
+    <div class="hero-features">
+      <div class="hero-feature">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+        <span>Producción diaria</span>
+      </div>
+      <div class="hero-feature">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+        </svg>
+        <span>Envíos a todo el país</span>
+      </div>
+      <div class="hero-feature">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span>Soporte personalizado</span>
+      </div>
+    </div>
   </div>
   <div class="hero-carousel" id="heroCarousel">
     <img class="hc-slide active" src="/public/assets/img/img1.webp" alt="Modelo 3D 1" sizes="100vw" fetchpriority="high" decoding="async" />
@@ -25,6 +46,48 @@
     <img class="hc-slide" src="/public/assets/img/img3.webp" alt="Modelo 3D 3" sizes="100vw" loading="lazy" decoding="async" />
     <img class="hc-slide" src="/public/assets/img/img4.webp" alt="Modelo 3D 4" sizes="100vw" loading="lazy" decoding="async" />
     <div class="hc-dots" id="hcDots"></div>
+  </div>
+</section>
+
+<!-- Stats Section -->
+<section class="stats-section">
+  <div class="stats-grid">
+    <div class="stat-item">
+      <div class="stat-icon">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+      </div>
+      <div class="stat-value">500+</div>
+      <div class="stat-label">Productos impresos</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </div>
+      <div class="stat-value">100+</div>
+      <div class="stat-label">Clientes satisfechos</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+        </svg>
+      </div>
+      <div class="stat-value">24-72hs</div>
+      <div class="stat-label">Tiempo de producción</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+      </div>
+      <div class="stat-value">5★</div>
+      <div class="stat-label">Calificación promedio</div>
+    </div>
   </div>
 </section>
 
@@ -42,29 +105,71 @@
     <div class="modal-actions"><button class="btn-primary" id="howBuyOk">Entendido</button></div>
   </div>
 </div>
-<section style="margin-top:40px">
-  <h2 class="title" style="margin-bottom:10px">Destacados</h2>
-  <div class="cards cards--home">
+<!-- Featured Products Section -->
+<section class="featured-section">
+  <div class="section-header">
+    <div class="section-header-content">
+      <h2 class="section-title">Productos destacados</h2>
+      <p class="section-subtitle">Descubrí nuestros modelos más populares</p>
+    </div>
+    <a href="/products" class="section-link">
+      Ver todos
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M5 12h14M12 5l7 7-7 7"/>
+      </svg>
+    </a>
+  </div>
+  <div class="cards cards--home cards--featured">
     {{range .Products}}
-    <div class="card">
-      <div class="card-media">
-        {{if .Images}}
-          <img src="{{img (index .Images 0).URL}}"
-               alt="{{if (index .Images 0).Alt}}{{(index .Images 0).Alt}}{{else}}{{.Name}}{{end}}"
-               loading="lazy" decoding="async"
-               srcset="{{img (index .Images 0).URL}} 300w, {{imgw (index .Images 0).URL 480}} 480w, {{imgw (index .Images 0).URL 640}} 640w"
-               sizes="(max-width:480px) 92vw, (max-width:768px) 44vw, 300px" />
-        {{else}}<div class="placeholder">IMG</div>{{end}}
-        
-      </div>
-      <div class="card-body">
-        <h3 class="card-title"><a href="/product/{{.Slug}}">{{.Name}}</a></h3>
-        <div class="card-meta">{{.Category}}</div>
-        <div class="price-row"><span class="price">${{printf "%.0f" .BasePrice}}</span></div>
-        <div class="actions"><a href="/product/{{.Slug}}" class="btn-secondary small">Ver</a></div>
-      </div>
+    <div class="card card--featured">
+      <a href="/product/{{.Slug}}" class="card-link">
+        <div class="card-media card-media--featured">
+          {{if .Images}}
+            <img src="{{img (index .Images 0).URL}}"
+                 alt="{{if (index .Images 0).Alt}}{{(index .Images 0).Alt}}{{else}}{{.Name}}{{end}}"
+                 loading="lazy" decoding="async"
+                 srcset="{{img (index .Images 0).URL}} 300w, {{imgw (index .Images 0).URL 480}} 480w, {{imgw (index .Images 0).URL 640}} 640w"
+                 sizes="(max-width:480px) 92vw, (max-width:768px) 44vw, 300px" />
+          {{else}}<div class="placeholder">IMG</div>{{end}}
+          <div class="card-overlay">
+            <span class="card-overlay-text">Ver detalles</span>
+          </div>
+        </div>
+        <div class="card-body card-body--featured">
+          <div class="card-category-badge">{{.Category}}</div>
+          <h3 class="card-title card-title--featured">{{.Name}}</h3>
+          <div class="card-price-row">
+            <span class="card-price">${{printf "%.0f" .BasePrice}}</span>
+            {{if .ReadyToShip}}<span class="card-ready-badge">✓ Listo</span>{{end}}
+          </div>
+        </div>
+      </a>
     </div>
     {{end}}
+  </div>
+</section>
+
+<!-- CTA Section -->
+<section class="cta-section">
+  <div class="cta-content">
+    <div class="cta-icon">
+      <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+    </div>
+    <h2 class="cta-title">¿Tenés un modelo propio?</h2>
+    <p class="cta-text">Subí tu archivo STL y recibí una cotización personalizada en minutos</p>
+    <div class="cta-actions">
+      <a href="https://wa.me/5493416219815?text=Hola%2C%20necesito%20una%20cotizaci%C3%B3n" target="_blank" rel="noopener" class="btn-primary">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M12.04 2c-5.52 0-10 4.46-10 9.97 0 1.76.46 3.48 1.34 5.01L2 22l5.2-1.36a9.96 9.96 0 0 0 4.84 1.23h.01c5.52 0 10-4.46 10-9.97 0-2.67-1.05-5.18-2.95-7.06A9.93 9.93 0 0 0 12.04 2Z"/>
+        </svg>
+        <span>Pedir cotización</span>
+      </a>
+      <a href="/products" class="btn-secondary">Explorar catálogo</a>
+    </div>
   </div>
 </section>
 {{template "layout_end" .}}
