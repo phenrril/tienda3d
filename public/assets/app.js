@@ -146,13 +146,16 @@
 (function(){
   const form=document.getElementById('checkoutForm'); if(!form) return;
   const shipRadios=form.querySelectorAll('input[name="shipping"]');
+  const paymentRadios=form.querySelectorAll('input[name="payment_method"]');
   const envioGroup=document.getElementById('envioGroup');
   const cadeteGroup=document.getElementById('cadeteGroup');
   const provinceSelect=document.getElementById('provinceSelect');
   const shipCostEl=document.getElementById('shipCost');
-  const grandEl=document.getElementById('grandTotal');
   const subtotalEl=document.getElementById('subtotalVal');
-  const base=parseFloat(((grandEl && grandEl.textContent) || '').replace(/[^0-9.,]/g,'').replace(',','.'))||0;
+  const discountEl=document.getElementById('discount');
+  const discountRow=document.getElementById('discountRow');
+  const finalTotalEl=document.getElementById('finalTotal');
+  const base=parseFloat(((subtotalEl && subtotalEl.textContent) || '').replace(/[^0-9.,]/g,'').replace(',','.'))||0;
   const CADETE_COST=5000;
   const COSTS=(()=>{ const m={}; document.querySelectorAll('#pcData [data-prov]').forEach(n=>{ const k=n.getAttribute('data-prov'); const v=parseFloat(n.getAttribute('data-cost')||'0'); if(k){ m[k]=v; } }); return m; })();
   const phone = form.querySelector('input[name="phone"]');
@@ -161,8 +164,17 @@
   const postal = form.querySelector('input[name="postal_code"]');
   const dni = form.querySelector('input[name="dni"]');
   function setRequired(el,flag){ if(!el) return; if(flag){el.setAttribute('required','required')} else {el.removeAttribute('required')} }
+  function updateRadioBorder(elements){
+    elements.forEach(el=>{
+      if(el.checked) el.closest('label').style.borderColor='#6366f1';
+      else el.closest('label').style.borderColor='var(--border)';
+    });
+  }
   function calcCost(){
     let method='retiro'; shipRadios.forEach(r=>{ if(r.checked) method=r.value });
+    let paymentMethod='efectivo'; paymentRadios.forEach(r=>{ if(r.checked) paymentMethod=r.value });
+    updateRadioBorder(shipRadios);
+    updateRadioBorder(paymentRadios);
     if(envioGroup) envioGroup.style.display='none'; if(cadeteGroup) cadeteGroup.style.display='none';
     setRequired(phone,false); setRequired(addrCadete,false); setRequired(addrEnvio,false); setRequired(provinceSelect,false); setRequired(postal,false); setRequired(dni,false);
     let cost=0;
@@ -176,11 +188,21 @@
       cost=CADETE_COST;
     }
     if(shipCostEl) shipCostEl.textContent='$'+cost.toFixed(2);
-    const withShip=(base+cost).toFixed(2);
-    if(grandEl) grandEl.textContent='$'+withShip;
-    if(subtotalEl) subtotalEl.textContent='$'+withShip;
+    const withShip=(base+cost);
+    if(subtotalEl) subtotalEl.textContent='$'+withShip.toFixed(2);
+    const discount=((paymentMethod==='efectivo'||paymentMethod==='transferencia')? withShip*0.1 : 0);
+    if(discount>0){
+      if(discountRow) discountRow.style.display='flex';
+      if(discountEl) discountEl.textContent='-$'+discount.toFixed(2);
+    } else {
+      if(discountRow) discountRow.style.display='none';
+      if(discountEl) discountEl.textContent='$0.00';
+    }
+    const final=(withShip-discount);
+    if(finalTotalEl) finalTotalEl.textContent='$'+final.toFixed(2);
   }
   shipRadios.forEach(r=>r.addEventListener('change',calcCost));
+  paymentRadios.forEach(r=>r.addEventListener('change',calcCost));
   provinceSelect && provinceSelect.addEventListener('change',calcCost);
   calcCost();
 })();
