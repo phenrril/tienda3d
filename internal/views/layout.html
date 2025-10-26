@@ -15,7 +15,7 @@
 <noscript><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 <link rel="icon" type="image/png" href="/public/assets/img/chroma-logo.png" />
 <link rel="apple-touch-icon" href="/public/assets/img/chroma-logo.png" />
-<link rel="stylesheet" href="/public/assets/styles.css?v=dark5" />
+<link rel="stylesheet" href="/public/assets/styles.css?v=dark6" />
 <link rel="preload" as="image" href="/public/assets/img/img1.webp">
 <!-- Manifest diferido para no bloquear LCP -->
 <link rel="manifest" href="/public/manifest.json" media="none" onload="this.media='all'">
@@ -34,7 +34,7 @@
 <meta name="twitter:image" content="{{.OGImage}}">
 {{with .SchemaJSON}}<script type="application/ld+json">{{.}}</script>{{end}}
 <!-- JS unificado de UI - deferido para no bloquear render -->
-<script type="module" src="/public/assets/app.js?v=3" defer></script>
+<script type="module" src="/public/assets/app.js?v=4" defer></script>
 </head>
 <body class="site">
 <header class="topbar">
@@ -48,7 +48,10 @@
     </a>
     
     <form method="get" action="/products" class="header-search" style="flex:1;max-width:300px;margin:0 16px">
-      <input type="text" name="q" placeholder="Buscar productos..." aria-label="Buscar productos" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:#12202c;color:var(--text);font-size:14px" />
+      <div class="search-wrapper">
+        <input type="text" id="searchInput" name="q" placeholder="Buscar productos..." aria-label="Buscar productos" autocomplete="off" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:#12202c;color:var(--text);font-size:14px" />
+        <div id="searchResults" class="search-results" style="display:none"></div>
+      </div>
     </form>
     
     <button class="nav-toggle" aria-label="Abrir menú" aria-expanded="false">☰</button>

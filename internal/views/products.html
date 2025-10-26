@@ -3,6 +3,17 @@
 <h1 class="section-title">Productos</h1>
 <p class="result-count">{{len .Products}} resultados de {{.Total}}{{if .Query}} para "{{.Query}}"{{end}}</p>
 <h2 class="sr-only">Filtros</h2>
+
+<!-- Barra de búsqueda mobile - visible arriba de los botones -->
+<form method="get" action="/products" class="products-search-mobile">
+  <div class="search-wrapper">
+    <input type="text" id="mobileSearchInput" name="q" placeholder="Buscar productos..." aria-label="Buscar productos" autocomplete="off" value="{{.Query}}" style="width:100%;padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:#12202c;color:var(--text);font-size:14px" />
+    <input type="hidden" name="category" value="{{.Category}}" />
+    <input type="hidden" name="sort" value="{{.Sort}}" />
+    <div id="mobileSearchResults" class="search-results" style="display:none"></div>
+  </div>
+</form>
+
 <div class="mobile-actions">
   <button class="btn-filter" aria-expanded="false" aria-controls="filterDrawer">Filtrar</button>
   <button class="btn-sort" aria-expanded="false" aria-controls="sortSheet">Ordenar</button>
