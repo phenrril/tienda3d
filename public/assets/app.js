@@ -155,7 +155,8 @@
   const discountEl=document.getElementById('discount');
   const discountRow=document.getElementById('discountRow');
   const finalTotalEl=document.getElementById('finalTotal');
-  const base=parseFloat(((subtotalEl && subtotalEl.textContent) || '').replace(/[^0-9.,]/g,'').replace(',','.'))||0;
+  if(!subtotalEl || !finalTotalEl || !shipCostEl) return;
+  const base=parseFloat((subtotalEl.textContent || '').replace(/[^0-9.,]/g,'').replace(',','.'))||0;
   const CADETE_COST=5000;
   const COSTS=(()=>{ const m={}; document.querySelectorAll('#pcData [data-prov]').forEach(n=>{ const k=n.getAttribute('data-prov'); const v=parseFloat(n.getAttribute('data-cost')||'0'); if(k){ m[k]=v; } }); return m; })();
   const phone = form.querySelector('input[name="phone"]');
