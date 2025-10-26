@@ -1,110 +1,179 @@
 {{define "cart.html"}}
 {{template "layout_start" .}}
-<div class="cart-header" style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:10px">
-  <a href="/products" class="btn-secondary" style="text-decoration:none">‹ Volver</a>
-  <h1 style="margin:0">Carrito</h1>
-  <div style="width:90px"></div>
-</div>
-{{if not .Lines}}
-<p>No hay productos en el carrito.</p>
-<p><a class="btn-primary" href="/products">Ir a productos</a></p>
-{{else}}
-<div class="table-responsive">
-<table class="cart-table">
-  <thead>
-    <tr>
-      <th>Producto</th>
-      <th>Color</th>
-      <th style="width:140px">Cant.</th>
-      <th>Unitario</th>
-      <th>Subtotal</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {{range .Lines}}
-    <tr>
-      <td class="cart-prod">
-        {{if .Image}}<img src="{{.Image}}" alt="{{.Name}}" class="thumb" loading="lazy" />{{end}}
-        <span>{{.Name}}</span>
-      </td>
-      <td><div class="color-dot" style="background: {{colorhex .Color}};"></div></td>
-      <td>
-        <form method="post" action="/cart/update" class="qty-form">
-          <input type="hidden" name="slug" value="{{.Slug}}" />
-          <input type="hidden" name="color" value="{{.Color}}" />
-            <button name="op" value="dec" class="qbtn" type="submit">-</button>
-            <span class="qval">{{.Qty}}</span>
-            <button name="op" value="inc" class="qbtn" type="submit">+</button>
-        </form>
-      </td>
-      <td>${{printf "%.2f" .UnitPrice}}</td>
-      <td>${{printf "%.2f" .Subtotal}}</td>
-      <td>
-        <form method="post" action="/cart/remove">
-          <input type="hidden" name="slug" value="{{.Slug}}" />
-          <input type="hidden" name="color" value="{{.Color}}" />
-          <button class="link danger" type="submit">✕</button>
-        </form>
-      </td>
-    </tr>
-    {{end}}
-  </tbody>
-</table>
-</div>
-<div class="cart-summary">
-  <div class="total">Subtotal: <strong id="subtotalVal">${{printf "%.2f" .Total}}</strong></div>
-  <form class="checkout-form" method="post" action="/cart/checkout" id="checkoutForm" novalidate>
-    <div class="form-group">
-      <label class="form-label" for="name">Nombre completo</label>
-      <input class="form-input" id="name" type="text" name="name" placeholder="Tu nombre" required />
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="email">Email</label>
-      <input class="form-input" id="email" type="email" name="email" placeholder="Tu email" required />
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="phone">Teléfono</label>
-      <input class="form-input" id="phone" type="text" name="phone" placeholder="Celular" />
-    </div>
-    <fieldset class="shipping-box">
-      <legend>Entrega</legend>
-      <div class="shipping-options">
-        <label class="radio-option">
-          <input type="radio" name="shipping" value="retiro" checked />
-          <span>Retiro en local <small>(sin costo)</small></span>
-        </label>
-        <label class="radio-option">
-          <input type="radio" name="shipping" value="cadete" />
-          <span>Cadete en Rosario <small>($5000)</small></span>
-        </label>
-        <label class="radio-option">
-          <input type="radio" name="shipping" value="envio" />
-          <span>Envío a domicilio <small>(según provincia)</small></span>
-        </label>
+<div style="max-width:1200px;margin:0 auto;padding:20px">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:32px">
+    <a href="/products" class="btn-secondary" style="text-decoration:none;display:flex;align-items:center;gap:8px">
+      <span style="font-size:20px">←</span> <span>Seguir comprando</span>
+    </a>
+    <h1 style="margin:0;font-size:32px;font-weight:700">Carrito de compras</h1>
+    <div style="width:140px"></div>
+  </div>
+  
+  {{if not .Lines}}
+  <div style="text-align:center;padding:80px 20px;background:var(--panel);border-radius:20px;border:1px solid var(--border)">
+    <div style="font-size:80px;margin-bottom:20px">🛒</div>
+    <h2 style="margin:0 0 12px;font-size:28px;color:var(--text)">Tu carrito está vacío</h2>
+    <p style="margin:0 0 32px;color:var(--muted);font-size:16px">Agrega productos para comenzar tu pedido</p>
+    <a class="btn-primary" href="/products" style="text-decoration:none;display:inline-block;padding:14px 28px">Ver productos</a>
+  </div>
+  {{else}}
+  
+  <div style="display:grid;grid-template-columns:1fr 440px;gap:24px;align-items:start">
+    <!-- Items del carrito -->
+    <div>
+      <div style="background:var(--panel);border-radius:20px;border:1px solid var(--border);overflow:hidden;margin-bottom:20px">
+        <div style="padding:20px;background:var(--bg);border-bottom:1px solid var(--border)">
+          <h2 style="margin:0;font-size:20px;font-weight:600">{{len .Lines}} {{if eq (len .Lines) 1}}producto{{else}}productos{{end}}</h2>
+        </div>
+        <table class="cart-table">
+          <tbody>
+            {{range .Lines}}
+            <tr style="border-top:1px solid var(--border)">
+              <td style="padding:20px;width:60px">
+                {{if .Image}}<img src="{{.Image}}" alt="{{.Name}}" loading="lazy" style="width:60px;height:60px;object-fit:cover;border-radius:12px" />{{end}}
+              </td>
+              <td style="padding:20px">
+                <div style="font-weight:600;margin-bottom:6px">{{.Name}}</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div class="color-dot" style="background: {{colorhex .Color}};width:20px;height:20px;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.2)"></div>
+                  <span style="font-size:13px;color:var(--muted)">{{.Color}}</span>
+                </div>
+              </td>
+              <td style="padding:20px;text-align:right;vertical-align:middle">
+                <form method="post" action="/cart/update">
+                  <input type="hidden" name="slug" value="{{.Slug}}" />
+                  <input type="hidden" name="color" value="{{.Color}}" />
+                  <div style="display:flex;align-items:center;gap:10px;justify-content:flex-end">
+                    <button name="op" value="dec" type="submit" style="width:36px;height:36px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--text);cursor:pointer;font-size:18px;font-weight:600">-</button>
+                    <span style="min-width:36px;text-align:center;font-weight:700">{{.Qty}}</span>
+                    <button name="op" value="inc" type="submit" style="width:36px;height:36px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--text);cursor:pointer;font-size:18px;font-weight:600">+</button>
+                  </div>
+                </form>
+              </td>
+              <td style="padding:20px;text-align:right;vertical-align:middle;font-weight:600;color:var(--primary)">${{printf "%.2f" .Subtotal}}</td>
+              <td style="padding:20px;width:50px;vertical-align:middle">
+                <form method="post" action="/cart/remove">
+                  <input type="hidden" name="slug" value="{{.Slug}}" />
+                  <input type="hidden" name="color" value="{{.Color}}" />
+                  <button type="submit" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:24px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:10px;transition:background 0.2s" title="Eliminar" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='none'">×</button>
+                </form>
+              </td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
       </div>
-      <div id="cadeteGroup" class="province-group" style="display:none">
-        <input type="text" name="address_cadete" placeholder="Dirección en Rosario" class="form-input" />
-      </div>
-      <div id="envioGroup" class="province-group" style="display:none">
-        <select name="province" id="provinceSelect" class="form-input">
-          <option value="">Seleccioná provincia</option>
-          {{range .Provinces}}<option value="{{.}}">{{.}}</option>{{end}}
-        </select>
-        <input type="text" name="address_envio" placeholder="Dirección completa" class="form-input" />
-        <input type="text" name="postal_code" placeholder="Código postal" class="form-input" />
-        <input type="text" name="dni" placeholder="DNI" class="form-input" />
-      </div>
-      <div class="cost-row">Costo envío: <span id="shipCost" class="mono">$0.00</span></div>
-      <div class="grand-row">Total final: <span id="grandTotal" class="grand-val">${{printf "%.2f" .Total}}</span></div>
-    </fieldset>
-    <div id="pcData" style="display:none">
-      {{range $k,$v := .ProvinceCosts}}<span data-prov="{{$k}}" data-cost="{{$v}}"></span>{{end}}
     </div>
-    <button type="submit" class="btn-primary pay-btn">Pagar con MercadoPago</button>
-  </form>
+
+    <!-- Formulario de checkout -->
+    <div style="position:sticky;top:20px">
+      <form method="post" action="/cart/checkout" id="checkoutForm" style="background:var(--panel);border-radius:20px;border:1px solid var(--border);padding:24px;display:flex;flex-direction:column;gap:24px">
+        <h2 style="margin:0;font-size:22px;font-weight:700">Finalizar pedido</h2>
+        
+        <!-- Datos personales -->
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <h3 style="margin:0;font-size:15px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted)">Datos de contacto</h3>
+          <input type="text" name="name" placeholder="Nombre completo *" required style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px" />
+          <input type="email" name="email" placeholder="Email *" required style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px" />
+          <input type="text" name="phone" placeholder="Teléfono" style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px" />
+        </div>
+
+        <!-- Método de entrega -->
+        <div style="display:flex;flex-direction:column;gap:16px;padding:20px;background:var(--bg);border-radius:16px;border:1px solid var(--border)">
+          <h3 style="margin:0;font-size:16px;font-weight:600">Método de entrega</h3>
+          <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--panel);border-radius:12px;border:2px solid var(--border);cursor:pointer;transition:border-color 0.2s">
+            <input type="radio" name="shipping" value="retiro" checked />
+            <span style="flex:1">
+              <div style="font-weight:600">Retiro en local</div>
+              <div style="font-size:13px;color:var(--muted)">Sin costo adicional</div>
+            </span>
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--panel);border-radius:12px;border:2px solid var(--border);cursor:pointer;transition:border-color 0.2s">
+            <input type="radio" name="shipping" value="cadete" />
+            <span style="flex:1">
+              <div style="font-weight:600">Cadete en Rosario</div>
+              <div style="font-size:13px;color:var(--muted)">$5,000</div>
+            </span>
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--panel);border-radius:12px;border:2px solid var(--border);cursor:pointer;transition:border-color 0.2s">
+            <input type="radio" name="shipping" value="envio" />
+            <span style="flex:1">
+              <div style="font-weight:600">Envío a domicilio</div>
+              <div style="font-size:13px;color:var(--muted)">Según provincia</div>
+            </span>
+          </label>
+          
+          <div id="cadeteGroup" style="display:none;margin-top:12px;gap:12px;flex-direction:column">
+            <input type="text" name="address_cadete" placeholder="Dirección en Rosario" style="padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:14px;width:100%" />
+          </div>
+          <div id="envioGroup" style="display:none;margin-top:12px;gap:12px;flex-direction:column">
+            <select name="province" id="provinceSelect" style="padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:14px;width:100%">
+              <option value="">Seleccioná provincia</option>
+              {{range .Provinces}}<option value="{{.}}">{{.}}</option>{{end}}
+            </select>
+            <input type="text" name="address_envio" placeholder="Dirección completa" style="padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:14px;width:100%" />
+            <input type="text" name="postal_code" placeholder="Código postal" style="padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:14px;width:100%" />
+            <input type="text" name="dni" placeholder="DNI" style="padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:14px;width:100%" />
+          </div>
+        </div>
+
+        <!-- Método de pago -->
+        <div style="display:flex;flex-direction:column;gap:16px;padding:20px;background:var(--bg);border-radius:16px;border:1px solid var(--border)">
+          <h3 style="margin:0;font-size:16px;font-weight:600">Método de pago</h3>
+          <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--panel);border-radius:12px;border:2px solid var(--border);cursor:pointer">
+            <input type="radio" name="payment_method" value="efectivo" checked />
+            <span style="flex:1">
+              <div style="font-weight:600">Efectivo</div>
+              <div style="font-size:13px;color:#10b981;font-weight:600">10% de descuento</div>
+            </span>
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--panel);border-radius:12px;border:2px solid var(--border);cursor:pointer">
+            <input type="radio" name="payment_method" value="transferencia" />
+            <span style="flex:1">
+              <div style="font-weight:600">Transferencia</div>
+              <div style="font-size:13px;color:#10b981;font-weight:600">10% de descuento</div>
+            </span>
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--panel);border-radius:12px;border:2px solid var(--border);cursor:pointer">
+            <input type="radio" name="payment_method" value="mercadopago" />
+            <span style="flex:1">
+              <div style="font-weight:600">Mercado Pago</div>
+              <div style="font-size:13px;color:var(--muted)">Pago seguro en línea</div>
+            </span>
+          </label>
+        </div>
+
+        <!-- Resumen de costos -->
+        <div style="padding:20px;background:var(--bg);border-radius:16px;border:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px;color:var(--muted)">
+            <span>Subtotal</span>
+            <span id="subtotalVal" style="color:var(--text);font-weight:500">${{printf "%.2f" .Total}}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px;color:var(--muted)">
+            <span>Costo de envío</span>
+            <span id="shipCost" style="color:var(--text);font-weight:500">$0.00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px;color:#10b981" id="discountRow" style="display:none">
+            <span>Descuento (10%)</span>
+            <span id="discount" style="font-weight:600">-$0.00</span>
+          </div>
+          <div style="border-top:2px solid var(--border);padding-top:12px;margin-top:12px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:18px;font-weight:700">Total</span>
+            <span id="finalTotal" style="font-size:24px;font-weight:700;color:var(--primary)">${{printf "%.2f" .Total}}</span>
+          </div>
+        </div>
+
+        <div id="pcData" style="display:none">
+          {{range $k,$v := .ProvinceCosts}}<span data-prov="{{$k}}" data-cost="{{$v}}"></span>{{end}}
+        </div>
+
+        <button type="submit" class="btn-primary" style="padding:16px;font-size:16px;font-weight:700;border-radius:12px;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);box-shadow:0 4px 12px rgba(99,102,241,0.3)">
+          Finalizar Compra
+        </button>
+      </form>
+    </div>
+  </div>
+  {{end}}
 </div>
- 
-{{end}}
 {{template "layout_end" .}}
 {{end}}

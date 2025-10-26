@@ -1199,6 +1199,11 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 		shippingMethod = "retiro"
 	}
 
+	paymentMethod := r.FormValue("payment_method")
+	if paymentMethod == "" {
+		paymentMethod = "efectivo"
+	}
+
 	addrEnvio := r.FormValue("address_envio")
 	addrCadete := r.FormValue("address_cadete")
 	legacyAddr := r.FormValue("address")
@@ -1243,7 +1248,7 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/cart?err=vacio", 302)
 		return
 	}
-	o := &domain.Order{ID: uuid.New(), Status: domain.OrderStatusAwaitingPay, Email: email, Name: name, Phone: phone, DNI: dni, PostalCode: postal, ShippingMethod: shippingMethod}
+	o := &domain.Order{ID: uuid.New(), Status: domain.OrderStatusAwaitingPay, Email: email, Name: name, Phone: phone, DNI: dni, PostalCode: postal, ShippingMethod: shippingMethod, PaymentMethod: paymentMethod}
 	itemsTotal := 0.0
 	for _, l := range lines {
 		p, _ := s.products.GetBySlug(r.Context(), l.Slug)
@@ -1278,19 +1283,60 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 		o.Province = province
 	}
 	o.ShippingCost = shippingCost
-	o.Total = itemsTotal + shippingCost
+	subtotal := itemsTotal + shippingCost
+
+	// Aplicar descuento para efectivo y transferencia (10%)
+	discountAmount := 0.0
+	if paymentMethod == "efectivo" || paymentMethod == "transferencia" {
+		discountAmount = subtotal * 0.1
+	}
+	o.DiscountAmount = discountAmount
+	o.Total = subtotal - discountAmount
+
 	if err := s.orders.Orders.Save(r.Context(), o); err != nil {
 		http.Redirect(w, r, "/cart?err=orden", 302)
 		return
 	}
-	redirURL, err := s.payments.CreatePreference(r.Context(), o)
-	if err != nil {
-		redirURL = "/pay/" + o.ID.String()
-	} else {
+
+	// Manejar según método de pago
+	switch paymentMethod {
+	case "efectivo":
+		// Finalizar transacción y enviar mensaje por Telegram
+		o.Status = domain.OrderStatusFinished
+		o.MPStatus = "efectivo_approved"
 		_ = s.orders.Orders.Save(r.Context(), o)
+		sendOrderNotify(o, true)
+		writeCart(w, cartPayload{})
+		http.Redirect(w, r, "/pay/"+o.ID.String()+"?status=approved", 302)
+	case "transferencia":
+		// Orden con pago pendiente
+		o.Status = domain.OrderStatusAwaitingPay
+		o.MPStatus = "transferencia_pending"
+		_ = s.orders.Orders.Save(r.Context(), o)
+		sendOrderNotify(o, false)
+		writeCart(w, cartPayload{})
+		http.Redirect(w, r, "/pay/"+o.ID.String()+"?status=pending", 302)
+	case "mercadopago":
+		// Redirigir a Mercado Pago
+		redirURL, err := s.payments.CreatePreference(r.Context(), o)
+		if err != nil {
+			redirURL = "/pay/" + o.ID.String()
+		} else {
+			_ = s.orders.Orders.Save(r.Context(), o)
+		}
+		writeCart(w, cartPayload{})
+		http.Redirect(w, r, redirURL, 302)
+	default:
+		// Fallback: usar Mercado Pago
+		redirURL, err := s.payments.CreatePreference(r.Context(), o)
+		if err != nil {
+			redirURL = "/pay/" + o.ID.String()
+		} else {
+			_ = s.orders.Orders.Save(r.Context(), o)
+		}
+		writeCart(w, cartPayload{})
+		http.Redirect(w, r, redirURL, 302)
 	}
-	writeCart(w, cartPayload{})
-	http.Redirect(w, r, redirURL, 302)
 }
 
 // apiSearchSuggestions retorna sugerencias de productos para autocompletado
@@ -1353,33 +1399,62 @@ func (s *Server) handlePaySimulated(w http.ResponseWriter, r *http.Request) {
 		status = strings.ToLower(q.Get("collection_status"))
 	}
 	success := false
-	if status == "approved" {
+	msg := ""
+
+	// Determinar mensaje según método de pago
+	if o.PaymentMethod == "efectivo" {
+		msg = "¡Gracias por tu compra! El pago en efectivo se confirmará al retirar el pedido. Recibirás una notificación con los detalles."
 		success = true
-	}
-	if status != "" {
-		if success {
-			o.MPStatus = "approved"
-			o.Status = domain.OrderStatusFinished
-			if !o.Notified {
-				o.Notified = true
-				_ = s.orders.Orders.Save(r.Context(), o)
-				go sendOrderNotify(o, true)
+	} else if o.PaymentMethod == "transferencia" || o.MPStatus == "transferencia_pending" || (o.MPStatus == "transferencia_pending" && status == "pending") {
+		msg = "Pago pendiente de confirmación. Por favor, realiza la transferencia y envía el comprobante por WhatsApp."
+		success = false
+		// Asegurar que el PaymentMethod esté configurado
+		if o.PaymentMethod == "" {
+			o.PaymentMethod = "transferencia"
+		}
+	} else {
+		// Mercado Pago
+		if status == "approved" {
+			success = true
+		}
+		if status != "" {
+			if success {
+				o.MPStatus = "approved"
+				o.Status = domain.OrderStatusFinished
+				if !o.Notified {
+					o.Notified = true
+					_ = s.orders.Orders.Save(r.Context(), o)
+					go sendOrderNotify(o, true)
+				} else {
+					_ = s.orders.Orders.Save(r.Context(), o)
+				}
 			} else {
+				o.MPStatus = status
 				_ = s.orders.Orders.Save(r.Context(), o)
 			}
-		} else {
-			o.MPStatus = status
-			_ = s.orders.Orders.Save(r.Context(), o)
+		}
+		if status == "rejected" {
+			msg = "El pago fue rechazado."
+		}
+		if success && msg == "" {
+			msg = "Pago aprobado. Gracias por tu compra."
+		} else if msg == "" {
+			msg = "Pago pendiente / simulado"
 		}
 	}
-	msg := "Pago pendiente / simulado"
-	if status == "rejected" {
-		msg = "El pago fue rechazado."
+
+	isTransferenciaPending := o.PaymentMethod == "transferencia" || o.MPStatus == "transferencia_pending" || (status == "pending" && o.MPStatus != "approved")
+	whatsappPhone := os.Getenv("WHATSAPP_PHONE")
+	if whatsappPhone == "" {
+		whatsappPhone = "543416000000" // fallback por compatibilidad
 	}
-	if success {
-		msg = "Pago aprobado. Gracias por tu compra."
+	data := map[string]any{
+		"Order":                  o,
+		"StatusMsg":              msg,
+		"Success":                success,
+		"IsTransferenciaPending": isTransferenciaPending,
+		"WhatsAppPhone":          whatsappPhone,
 	}
-	data := map[string]any{"Order": o, "StatusMsg": msg, "Success": success}
 	if u := readUserSession(w, r); u != nil {
 		data["User"] = u
 	}
@@ -2148,6 +2223,19 @@ func sendOrderEmail(o *domain.Order, success bool) error {
 	_, _ = fmt.Fprintf(&buf, "Estado: %s\n", statusTxt)
 	_, _ = fmt.Fprintf(&buf, "Orden: %s\n", o.ID)
 	_, _ = fmt.Fprintf(&buf, "Nombre: %s\nEmail: %s\nTel: %s\nDNI: %s\n", o.Name, o.Email, o.Phone, o.DNI)
+
+	// Método de pago
+	paymentMethod := "Mercado Pago"
+	if o.PaymentMethod == "efectivo" {
+		paymentMethod = "Efectivo (10% OFF)"
+	} else if o.PaymentMethod == "transferencia" {
+		paymentMethod = "Transferencia (10% OFF)"
+	}
+	_, _ = fmt.Fprintf(&buf, "Método de pago: %s\n", paymentMethod)
+	if o.DiscountAmount > 0 {
+		_, _ = fmt.Fprintf(&buf, "Descuento: -$%.2f\n", o.DiscountAmount)
+	}
+
 	if o.ShippingMethod == "envio" || o.ShippingMethod == "cadete" {
 		_, _ = fmt.Fprintf(&buf, "Envío (%s) a: %s (%s) CP:%s\n", o.ShippingMethod, o.Address, o.Province, o.PostalCode)
 	} else {
@@ -2192,6 +2280,19 @@ func sendOrderTelegram(o *domain.Order, success bool) error {
 	b.WriteString(statusTxt)
 	b.WriteString("\n")
 	fmt.Fprintf(&b, "Nombre: %s\nEmail: %s\nTel: %s\nDNI: %s\n", o.Name, o.Email, o.Phone, o.DNI)
+
+	// Método de pago
+	paymentMethod := "Mercado Pago"
+	if o.PaymentMethod == "efectivo" {
+		paymentMethod = "Efectivo (10% OFF)"
+	} else if o.PaymentMethod == "transferencia" {
+		paymentMethod = "Transferencia (10% OFF)"
+	}
+	fmt.Fprintf(&b, "Método de pago: %s\n", paymentMethod)
+	if o.DiscountAmount > 0 {
+		fmt.Fprintf(&b, "Descuento: -$%.2f\n", o.DiscountAmount)
+	}
+
 	if o.ShippingMethod == "envio" || o.ShippingMethod == "cadete" {
 		fmt.Fprintf(&b, "Envío (%s) a: %s (%s %s) CP:%s\n", o.ShippingMethod, o.Address, o.Province, o.ShippingMethod, o.PostalCode)
 	} else {
