@@ -451,8 +451,8 @@ body.drawer-open .drawer{pointer-events:auto;opacity:1}
   .hero-copy h1{font-size:24px}
   .hero-actions{display:flex;flex-direction:column;gap:10px;width:100%}
   .btn-hero,.btn-hero-secondary{width:100%;justify-content:center;align-items:center;padding:14px 20px !important;font-size:15px}
-  .btn-hero svg,.btn-hero-secondary svg{width:20px;height:20px;flex-shrink:0}
-  .btn-hero span,.btn-hero-secondary span{text-align:center}
+  .btn-hero svg,.btn-hero-secondary svg{width:18px;height:18px;flex-shrink:0}
+  .btn-hero span,.btn-hero-secondary span{display:inline-block;text-align:center}
   .btn-primary,.btn-secondary{padding:12px 16px;font-size:14px;width:100%}
   .stat-value{font-size:22px}
   .stat-label{font-size:12px}
