@@ -259,8 +259,69 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "err", 500)
 		return
 	}
+
+	// Leer los productos del carrusel desde .env y obtener sus imágenes
+	type carouselItem struct {
+		Slug  string
+		Image string
+		Alt   string
+	}
+	itemSlugs := []string{
+		os.Getenv("ITEM_1"),
+		os.Getenv("ITEM_2"),
+		os.Getenv("ITEM_3"),
+		os.Getenv("ITEM_4"),
+		os.Getenv("ITEM_5"),
+	}
+
+	carouselItems := []carouselItem{}
+	for _, slug := range itemSlugs {
+		if slug == "" {
+			carouselItems = append(carouselItems, carouselItem{})
+			continue
+		}
+
+		product, err := s.products.GetBySlug(r.Context(), slug)
+		if err != nil || product == nil || len(product.Images) == 0 {
+			carouselItems = append(carouselItems, carouselItem{})
+			continue
+		}
+
+		// Usar la primera imagen del producto
+		img := product.Images[0]
+		carouselItems = append(carouselItems, carouselItem{
+			Slug:  slug,
+			Image: img.URL,
+			Alt:   product.Name,
+		})
+	}
+
+	// Si no hay items configurados, usar imágenes por defecto
+	hasCarouselItems := false
+	for _, item := range carouselItems {
+		if item.Slug != "" {
+			hasCarouselItems = true
+			break
+		}
+	}
+
+	if !hasCarouselItems {
+		// Usar imágenes por defecto
+		carouselItems = []carouselItem{
+			{Image: "/public/assets/img/img1.webp", Alt: "Modelo 3D 1"},
+			{Image: "/public/assets/img/img2.webp", Alt: "Modelo 3D 2"},
+			{Image: "/public/assets/img/img3.webp", Alt: "Modelo 3D 3"},
+			{Image: "/public/assets/img/img4.webp", Alt: "Modelo 3D 4"},
+		}
+	}
+
 	base := s.canonicalBase(r)
-	data := map[string]any{"Products": list, "CanonicalURL": base + "/", "OGImage": base + "/public/assets/img/chroma-logo.png"}
+	data := map[string]any{
+		"Products":      list,
+		"CanonicalURL":  base + "/",
+		"OGImage":       base + "/public/assets/img/chroma-logo.png",
+		"CarouselItems": carouselItems,
+	}
 	if u := readUserSession(w, r); u != nil {
 		data["User"] = u
 	}

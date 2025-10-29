@@ -41,10 +41,15 @@
     </div>
   </div>
   <div class="hero-carousel" id="heroCarousel">
-    <img class="hc-slide active" src="/public/assets/img/img1.webp" alt="Modelo 3D 1" sizes="100vw" fetchpriority="high" decoding="async" />
-    <img class="hc-slide" src="/public/assets/img/img2.webp" alt="Modelo 3D 2" sizes="100vw" loading="lazy" decoding="async" />
-    <img class="hc-slide" src="/public/assets/img/img3.webp" alt="Modelo 3D 3" sizes="100vw" loading="lazy" decoding="async" />
-    <img class="hc-slide" src="/public/assets/img/img4.webp" alt="Modelo 3D 4" sizes="100vw" loading="lazy" decoding="async" />
+    {{range $i, $item := .CarouselItems}}
+      {{if $item.Slug}}
+        <a href="/product/{{$item.Slug}}" class="hc-slide-link{{if eq $i 0}} active{{end}}">
+          <img class="hc-slide{{if eq $i 0}} active{{end}}" src="{{img $item.Image}}" alt="{{$item.Alt}}" sizes="100vw" {{if eq $i 0}}fetchpriority="high"{{else}}loading="lazy"{{end}} decoding="async" />
+        </a>
+      {{else if $item.Image}}
+        <img class="hc-slide{{if eq $i 0}} active{{end}}" src="{{img $item.Image}}" alt="{{$item.Alt}}" sizes="100vw" {{if eq $i 0}}fetchpriority="high"{{else}}loading="lazy"{{end}} decoding="async" />
+      {{end}}
+    {{end}}
     <div class="hc-dots" id="hcDots"></div>
   </div>
 </section>
