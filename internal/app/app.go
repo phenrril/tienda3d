@@ -29,7 +29,8 @@ type App struct {
 	QuoteUC        *usecase.QuoteUC
 	OrderUC        *usecase.OrderUC
 	PaymentUC      *usecase.PaymentUC
-	WhatsAppUC     *usecase.WhatsAppUC
+    WhatsAppUC     *usecase.WhatsAppUC
+    Expenses       domain.ExpenseRepo
 	ModelRepo      domain.UploadedModelRepo
 	ShippingMethod string  `gorm:"size:30"`
 	ShippingCost   float64 `gorm:"type:decimal(12,2)"`
@@ -91,7 +92,8 @@ func NewApp(db *gorm.DB) (*App, error) {
 	}
 
 	// Crear repositorio de WhatsApp
-	whatsappRepo := postgres.NewWhatsAppRepo(db)
+    whatsappRepo := postgres.NewWhatsAppRepo(db)
+    expenseRepo := postgres.NewExpenseRepo(db)
 
 	app := &App{}
 	app.ProductUC = &usecase.ProductUC{Products: prodRepo}
@@ -107,7 +109,8 @@ func NewApp(db *gorm.DB) (*App, error) {
 	app.ModelRepo = modelRepo
 	app.Storage = storage
 	app.Customers = custRepo
-	app.OAuthConfig = oauthCfg
+    app.OAuthConfig = oauthCfg
+    app.Expenses = expenseRepo
 
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
@@ -177,12 +180,12 @@ func NewApp(db *gorm.DB) (*App, error) {
 }
 
 func (a *App) HTTPHandler() http.Handler {
-	return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.WhatsAppUC, a.ModelRepo, a.Storage, a.Customers, a.OAuthConfig)
+    return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.WhatsAppUC, a.ModelRepo, a.Storage, a.Customers, a.Expenses, a.OAuthConfig)
 }
 
 func (a *App) MigrateAndSeed() error {
 	if err := a.DB.AutoMigrate(
-		&domain.Product{}, &domain.Variant{}, &domain.Image{}, &domain.Order{}, &domain.OrderItem{}, &domain.UploadedModel{}, &domain.Quote{}, &domain.Page{}, &domain.Customer{}, &domain.WhatsAppOrder{}, &domain.WhatsAppProductSync{},
+        &domain.Product{}, &domain.Variant{}, &domain.Image{}, &domain.Order{}, &domain.OrderItem{}, &domain.UploadedModel{}, &domain.Quote{}, &domain.Page{}, &domain.Customer{}, &domain.WhatsAppOrder{}, &domain.WhatsAppProductSync{}, &domain.Expense{},
 	); err != nil {
 		return err
 	}

@@ -38,10 +38,11 @@ type Server struct {
 	quotes    *usecase.QuoteUC
 	orders    *usecase.OrderUC
 	payments  *usecase.PaymentUC
-	whatsapp  *usecase.WhatsAppUC
+    whatsapp  *usecase.WhatsAppUC
 	models    domain.UploadedModelRepo
 	storage   domain.FileStorage
 	customers domain.CustomerRepo
+    expenses  domain.ExpenseRepo
 	oauthCfg  *oauth2.Config
 
 	adminAllowed map[string]struct{}
@@ -50,8 +51,8 @@ type Server struct {
 
 var emailRe = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
 
-func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config) http.Handler {
-	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, models: m, storage: fs, customers: customers, oauthCfg: oauthCfg, mux: http.NewServeMux()}
+func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, expenses domain.ExpenseRepo, oauthCfg *oauth2.Config) http.Handler {
+    s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, models: m, storage: fs, customers: customers, expenses: expenses, oauthCfg: oauthCfg, mux: http.NewServeMux()}
 
 	allowed := map[string]struct{}{}
 	if raw := os.Getenv("ADMIN_ALLOWED_EMAILS"); raw != "" {
@@ -133,7 +134,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/admin/orders", s.handleAdminOrders)
 	s.mux.HandleFunc("/admin/products", s.handleAdminProducts)
 
-	s.mux.HandleFunc("/admin/sales", s.handleAdminSales)
+    s.mux.HandleFunc("/admin/sales", s.handleAdminSales)
+    // Admin: ventas/egresos manuales
+    s.mux.HandleFunc("/admin/manual", s.handleAdminManual)
+    s.mux.HandleFunc("/admin/manual/sale", s.handleAdminManualSale)
+    s.mux.HandleFunc("/admin/manual/expense", s.handleAdminManualExpense)
 
 	// Admin: reparación de imágenes huérfanas
 	s.mux.HandleFunc("/admin/repair_images", s.handleAdminRepairImages)
@@ -2040,6 +2045,95 @@ func (s *Server) handleAdminSales(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, layout, data)
+}
+
+// ===== Admin: Ventas/Egresos manuales =====
+func (s *Server) handleAdminManual(w http.ResponseWriter, r *http.Request) {
+    if !s.isAdminSession(r) { http.Redirect(w, r, "/admin/auth", 302); return }
+    // Cargar últimos movimientos para referencia rápida
+    recent, _ := s.expenses.Recent(r.Context(), 50)
+    data := map[string]any{"AdminToken": s.readAdminToken(r), "Recent": recent}
+    s.render(w, "admin_manual.html", data)
+}
+
+func (s *Server) handleAdminManualSale(w http.ResponseWriter, r *http.Request) {
+    if !s.requireAdmin(w, r) { return }
+    if r.Method != http.MethodPost { http.Error(w, "method", 405); return }
+    if err := r.ParseForm(); err != nil { http.Error(w, "form", 400); return }
+
+    name := strings.TrimSpace(r.FormValue("customer_name"))
+    email := strings.TrimSpace(r.FormValue("customer_email"))
+    phone := strings.TrimSpace(r.FormValue("customer_phone"))
+    payMethod := strings.TrimSpace(r.FormValue("payment_method"))
+    if payMethod == "" { payMethod = "efectivo" }
+
+    // Items: arrays paralelos
+    slugs := r.Form["item_slug"]
+    qtys := r.Form["item_qty"]
+    prices := r.Form["item_price"]
+    if len(slugs) == 0 { http.Error(w, "items", 400); return }
+
+    o := &domain.Order{ID: uuid.New(), Status: domain.OrderStatusFinished, Name: name, Email: email, Phone: phone, PaymentMethod: payMethod}
+    itemsTotal := 0.0
+    for i := range slugs {
+        slug := strings.TrimSpace(slugs[i])
+        if slug == "" { continue }
+        qty := 1
+        if i < len(qtys) { if v, err := strconv.Atoi(strings.TrimSpace(qtys[i])); err == nil && v > 0 { qty = v } }
+        unit := 0.0
+        if i < len(prices) { if v, err := strconv.ParseFloat(strings.TrimSpace(prices[i]), 64); err == nil && v >= 0 { unit = v } }
+        var title string
+        var pid *uuid.UUID
+        if p, err := s.products.GetBySlug(r.Context(), slug); err == nil && p != nil {
+            title = p.Name
+            pid = &p.ID
+            if unit <= 0 { unit = p.BasePrice }
+        } else {
+            if unit <= 0 { continue }
+            title = slug
+        }
+        line := domain.OrderItem{ID: uuid.New(), ProductID: pid, Qty: qty, UnitPrice: unit, Title: title}
+        o.Items = append(o.Items, line)
+        itemsTotal += unit * float64(qty)
+    }
+    if len(o.Items) == 0 { http.Error(w, "items", 400); return }
+
+    // Descuento automático efectivo/transferencia 10%, igual que checkout
+    subtotal := itemsTotal
+    discount := 0.0
+    if payMethod == "efectivo" || payMethod == "transferencia" {
+        discount = subtotal * 0.10
+    }
+    o.DiscountAmount = discount
+    o.Total = subtotal - discount
+    o.MPStatus = "manual"
+
+    if err := s.orders.Orders.Save(r.Context(), o); err != nil { http.Error(w, "save", 500); return }
+    // Registrar también como ingreso manual para el flujo de caja rápido
+    _ = s.expenses.Save(r.Context(), &domain.Expense{ID: uuid.New(), Kind: domain.ExpenseTypeIn, Date: time.Now(), Category: "venta_manual", Description: "Venta manual", Amount: o.Total, PaymentMethod: payMethod, CustomerName: name, CustomerEmail: email, CustomerPhone: phone})
+
+    if strings.Contains(r.Header.Get("Accept"), "application/json") || r.Header.Get("X-Requested-With") == "fetch" { writeJSON(w, 201, map[string]any{"order_id": o.ID, "total": o.Total}); return }
+    http.Redirect(w, r, "/admin/manual?ok=1", 302)
+}
+
+func (s *Server) handleAdminManualExpense(w http.ResponseWriter, r *http.Request) {
+    if !s.requireAdmin(w, r) { return }
+    if r.Method != http.MethodPost { http.Error(w, "method", 405); return }
+    if err := r.ParseForm(); err != nil { http.Error(w, "form", 400); return }
+    amount, _ := strconv.ParseFloat(strings.TrimSpace(r.FormValue("amount")), 64)
+    if amount <= 0 { http.Error(w, "amount", 400); return }
+    cat := strings.TrimSpace(r.FormValue("category"))
+    if cat == "" { cat = "otros" }
+    desc := strings.TrimSpace(r.FormValue("description"))
+    pm := strings.TrimSpace(r.FormValue("payment_method"))
+    if pm == "" { pm = "efectivo" }
+    dstr := strings.TrimSpace(r.FormValue("date"))
+    dt := time.Now()
+    if dstr != "" { if t, err := time.Parse("2006-01-02", dstr); err == nil { dt = t } }
+    e := &domain.Expense{ID: uuid.New(), Kind: domain.ExpenseTypeOut, Date: dt, Category: cat, Description: desc, Amount: amount, PaymentMethod: pm}
+    if err := s.expenses.Save(r.Context(), e); err != nil { http.Error(w, "save", 500); return }
+    if strings.Contains(r.Header.Get("Accept"), "application/json") || r.Header.Get("X-Requested-With") == "fetch" { writeJSON(w, 201, map[string]any{"id": e.ID}); return }
+    http.Redirect(w, r, "/admin/manual?ok=1", 302)
 }
 
 func (s *Server) handleAdminAuth(w http.ResponseWriter, r *http.Request) {

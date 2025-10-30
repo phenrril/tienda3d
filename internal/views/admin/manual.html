@@ -1,0 +1,119 @@
+{{define "admin_manual.html"}}
+{{template "layout_start" .}}
+<h1>Ventas manuales y Egresos</h1>
+<nav class="admin-nav"><a href="/admin/products">Productos</a> | <a href="/admin/orders">Órdenes</a> | <a href="/admin/sales">Ventas</a> | <a href="/admin/manual" class="active">Manual</a> | <a href="/admin/costs">Calculadora</a> | <a href="/admin/logout">Salir</a></nav>
+
+<section class="grid" style="grid-template-columns:1fr 1fr; gap:18px; margin-top:16px; align-items:start">
+  <div class="admin-card" style="padding:16px">
+    <h2 style="margin:0 0 10px;font-size:18px">Nueva venta manual</h2>
+    <form method="post" action="/admin/manual/sale" id="manualSaleForm">
+      <input type="hidden" name="_csrf" value="{{.AdminToken}}" />
+      <fieldset>
+        <legend>Cliente</legend>
+        <label>Nombre<input type="text" name="customer_name" placeholder="Ej: Juan Perez" /></label>
+        <label>Email<input type="email" name="customer_email" placeholder="Opcional" /></label>
+        <label>Teléfono<input type="text" name="customer_phone" placeholder="Opcional" /></label>
+      </fieldset>
+      <fieldset>
+        <legend>Items</legend>
+        <div id="itemsList" class="col" style="display:flex;flex-direction:column;gap:8px"></div>
+        <button type="button" class="btn-secondary" id="addItemBtn">+ Agregar item</button>
+      </fieldset>
+      <fieldset>
+        <legend>Pago</legend>
+        <label>Método de pago
+          <select name="payment_method">
+            <option value="efectivo">Efectivo (10% OFF)</option>
+            <option value="transferencia">Transferencia (10% OFF)</option>
+            <option value="mercadopago">Mercado Pago</option>
+          </select>
+        </label>
+      </fieldset>
+      <div class="row" style="gap:.5rem;align-items:center">
+        <button class="btn-primary" type="submit">Guardar venta</button>
+        <span id="saleStatus" style="font-size:.9rem;color:var(--muted)"></span>
+      </div>
+    </form>
+  </div>
+
+  <div class="admin-card" style="padding:16px">
+    <h2 style="margin:0 0 10px;font-size:18px">Nuevo egreso</h2>
+    <form method="post" action="/admin/manual/expense" id="manualExpenseForm">
+      <input type="hidden" name="_csrf" value="{{.AdminToken}}" />
+      <fieldset>
+        <legend>Detalle</legend>
+        <label>Fecha<input type="date" name="date" value="" /></label>
+        <label>Categoría
+          <select name="category">
+            <option value="filamentos">Filamentos</option>
+            <option value="insumos">Insumos</option>
+            <option value="herramientas">Herramientas</option>
+            <option value="envios">Envíos</option>
+            <option value="otros" selected>Otros</option>
+          </select>
+        </label>
+        <label>Descripción<input type="text" name="description" placeholder="Ej: compra filamento PLA" /></label>
+        <label>Monto (ARS)<input type="number" step="0.01" min="0" name="amount" required /></label>
+        <label>Método de pago
+          <select name="payment_method">
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="mercadopago">Mercado Pago</option>
+          </select>
+        </label>
+      </fieldset>
+      <div class="row" style="gap:.5rem;align-items:center">
+        <button class="btn-primary" type="submit">Guardar egreso</button>
+        <span id="expenseStatus" style="font-size:.9rem;color:var(--muted)"></span>
+      </div>
+    </form>
+  </div>
+</section>
+
+<div class="admin-card" style="padding:16px; margin-top:18px">
+  <h2 style="margin:0 0 10px;font-size:16px">Últimos movimientos</h2>
+  <table class="table" style="font-size:.85rem">
+    <thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Descripción</th><th>Método</th><th style="text-align:right">Monto</th></tr></thead>
+    <tbody>
+      {{range .Recent}}
+      <tr>
+        <td>{{.Date.Format "2006-01-02"}}</td>
+        <td>{{.Kind}}</td>
+        <td>{{.Category}}</td>
+        <td>{{.Description}}</td>
+        <td>{{.PaymentMethod}}</td>
+        <td style="text-align:right">${{printf "%.2f" .Amount}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+
+<script>
+(function(){
+  const list=document.getElementById('itemsList');
+  const addBtn=document.getElementById('addItemBtn');
+  function makeItem(){
+    const row=document.createElement('div');
+    row.className='row';
+    row.style.gap='6px';
+    row.innerHTML=`
+      <input type="text" name="item_slug" placeholder="slug del producto" list="prodList" style="flex:2" required />
+      <input type="number" name="item_qty" min="1" step="1" value="1" style="width:90px" />
+      <input type="number" name="item_price" min="0" step="0.01" placeholder="Precio" style="width:130px" />
+      <button class="btn-danger" type="button">✖</button>
+    `;
+    row.querySelector('button').addEventListener('click',()=>{ row.remove(); });
+    return row;
+  }
+  addBtn.addEventListener('click',()=>{ list.appendChild(makeItem()); });
+  // crear al menos una fila
+  list.appendChild(makeItem());
+
+  // set fecha hoy por defecto si vacío
+  const fd=document.querySelector('form#manualExpenseForm input[name=date]');
+  if(fd && !fd.value){ const d=new Date(); const m=(d.getMonth()+1).toString().padStart(2,'0'); const day=d.getDate().toString().padStart(2,'0'); fd.value=`${d.getFullYear()}-${m}-${day}`; }
+})();
+</script>
+{{template "layout_end" .}}
+{{end}}
