@@ -23,19 +23,20 @@ import (
 )
 
 type App struct {
-	DB             *gorm.DB
-	Tmpl           *template.Template
-	ProductUC      *usecase.ProductUC
-	QuoteUC        *usecase.QuoteUC
-	OrderUC        *usecase.OrderUC
-	PaymentUC      *usecase.PaymentUC
-	WhatsAppUC     *usecase.WhatsAppUC
-	ModelRepo      domain.UploadedModelRepo
-	ShippingMethod string  `gorm:"size:30"`
-	ShippingCost   float64 `gorm:"type:decimal(12,2)"`
-	Storage        domain.FileStorage
-	Customers      domain.CustomerRepo
-	OAuthConfig    *oauth2.Config
+	DB                  *gorm.DB
+	Tmpl                *template.Template
+	ProductUC           *usecase.ProductUC
+	QuoteUC             *usecase.QuoteUC
+	OrderUC             *usecase.OrderUC
+	PaymentUC           *usecase.PaymentUC
+	WhatsAppUC          *usecase.WhatsAppUC
+	ModelRepo           domain.UploadedModelRepo
+	FeaturedProductRepo domain.FeaturedProductRepo
+	ShippingMethod      string  `gorm:"size:30"`
+	ShippingCost        float64 `gorm:"type:decimal(12,2)"`
+	Storage             domain.FileStorage
+	Customers           domain.CustomerRepo
+	OAuthConfig         *oauth2.Config
 }
 
 func NewApp(db *gorm.DB) (*App, error) {
@@ -44,6 +45,7 @@ func NewApp(db *gorm.DB) (*App, error) {
 	orderRepo := postgres.NewOrderRepo(db)
 	modelRepo := postgres.NewUploadedModelRepo(db)
 	custRepo := postgres.NewCustomerRepo(db)
+	featuredRepo := postgres.NewFeaturedProductRepo(db)
 	storageDir := os.Getenv("STORAGE_DIR")
 	if storageDir == "" {
 		storageDir = "uploads"
@@ -105,6 +107,7 @@ func NewApp(db *gorm.DB) (*App, error) {
 	}
 	app.DB = db
 	app.ModelRepo = modelRepo
+	app.FeaturedProductRepo = featuredRepo
 	app.Storage = storage
 	app.Customers = custRepo
 	app.OAuthConfig = oauthCfg
@@ -177,12 +180,12 @@ func NewApp(db *gorm.DB) (*App, error) {
 }
 
 func (a *App) HTTPHandler() http.Handler {
-	return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.WhatsAppUC, a.ModelRepo, a.Storage, a.Customers, a.OAuthConfig)
+	return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.WhatsAppUC, a.ModelRepo, a.Storage, a.Customers, a.OAuthConfig, a.FeaturedProductRepo)
 }
 
 func (a *App) MigrateAndSeed() error {
 	if err := a.DB.AutoMigrate(
-		&domain.Product{}, &domain.Variant{}, &domain.Image{}, &domain.Order{}, &domain.OrderItem{}, &domain.UploadedModel{}, &domain.Quote{}, &domain.Page{}, &domain.Customer{}, &domain.WhatsAppOrder{}, &domain.WhatsAppProductSync{},
+		&domain.Product{}, &domain.Variant{}, &domain.Image{}, &domain.Order{}, &domain.OrderItem{}, &domain.UploadedModel{}, &domain.Quote{}, &domain.Page{}, &domain.Customer{}, &domain.WhatsAppOrder{}, &domain.WhatsAppProductSync{}, &domain.FeaturedProduct{},
 	); err != nil {
 		return err
 	}

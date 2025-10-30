@@ -1,0 +1,70 @@
+{{define "admin_destacada.html"}}
+{{template "layout_start" .}}
+<h1>Productos Destacados</h1>
+<nav class="admin-nav"><a href="/admin/products">Productos</a> | <a href="/admin/orders">Órdenes</a> | <a href="/admin/sales">Ventas</a> | <a href="/admin/destacada" class="active">Destacada</a> | <a href="/admin/costs">Calculadora</a> | <a href="/admin/logout">Salir</a></nav>
+
+<div data-admin-token="{{.AdminToken}}" style="display:none"></div>
+
+<section class="grid" style="margin-top:1rem;grid-template-columns:1fr 1fr;gap:2rem;align-items:start">
+  <!-- Columna Izquierda: Productos Destacados -->
+  <div>
+    <h2 style="margin:0 0 16px;font-size:18px">Productos Destacados ({{len .Featured}}/9)</h2>
+    <div class="admin-card" style="padding:16px;margin-bottom:20px">
+      <p style="color:var(--muted);margin:0 0 12px;font-size:14px">Productos actualmente destacados en la página principal.</p>
+      <div id="featuredList" class="admin-list">
+        {{if .Featured}}
+          {{range .Featured}}
+          <div class="admin-list-item" data-product-id="{{.ProductID}}">
+            <div style="flex:1">
+              <strong>{{.Product.Name}}</strong>
+              {{if .Product.Images}}
+              <div style="margin-top:6px">
+                <img src="{{(index .Product.Images 0).URL}}" alt="{{.Product.Name}}" style="width:50px;height:50px;object-fit:cover;border-radius:4px" />
+              </div>
+              {{end}}
+            </div>
+            <button type="button" class="btn-danger small" data-action="remove">Quitar</button>
+          </div>
+          {{end}}
+        {{else}}
+          <p style="color:var(--muted);text-align:center;padding:20px">No hay productos destacados todavía.</p>
+        {{end}}
+      </div>
+    </div>
+  </div>
+
+  <!-- Columna Derecha: Todos los Productos -->
+  <div>
+    <h2 style="margin:0 0 16px;font-size:18px">Todos los Productos</h2>
+    <div class="admin-card" style="padding:16px">
+      <input type="text" id="productSearch" placeholder="Buscar productos..." style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid #223140;background:#0b1520;color:#e5f0ff;margin-bottom:12px" />
+      <div id="allProductsList" class="admin-list" style="max-height:600px;overflow-y:auto">
+        {{range .Products}}
+        <div class="admin-list-item" data-product-id="{{.ID}}" data-product-name="{{.Name}}" data-is-featured="false" title="ID: {{.ID}}">
+          <div style="flex:1">
+            <strong>{{.Name}}</strong>
+            {{if .Images}}
+            <div style="margin-top:6px">
+              <img src="{{(index .Images 0).URL}}" alt="{{.Name}}" style="width:50px;height:50px;object-fit:cover;border-radius:4px" />
+            </div>
+            {{else}}
+            <div style="margin-top:6px;font-size:12px;color:var(--muted)">Sin imagen</div>
+            {{end}}
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">${{printf "%.2f" .BasePrice}}</div>
+          </div>
+          <button type="button" class="btn-primary small" data-action="add">Destacar</button>
+        </div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+.admin-list-item{display:flex;align-items:center;gap:12px;padding:12px;background:#0f1924;border:1px solid #223140;border-radius:8px;margin-bottom:8px;transition:border-color .2s}
+.admin-list-item:hover{border-color:#6366f1}
+.admin-list-item.featured{background:#1a2e40;border-color:#6366f1}
+</style>
+
+{{template "layout_end" .}}
+{{end}}

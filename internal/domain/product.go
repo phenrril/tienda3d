@@ -41,3 +41,13 @@ type Image struct {
 	Alt       string    `gorm:"size:140"`
 	CreatedAt time.Time
 }
+
+type FeaturedProduct struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ProductID uuid.UUID `gorm:"type:uuid;uniqueIndex;not null"`
+	Product   Product   `gorm:"foreignKey:ProductID;references:ID"`
+	Order     int       `gorm:"column:display_order;default:0"`
+	Active    bool      `gorm:"default:true"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
