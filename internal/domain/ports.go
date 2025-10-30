@@ -12,8 +12,8 @@ type ProductRepo interface {
 	FindBySlug(ctx context.Context, slug string) (*Product, error)
 	List(ctx context.Context, filter ProductFilter) ([]Product, int64, error)
 	AddImages(ctx context.Context, productID uuid.UUID, imgs []Image) error
-    FindImageByID(ctx context.Context, id uuid.UUID) (*Image, error)
-    DeleteImageByID(ctx context.Context, id uuid.UUID) error
+	FindImageByID(ctx context.Context, id uuid.UUID) (*Image, error)
+	DeleteImageByID(ctx context.Context, id uuid.UUID) error
 	DistinctCategories(ctx context.Context) ([]string, error)
 }
 
@@ -53,6 +53,14 @@ type UploadedModelRepo interface {
 type PageRepo interface {
 	FindBySlug(ctx context.Context, slug string) (*Page, error)
 	Save(ctx context.Context, p *Page) error
+}
+
+type FeaturedProductRepo interface {
+	Save(ctx context.Context, fp *FeaturedProduct) error
+	FindByProductID(ctx context.Context, productID uuid.UUID) (*FeaturedProduct, error)
+	FindAll(ctx context.Context) ([]FeaturedProduct, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+	Count(ctx context.Context) (int64, error)
 }
 
 type QuoteService interface {

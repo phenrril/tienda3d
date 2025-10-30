@@ -794,3 +794,138 @@ if ('serviceWorker' in navigator) {
   handleInput(searchInput,searchResults);
   handleInput(mobileSearchInput,mobileSearchResults);
 })();
+
+// Admin: Productos Destacados
+(function(){
+  const featuredList = document.getElementById('featuredList');
+  const allProductsList = document.getElementById('allProductsList');
+  const productSearch = document.getElementById('productSearch');
+  if(!allProductsList) return; // No estamos en la página de destacada
+  
+  console.log('=== Inicializando Destacada Admin ===');
+  const adminTokenEl = document.querySelector('[data-admin-token]');
+  const adminToken = adminTokenEl ? adminTokenEl.getAttribute('data-admin-token') : '';
+  console.log('AdminToken:', adminToken ? 'Presente' : 'FALTANTE');
+  console.log('Elements found:', {featuredList: !!featuredList, allProductsList: !!allProductsList, productSearch: !!productSearch});
+  
+  // Log productos disponibles
+  const items = allProductsList.querySelectorAll('.admin-list-item');
+  console.log('Total productos encontrados:', items.length);
+  items.forEach((item, idx) => {
+    const id = item.getAttribute('data-product-id');
+    const name = item.getAttribute('data-product-name');
+    if(idx < 5) console.log(`Producto ${idx+1}: ID="${id}", Name="${name}"`);
+  });
+
+  function updateFeaturedStatus(){
+    if(!allProductsList) return;
+    const featured = document.querySelectorAll('#featuredList .admin-list-item');
+    const featuredIds = new Set();
+    featured.forEach(item => featuredIds.add(item.getAttribute('data-product-id')));
+    
+    allProductsList.querySelectorAll('.admin-list-item').forEach(item => {
+      const productId = item.getAttribute('data-product-id');
+      const btn = item.querySelector('button');
+      if(featuredIds.has(productId)){
+        item.classList.add('featured');
+        if(btn) {
+          btn.textContent = 'Destacado';
+          btn.disabled = true;
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-secondary');
+        }
+      }
+    });
+  }
+
+  function addFeatured(productId){
+    console.log('Sending request to add featured product:', productId);
+    fetch('/api/featured/add', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + adminToken
+      },
+      body: JSON.stringify({product_id: productId, order: 0})
+    }).then(res => {
+      console.log('Response status:', res.status);
+      if(res.ok){
+        location.reload();
+      } else {
+        res.text().then(text => {
+          console.error('Error response:', text);
+          alert('Error: ' + text);
+        });
+      }
+    }).catch(err => {
+      console.error('Fetch error:', err);
+      alert('Error: ' + err);
+    });
+  }
+
+  function removeFeatured(productId){
+    if(!confirm('¿Quitar este producto de destacados?')) return;
+    fetch('/api/featured/remove', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + adminToken
+      },
+      body: JSON.stringify({product_id: productId})
+    }).then(res => {
+      if(res.ok){
+        location.reload();
+      } else {
+        res.text().then(text => alert('Error: ' + text));
+      }
+    }).catch(err => alert('Error: ' + err));
+  }
+
+  // Event delegation
+  if(featuredList){
+    featuredList.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action="remove"]');
+      if(btn){
+        const item = btn.closest('.admin-list-item');
+        const productId = item.getAttribute('data-product-id');
+        removeFeatured(productId);
+      }
+    });
+  }
+
+  if(allProductsList){
+    console.log('Registrando event listener en allProductsList');
+    allProductsList.addEventListener('click', e => {
+      console.log('Click detectado en allProductsList, target:', e.target);
+      const btn = e.target.closest('[data-action="add"]');
+      console.log('Button encontrado:', btn);
+      if(btn) {
+        console.log('Button disabled?', btn.disabled);
+      }
+      if(btn && !btn.disabled){
+        const item = btn.closest('.admin-list-item');
+        const productId = item.getAttribute('data-product-id');
+        console.log('Adding featured product:', productId);
+        addFeatured(productId);
+      } else {
+        console.log('Botón no encontrado o está deshabilitado');
+      }
+    });
+
+    // Search
+    if(productSearch){
+      productSearch.addEventListener('input', e => {
+        const query = e.target.value.toLowerCase();
+        allProductsList.querySelectorAll('.admin-list-item').forEach(item => {
+          const name = item.getAttribute('data-product-name').toLowerCase();
+          item.style.display = name.includes(query) ? '' : 'none';
+        });
+      });
+    }
+  }
+
+  // Update status on load
+  console.log('Ejecutando updateFeaturedStatus()');
+  updateFeaturedStatus();
+  console.log('=== Destacada Admin inicializado correctamente ===');
+})();

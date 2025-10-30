@@ -32,17 +32,18 @@ import (
 )
 
 type Server struct {
-	mux       *http.ServeMux
-	tmpl      *template.Template
-	products  *usecase.ProductUC
-	quotes    *usecase.QuoteUC
-	orders    *usecase.OrderUC
-	payments  *usecase.PaymentUC
-	whatsapp  *usecase.WhatsAppUC
-	models    domain.UploadedModelRepo
-	storage   domain.FileStorage
-	customers domain.CustomerRepo
-	oauthCfg  *oauth2.Config
+	mux              *http.ServeMux
+	tmpl             *template.Template
+	products         *usecase.ProductUC
+	quotes           *usecase.QuoteUC
+	orders           *usecase.OrderUC
+	payments         *usecase.PaymentUC
+	whatsapp         *usecase.WhatsAppUC
+	models           domain.UploadedModelRepo
+	featuredProducts domain.FeaturedProductRepo
+	storage          domain.FileStorage
+	customers        domain.CustomerRepo
+	oauthCfg         *oauth2.Config
 
 	adminAllowed map[string]struct{}
 	adminSecret  []byte
@@ -50,8 +51,8 @@ type Server struct {
 
 var emailRe = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
 
-func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config) http.Handler {
-	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, models: m, storage: fs, customers: customers, oauthCfg: oauthCfg, mux: http.NewServeMux()}
+func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config, fp domain.FeaturedProductRepo) http.Handler {
+	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, models: m, featuredProducts: fp, storage: fs, customers: customers, oauthCfg: oauthCfg, mux: http.NewServeMux()}
 
 	allowed := map[string]struct{}{}
 	if raw := os.Getenv("ADMIN_ALLOWED_EMAILS"); raw != "" {
@@ -122,6 +123,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/webhooks/mp", s.webhookMP)
 	s.mux.HandleFunc("/api/products/delete", s.apiProductsBulkDelete)
 
+	// Featured Products API
+	s.mux.HandleFunc("/api/featured", s.apiFeaturedProducts)
+	s.mux.HandleFunc("/api/featured/add", s.apiFeaturedAdd)
+	s.mux.HandleFunc("/api/featured/remove", s.apiFeaturedRemove)
+
 	s.mux.HandleFunc("/auth/google/login", s.handleGoogleLogin)
 	s.mux.HandleFunc("/auth/google/callback", s.handleGoogleCallback)
 	s.mux.HandleFunc("/logout", s.handleLogout)
@@ -134,6 +140,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/admin/products", s.handleAdminProducts)
 
 	s.mux.HandleFunc("/admin/sales", s.handleAdminSales)
+	s.mux.HandleFunc("/admin/destacada", s.handleAdminDestacada)
 
 	// Admin: reparación de imágenes huérfanas
 	s.mux.HandleFunc("/admin/repair_images", s.handleAdminRepairImages)
@@ -313,6 +320,30 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 			{Image: "/public/assets/img/img3.webp", Alt: "Modelo 3D 3"},
 			{Image: "/public/assets/img/img4.webp", Alt: "Modelo 3D 4"},
 		}
+	}
+
+	// Filtrar imágenes inexistentes para la lista regular
+	filteredList := make([]domain.Product, 0, len(list))
+	for i := range list {
+		p := &list[i]
+		p.Images = filterExistingProductImages(p.Images)
+		if len(p.Images) > 0 {
+			filteredList = append(filteredList, *p)
+		}
+	}
+	list = filteredList
+
+	// Cargar productos destacados
+	featured, _ := s.featuredProducts.FindAll(r.Context())
+	featuredProducts := []domain.Product{}
+	for _, fp := range featured {
+		if len(fp.Product.Images) > 0 {
+			featuredProducts = append(featuredProducts, fp.Product)
+		}
+	}
+	// Si hay productos destacados, reemplazar la lista regular
+	if len(featuredProducts) > 0 {
+		list = featuredProducts
 	}
 
 	base := s.canonicalBase(r)
@@ -2224,6 +2255,29 @@ func (s *Server) handleAdminCostsCalculate(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, 200, out)
 }
 
+func (s *Server) handleAdminDestacada(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", 302)
+		return
+	}
+	list, _, err := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 1000})
+	if err != nil {
+		log.Error().Err(err).Msg("error loading products for featured")
+		list = []domain.Product{}
+	}
+	log.Info().Int("products_count", len(list)).Msg("loaded products for destacada admin")
+	for i, p := range list {
+		if i < 5 { // Log primeros 5 para debugging
+			log.Info().Str("id", p.ID.String()).Str("name", p.Name).Msg("product sample")
+		}
+	}
+	featured, _ := s.featuredProducts.FindAll(r.Context())
+	log.Info().Int("featured_count", len(featured)).Msg("loaded featured products")
+	tok := s.readAdminToken(r)
+	data := map[string]any{"Products": list, "Featured": featured, "AdminToken": tok}
+	s.render(w, "admin_destacada.html", data)
+}
+
 func (s *Server) isAdminSession(r *http.Request) bool {
 	if tok := s.readAdminToken(r); tok != "" {
 		if _, err := s.verifyAdminToken(tok); err == nil {
@@ -2801,4 +2855,99 @@ func (s *Server) handleWhatsAppOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "method not allowed", 405)
+}
+
+// API Featured Products
+func (s *Server) apiFeaturedProducts(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method", 405)
+		return
+	}
+	list, err := s.featuredProducts.FindAll(r.Context())
+	if err != nil {
+		http.Error(w, "error", 500)
+		return
+	}
+	writeJSON(w, 200, list)
+}
+
+func (s *Server) apiFeaturedAdd(w http.ResponseWriter, r *http.Request) {
+	log.Info().Str("method", r.Method).Str("path", r.URL.Path).Msg("=== apiFeaturedAdd called ===")
+	if !s.requireAdmin(w, r) {
+		log.Error().Msg("requireAdmin failed")
+		return
+	}
+	if r.Method != http.MethodPost {
+		log.Error().Str("method", r.Method).Msg("method not allowed")
+		http.Error(w, "method", 405)
+		return
+	}
+	var req struct {
+		ProductID uuid.UUID `json:"product_id"`
+		Order     int       `json:"order"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Error().Err(err).Msg("error decoding featured add request")
+		http.Error(w, "json", 400)
+		return
+	}
+	log.Info().Str("product_id", req.ProductID.String()).Int("order", req.Order).Msg("decoded request - attempting to add featured product")
+	// Verificar que no haya más de 9 productos destacados
+	count, err := s.featuredProducts.Count(r.Context())
+	if err != nil {
+		http.Error(w, "error", 500)
+		return
+	}
+	if count >= 9 {
+		http.Error(w, "max 9 featured products", 400)
+		return
+	}
+	// Verificar si ya está destacado
+	_, err = s.featuredProducts.FindByProductID(r.Context(), req.ProductID)
+	if err == nil {
+		http.Error(w, "product already featured", 400)
+		return
+	}
+	fp := &domain.FeaturedProduct{
+		ProductID: req.ProductID,
+		Order:     req.Order,
+		Active:    true,
+	}
+	if err := s.featuredProducts.Save(r.Context(), fp); err != nil {
+		log.Error().Err(err).Msg("error saving featured product")
+		http.Error(w, "error saving", 500)
+		return
+	}
+	log.Info().Str("featured_id", fp.ID.String()).Msg("featured product saved successfully")
+	writeJSON(w, 201, fp)
+}
+
+func (s *Server) apiFeaturedRemove(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method", 405)
+		return
+	}
+	var req struct {
+		ProductID uuid.UUID `json:"product_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "json", 400)
+		return
+	}
+	fp, err := s.featuredProducts.FindByProductID(r.Context(), req.ProductID)
+	if err != nil {
+		http.Error(w, "not found", 404)
+		return
+	}
+	if err := s.featuredProducts.Delete(r.Context(), fp.ID); err != nil {
+		http.Error(w, "error deleting", 500)
+		return
+	}
+	writeJSON(w, 200, map[string]string{"status": "deleted"})
 }
