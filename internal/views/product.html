@@ -40,6 +40,17 @@
       <div class="pd-price">${{printf "%.2f" .Product.BasePrice}}</div>
       <div class="pd-price-note">Precio base</div>
     </div>
+    <div class="pd-actions">
+      <button class="btn-primary btn-add-cart" type="submit" form="pdForm" aria-label="Agregar al carrito">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <span>Agregar</span>
+      </button>
+      <a href="/cart" class="btn-secondary btn-view-cart" aria-label="Ver carrito">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <span>Carrito</span>
+      </a>
+      <span id="addedMsg" class="added-msg" {{if ne .Added 1}}hidden{{end}}>{{if eq .Added 1}}✓ Agregado!{{end}}</span>
+    </div>
     <div class="trust-signals">
       <div class="trust-item">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -106,7 +117,7 @@
         <strong>Importante:</strong> el tiempo de impresión depende del tamaño de cada pieza. Para cualquier consulta, escribinos por <a href="https://wa.me/5493416219815" target="_blank" rel="noopener">WhatsApp</a>.
       </div>
     </div>
-    <form method="post" action="/cart" class="pd-form">
+    <form method="post" action="/cart" class="pd-form" id="pdForm">
       <input type="hidden" name="slug" value="{{.Product.Slug}}" />
       <div class="color-picker">
         <h3 class="pd-section-title">Elegí tu color <span id="colorPreview" class="color-dot" style="vertical-align:middle;margin-left:8px"></span></h3>
@@ -122,17 +133,7 @@
         <input type="hidden" name="color" id="colorInput" value="{{.DefaultColor}}" aria-describedby="color-desc" />
         <p id="color-desc" class="sr-only">Selecciona el color del producto</p>
       </div>
-      <div class="pd-actions">
-        <button class="btn-primary btn-add-cart" type="submit">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-          <span>Agregar al carrito</span>
-        </button>
-        <a href="/cart" class="btn-secondary btn-view-cart">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-          <span>Ver carrito</span>
-        </a>
-        <span id="addedMsg" class="added-msg" {{if ne .Added 1}}hidden{{end}}>{{if eq .Added 1}}✓ Agregado!{{end}}</span>
-      </div>
+      
     </form>
     <div class="pd-mobile-sticky" id="pdMobileSticky" style="display:none">
       <div class="sticky-content">
