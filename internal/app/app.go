@@ -51,6 +51,7 @@ func NewApp(db *gorm.DB) (*App, error) {
 		storageDir = "uploads"
 	}
 	_ = os.MkdirAll(storageDir, 0755)
+	log.Info().Str("storage_dir", storageDir).Msg("using storage directory")
 	storage := localfs.New(storageDir)
 
 	token := os.Getenv("MP_ACCESS_TOKEN")

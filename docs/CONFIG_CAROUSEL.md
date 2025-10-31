@@ -13,7 +13,7 @@ El carrusel de imágenes en la página de inicio puede enlazar a productos espec
 
 ## Configuración
 
-Los productos del carrusel se configuran a través del archivo `carousel.json` en la raíz del proyecto. El archivo se crea automáticamente cuando usas la interfaz de administración en `/admin/destacada`.
+Los productos del carrusel se configuran a través del archivo `uploads/config/carousel.json` (o en la carpeta definida por `STORAGE_DIR`). El archivo se crea automáticamente cuando usas la interfaz de administración en `/admin/destacada`.
 
 También puedes crearlo manualmente con el siguiente formato:
 
@@ -36,7 +36,7 @@ Si tienes productos con los siguientes slugs:
 - `lampara-luna`
 - `soporte-celular`
 
-Tu configuración en `carousel.json` sería:
+Tu configuración en `uploads/config/carousel.json` sería:
 
 ```json
 {
