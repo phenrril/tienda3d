@@ -128,6 +128,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/featured/add", s.apiFeaturedAdd)
 	s.mux.HandleFunc("/api/featured/remove", s.apiFeaturedRemove)
 
+	// Carousel API
+	s.mux.HandleFunc("/api/carousel/update", s.apiCarouselUpdate)
+
 	s.mux.HandleFunc("/auth/google/login", s.handleGoogleLogin)
 	s.mux.HandleFunc("/auth/google/callback", s.handleGoogleCallback)
 	s.mux.HandleFunc("/logout", s.handleLogout)
@@ -2273,8 +2276,42 @@ func (s *Server) handleAdminDestacada(w http.ResponseWriter, r *http.Request) {
 	}
 	featured, _ := s.featuredProducts.FindAll(r.Context())
 	log.Info().Int("featured_count", len(featured)).Msg("loaded featured products")
+
+	// Cargar productos actuales del carrusel desde .env
+	carouselSlugs := []string{
+		os.Getenv("ITEM_1"),
+		os.Getenv("ITEM_2"),
+		os.Getenv("ITEM_3"),
+		os.Getenv("ITEM_4"),
+		os.Getenv("ITEM_5"),
+	}
+
+	// Obtener información de los productos del carrusel
+	carouselProducts := make([]map[string]interface{}, 0, len(carouselSlugs))
+	for idx, slug := range carouselSlugs {
+		if slug != "" {
+			product, err := s.products.GetBySlug(r.Context(), slug)
+			if err == nil && product != nil {
+				carouselProducts = append(carouselProducts, map[string]interface{}{
+					"position": idx + 1,
+					"slug":     slug,
+					"name":     product.Name,
+					"image":    "",
+				})
+				if len(product.Images) > 0 {
+					carouselProducts[len(carouselProducts)-1]["image"] = product.Images[0].URL
+				}
+			}
+		}
+	}
+
 	tok := s.readAdminToken(r)
-	data := map[string]any{"Products": list, "Featured": featured, "AdminToken": tok}
+	data := map[string]any{
+		"Products":      list,
+		"Featured":      featured,
+		"CarouselItems": carouselProducts,
+		"AdminToken":    tok,
+	}
 	s.render(w, "admin_destacada.html", data)
 }
 
@@ -2950,4 +2987,103 @@ func (s *Server) apiFeaturedRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]string{"status": "deleted"})
+}
+
+// API Carousel
+func (s *Server) apiCarouselUpdate(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+
+	var req struct {
+		Items []string `json:"items"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid json", 400)
+		return
+	}
+
+	// Validar que haya máximo 5 items
+	if len(req.Items) > 5 {
+		http.Error(w, "maximum 5 items allowed", 400)
+		return
+	}
+
+	// Validar que los slugs existan
+	for _, slug := range req.Items {
+		if slug == "" {
+			continue
+		}
+		product, err := s.products.GetBySlug(r.Context(), slug)
+		if err != nil || product == nil {
+			http.Error(w, fmt.Sprintf("product with slug '%s' not found", slug), 400)
+			return
+		}
+		if len(product.Images) == 0 {
+			http.Error(w, fmt.Sprintf("product '%s' has no images", slug), 400)
+			return
+		}
+	}
+
+	// Leer el archivo .env actual
+	envContent, err := os.ReadFile(".env")
+	if err != nil {
+		http.Error(w, "error reading .env file", 500)
+		return
+	}
+
+	envLines := strings.Split(string(envContent), "\n")
+
+	// Crear mapa de las líneas para actualizar
+	updatedEnv := make([]string, 0, len(envLines))
+	itemKeys := []string{"ITEM_1", "ITEM_2", "ITEM_3", "ITEM_4", "ITEM_5"}
+
+	// Primero, eliminar las líneas de ITEM_*
+	for _, line := range envLines {
+		shouldSkip := false
+		for _, key := range itemKeys {
+			if strings.HasPrefix(strings.TrimSpace(line), key+"=") {
+				shouldSkip = true
+				break
+			}
+		}
+		if !shouldSkip {
+			updatedEnv = append(updatedEnv, line)
+		}
+	}
+
+	// Agregar las nuevas líneas de ITEM_*
+	for i := 0; i < 5; i++ {
+		var slug string
+		if i < len(req.Items) {
+			slug = req.Items[i]
+		}
+		updatedEnv = append(updatedEnv, fmt.Sprintf("%s=%s", itemKeys[i], slug))
+	}
+
+	// Escribir el archivo .env actualizado
+	newEnvContent := strings.Join(updatedEnv, "\n")
+	if err := os.WriteFile(".env", []byte(newEnvContent), 0644); err != nil {
+		http.Error(w, "error writing .env file", 500)
+		return
+	}
+
+	// Actualizar las variables de entorno en memoria para la sesión actual
+	for i := 0; i < 5; i++ {
+		var slug string
+		if i < len(req.Items) {
+			slug = req.Items[i]
+		}
+		os.Setenv(itemKeys[i], slug)
+	}
+
+	log.Info().Interface("items", req.Items).Msg("carousel items updated successfully")
+	writeJSON(w, 200, map[string]interface{}{
+		"status": "success",
+		"items":  req.Items,
+	})
 }

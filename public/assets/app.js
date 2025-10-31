@@ -929,3 +929,143 @@ if ('serviceWorker' in navigator) {
   updateFeaturedStatus();
   console.log('=== Destacada Admin inicializado correctamente ===');
 })();
+
+// Admin: Carrusel
+(function(){
+  const carouselList = document.getElementById('carouselList');
+  const refreshBtn = document.getElementById('refreshCarouselBtn');
+  const allProductsList = document.getElementById('allProductsList');
+  if(!carouselList || !allProductsList) return;
+  
+  const adminTokenEl = document.querySelector('[data-admin-token]');
+  const adminToken = adminTokenEl ? adminTokenEl.getAttribute('data-admin-token') : '';
+  
+  // Función para actualizar el estado de productos en el carrusel
+  function updateCarouselStatus(){
+    const carouselItems = document.querySelectorAll('#carouselList .carousel-item');
+    const carouselSlugs = new Set();
+    carouselItems.forEach(item => {
+      carouselSlugs.add(item.getAttribute('data-slug'));
+    });
+    
+    allProductsList.querySelectorAll('.admin-list-item').forEach(item => {
+      const slug = item.getAttribute('data-product-slug');
+      const carouselBtn = item.querySelector('[data-action="add-carousel"]');
+      if(carouselSlugs.has(slug)){
+        item.classList.add('in-carousel');
+        if(carouselBtn) {
+          carouselBtn.disabled = true;
+          carouselBtn.textContent = 'En Carrusel';
+        }
+      } else {
+        item.classList.remove('in-carousel');
+        if(carouselBtn) {
+          carouselBtn.disabled = false;
+          carouselBtn.textContent = 'Añadir al Carrusel';
+        }
+      }
+    });
+  }
+  
+  // Función para refrescar el carrusel
+  function refreshCarousel(){
+    location.reload();
+  }
+  
+  // Función para agregar producto al carrusel
+  function addToCarousel(slug){
+    const carouselItems = document.querySelectorAll('#carouselList .carousel-item');
+    const carouselSlugs = [];
+    carouselItems.forEach(item => {
+      const itemSlug = item.getAttribute('data-slug');
+      if(itemSlug) carouselSlugs.push(itemSlug);
+    });
+    
+    // Agregar el nuevo slug
+    if(carouselSlugs.length >= 5){
+      alert('El carrusel ya tiene el máximo de 5 productos');
+      return;
+    }
+    carouselSlugs.push(slug);
+    
+    fetch('/api/carousel/update', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + adminToken
+      },
+      body: JSON.stringify({items: carouselSlugs})
+    }).then(res => {
+      if(res.ok){
+        refreshCarousel();
+      } else {
+        res.text().then(text => {
+          console.error('Error response:', text);
+          alert('Error: ' + text);
+        });
+      }
+    }).catch(err => {
+      console.error('Fetch error:', err);
+      alert('Error: ' + err);
+    });
+  }
+  
+  // Función para quitar producto del carrusel
+  function removeFromCarousel(slug){
+    if(!confirm('¿Quitar este producto del carrusel?')) return;
+    
+    const carouselItems = document.querySelectorAll('#carouselList .carousel-item');
+    const carouselSlugs = [];
+    carouselItems.forEach(item => {
+      const itemSlug = item.getAttribute('data-slug');
+      if(itemSlug && itemSlug !== slug) carouselSlugs.push(itemSlug);
+    });
+    
+    fetch('/api/carousel/update', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + adminToken
+      },
+      body: JSON.stringify({items: carouselSlugs})
+    }).then(res => {
+      if(res.ok){
+        refreshCarousel();
+      } else {
+        res.text().then(text => alert('Error: ' + text));
+      }
+    }).catch(err => alert('Error: ' + err));
+  }
+  
+  // Event delegation para carrusel
+  if(carouselList){
+    carouselList.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action="remove-carousel"]');
+      if(btn){
+        const item = btn.closest('.carousel-item');
+        const slug = item.getAttribute('data-slug');
+        removeFromCarousel(slug);
+      }
+    });
+  }
+  
+  // Event delegation para agregar al carrusel
+  if(allProductsList){
+    allProductsList.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action="add-carousel"]');
+      if(btn && !btn.disabled){
+        const item = btn.closest('.admin-list-item');
+        const slug = item.getAttribute('data-product-slug');
+        addToCarousel(slug);
+      }
+    });
+  }
+  
+  // Botón de refrescar carrusel
+  if(refreshBtn){
+    refreshBtn.addEventListener('click', refreshCarousel);
+  }
+  
+  // Actualizar estado al cargar
+  updateCarouselStatus();
+})();
