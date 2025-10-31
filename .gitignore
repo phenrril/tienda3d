@@ -27,6 +27,9 @@ go.work.sum
 # env file
 .env
 
+# carousel configuration
+carousel.json
+
 Caddyfile
 # Editor/IDE
 # .idea/
