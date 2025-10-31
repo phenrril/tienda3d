@@ -16,6 +16,7 @@ import (
 	"net/smtp"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -2978,17 +2979,34 @@ func (s *Server) apiFeaturedRemove(w http.ResponseWriter, r *http.Request) {
 }
 
 // API Carousel
-const carouselFilePath = "carousel.json"
+const carouselFileSubdir = "config"
+
+// getCarouselFilePath devuelve la ruta absoluta al archivo de carrusel
+func getCarouselFilePath() string {
+	base := os.Getenv("STORAGE_DIR")
+	if strings.TrimSpace(base) == "" {
+		base = "uploads"
+	}
+	// uploads/config
+	dir := base
+	if carouselFileSubdir != "" {
+		dir = dir + string(os.PathSeparator) + carouselFileSubdir
+	}
+	// Intentar crear el directorio si no existe
+	_ = os.MkdirAll(dir, 0755)
+	return dir + string(os.PathSeparator) + "carousel.json"
+}
 
 // loadCarouselItems carga los items del carrusel desde el archivo JSON
 func loadCarouselItems() []string {
-	data, err := os.ReadFile(carouselFilePath)
+	path := getCarouselFilePath()
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Si el archivo no existe, retornar lista vacía
 			return make([]string, 5)
 		}
-		log.Error().Err(err).Msg("error reading carousel.json")
+		log.Error().Err(err).Str("path", path).Msg("error reading carousel.json")
 		return make([]string, 5)
 	}
 
@@ -2996,7 +3014,7 @@ func loadCarouselItems() []string {
 		Items []string `json:"items"`
 	}
 	if err := json.Unmarshal(data, &carouselData); err != nil {
-		log.Error().Err(err).Msg("error parsing carousel.json")
+		log.Error().Err(err).Str("path", path).Msg("error parsing carousel.json")
 		return make([]string, 5)
 	}
 
@@ -3034,7 +3052,10 @@ func saveCarouselItems(items []string) error {
 		return fmt.Errorf("error marshaling carousel data: %w", err)
 	}
 
-	if err := os.WriteFile(carouselFilePath, data, 0644); err != nil {
+	path := getCarouselFilePath()
+	// Asegurarnos de que el directorio existe (por si falla arriba)
+	_ = os.MkdirAll(filepath.Dir(path), 0755)
+	if err := os.WriteFile(path, data, 0644); err != nil {
 		return fmt.Errorf("error writing carousel.json: %w", err)
 	}
 
