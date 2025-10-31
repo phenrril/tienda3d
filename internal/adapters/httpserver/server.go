@@ -270,19 +270,13 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Leer los productos del carrusel desde .env y obtener sus imágenes
+	// Leer los productos del carrusel desde carousel.json y obtener sus imágenes
 	type carouselItem struct {
 		Slug  string
 		Image string
 		Alt   string
 	}
-	itemSlugs := []string{
-		os.Getenv("ITEM_1"),
-		os.Getenv("ITEM_2"),
-		os.Getenv("ITEM_3"),
-		os.Getenv("ITEM_4"),
-		os.Getenv("ITEM_5"),
-	}
+	itemSlugs := loadCarouselItems()
 
 	carouselItems := []carouselItem{}
 	for _, slug := range itemSlugs {
@@ -2277,14 +2271,8 @@ func (s *Server) handleAdminDestacada(w http.ResponseWriter, r *http.Request) {
 	featured, _ := s.featuredProducts.FindAll(r.Context())
 	log.Info().Int("featured_count", len(featured)).Msg("loaded featured products")
 
-	// Cargar productos actuales del carrusel desde .env
-	carouselSlugs := []string{
-		os.Getenv("ITEM_1"),
-		os.Getenv("ITEM_2"),
-		os.Getenv("ITEM_3"),
-		os.Getenv("ITEM_4"),
-		os.Getenv("ITEM_5"),
-	}
+	// Cargar productos actuales del carrusel desde carousel.json
+	carouselSlugs := loadCarouselItems()
 
 	// Obtener información de los productos del carrusel
 	carouselProducts := make([]map[string]interface{}, 0, len(carouselSlugs))
@@ -2990,6 +2978,69 @@ func (s *Server) apiFeaturedRemove(w http.ResponseWriter, r *http.Request) {
 }
 
 // API Carousel
+const carouselFilePath = "carousel.json"
+
+// loadCarouselItems carga los items del carrusel desde el archivo JSON
+func loadCarouselItems() []string {
+	data, err := os.ReadFile(carouselFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Si el archivo no existe, retornar lista vacía
+			return make([]string, 5)
+		}
+		log.Error().Err(err).Msg("error reading carousel.json")
+		return make([]string, 5)
+	}
+
+	var carouselData struct {
+		Items []string `json:"items"`
+	}
+	if err := json.Unmarshal(data, &carouselData); err != nil {
+		log.Error().Err(err).Msg("error parsing carousel.json")
+		return make([]string, 5)
+	}
+
+	// Asegurar que siempre tenemos 5 items (llenar con strings vacíos si faltan)
+	items := make([]string, 5)
+	for i := 0; i < 5; i++ {
+		if i < len(carouselData.Items) {
+			items[i] = carouselData.Items[i]
+		} else {
+			items[i] = ""
+		}
+	}
+	return items
+}
+
+// saveCarouselItems guarda los items del carrusel en el archivo JSON
+func saveCarouselItems(items []string) error {
+	// Asegurar que siempre tenemos máximo 5 items
+	if len(items) > 5 {
+		items = items[:5]
+	}
+	// Rellenar hasta 5 con strings vacíos si faltan
+	for len(items) < 5 {
+		items = append(items, "")
+	}
+
+	carouselData := struct {
+		Items []string `json:"items"`
+	}{
+		Items: items,
+	}
+
+	data, err := json.MarshalIndent(carouselData, "", "  ")
+	if err != nil {
+		return fmt.Errorf("error marshaling carousel data: %w", err)
+	}
+
+	if err := os.WriteFile(carouselFilePath, data, 0644); err != nil {
+		return fmt.Errorf("error writing carousel.json: %w", err)
+	}
+
+	return nil
+}
+
 func (s *Server) apiCarouselUpdate(w http.ResponseWriter, r *http.Request) {
 	if !s.requireAdmin(w, r) {
 		return
@@ -3029,56 +3080,11 @@ func (s *Server) apiCarouselUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Leer el archivo .env actual
-	envContent, err := os.ReadFile(".env")
-	if err != nil {
-		http.Error(w, "error reading .env file", 500)
+	// Guardar los items del carrusel en el archivo JSON
+	if err := saveCarouselItems(req.Items); err != nil {
+		log.Error().Err(err).Msg("error saving carousel items")
+		http.Error(w, fmt.Sprintf("error saving carousel items: %v", err), 500)
 		return
-	}
-
-	envLines := strings.Split(string(envContent), "\n")
-
-	// Crear mapa de las líneas para actualizar
-	updatedEnv := make([]string, 0, len(envLines))
-	itemKeys := []string{"ITEM_1", "ITEM_2", "ITEM_3", "ITEM_4", "ITEM_5"}
-
-	// Primero, eliminar las líneas de ITEM_*
-	for _, line := range envLines {
-		shouldSkip := false
-		for _, key := range itemKeys {
-			if strings.HasPrefix(strings.TrimSpace(line), key+"=") {
-				shouldSkip = true
-				break
-			}
-		}
-		if !shouldSkip {
-			updatedEnv = append(updatedEnv, line)
-		}
-	}
-
-	// Agregar las nuevas líneas de ITEM_*
-	for i := 0; i < 5; i++ {
-		var slug string
-		if i < len(req.Items) {
-			slug = req.Items[i]
-		}
-		updatedEnv = append(updatedEnv, fmt.Sprintf("%s=%s", itemKeys[i], slug))
-	}
-
-	// Escribir el archivo .env actualizado
-	newEnvContent := strings.Join(updatedEnv, "\n")
-	if err := os.WriteFile(".env", []byte(newEnvContent), 0644); err != nil {
-		http.Error(w, "error writing .env file", 500)
-		return
-	}
-
-	// Actualizar las variables de entorno en memoria para la sesión actual
-	for i := 0; i < 5; i++ {
-		var slug string
-		if i < len(req.Items) {
-			slug = req.Items[i]
-		}
-		os.Setenv(itemKeys[i], slug)
 	}
 
 	log.Info().Interface("items", req.Items).Msg("carousel items updated successfully")
