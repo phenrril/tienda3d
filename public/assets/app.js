@@ -414,6 +414,11 @@ if ('serviceWorker' in navigator) {
   const fWidth=document.getElementById('pfWidth');
   const fHeight=document.getElementById('pfHeight');
   const fDepth=document.getElementById('pfDepth');
+  const fObservation=document.getElementById('pfObservation');
+  const fGrams=document.getElementById('pfGrams');
+  const fHours=document.getElementById('pfHours');
+  const fGrossPrice=document.getElementById('pfGrossPrice');
+  const fProfit=document.getElementById('pfProfit');
   const btnDel=document.getElementById('pfDelete');
   const btnReset=document.getElementById('pfReset');
   const btnSubmit=document.getElementById('pfSubmit');
@@ -437,7 +442,7 @@ if ('serviceWorker' in navigator) {
     const tr=document.querySelector('tr[data-slug="'+CSS.escape(slug)+'"]');
     if(!tr) return;
     const tds=tr.querySelectorAll('td');
-    if(tds && tds[7]){ tds[7].textContent = String(count|0); }
+    if(tds && tds[12]){ tds[12].textContent = String(count|0); }
   }
   async function reloadProductAndSync(){
     const slug=getCurrentSlug(); if(!slug) return;
@@ -477,11 +482,11 @@ if ('serviceWorker' in navigator) {
   }
   function fill(p){
     if(!p) return;
-    if(fSlug) fSlug.value=p.Slug||''; if(fName) fName.value=p.Name||''; if(fCat) fCat.value=p.Category||''; if(fDesc) fDesc.value=p.ShortDesc||''; if(fPrice) fPrice.value=p.BasePrice!=null?p.BasePrice:''; if(fReady) fReady.checked=!!p.ReadyToShip; if(fWidth) fWidth.value=p.WidthMM||0; if(fHeight) fHeight.value=p.HeightMM||0; if(fDepth) fDepth.value=p.DepthMM||0; if(btnDel) btnDel.style.display=''; setModeEdit(true);
+    if(fSlug) fSlug.value=p.Slug||''; if(fName) fName.value=p.Name||''; if(fCat) fCat.value=p.Category||''; if(fDesc) fDesc.value=p.ShortDesc||''; if(fPrice) fPrice.value=p.BasePrice!=null?p.BasePrice:''; if(fReady) fReady.checked=!!p.ReadyToShip; if(fWidth) fWidth.value=p.WidthMM||0; if(fHeight) fHeight.value=p.HeightMM||0; if(fDepth) fDepth.value=p.DepthMM||0; if(fObservation) fObservation.value=p.Observation||''; if(fGrams) fGrams.value=p.Grams||0; if(fHours) fHours.value=p.Hours||0; if(fGrossPrice) fGrossPrice.value=p.GrossPrice||0; if(fProfit) fProfit.value=p.Profit||0; if(btnDel) btnDel.style.display=''; setModeEdit(true);
     renderGallery((p && p.Images) || []);
     scrollToForm();
   }
-  function clear(){ if(form) form.reset(); if(fSlug) fSlug.value=''; if(btnDel) btnDel.style.display='none'; if(btnManage) btnManage.style.display='none'; if(fWidth) fWidth.value=''; if(fHeight) fHeight.value=''; if(fDepth) fDepth.value=''; if(imagesInput) imagesInput.value=''; if(preview) preview.innerHTML=''; if(dzCount) dzCount.textContent='0 archivos'; setModeEdit(false); selectedIDs.clear(); updateSelectionUI(); renderGallery([]); }
+  function clear(){ if(form) form.reset(); if(fSlug) fSlug.value=''; if(btnDel) btnDel.style.display='none'; if(btnManage) btnManage.style.display='none'; if(fWidth) fWidth.value=''; if(fHeight) fHeight.value=''; if(fDepth) fDepth.value=''; if(fObservation) fObservation.value=''; if(fGrams) fGrams.value=''; if(fHours) fHours.value=''; if(fGrossPrice) fGrossPrice.value=''; if(fProfit) fProfit.value=''; if(imagesInput) imagesInput.value=''; if(preview) preview.innerHTML=''; if(dzCount) dzCount.textContent='0 archivos'; setModeEdit(false); selectedIDs.clear(); updateSelectionUI(); renderGallery([]); }
 
   function renderGallery(imgs){
     const g=document.getElementById('imgGallery'); if(!g) return;
@@ -558,7 +563,7 @@ if ('serviceWorker' in navigator) {
   form.addEventListener('submit', async e=>{
     e.preventDefault();
     const slug=(fSlug&&fSlug.value.trim())||'';
-    const payload={ name:(fName&&fName.value.trim())||'', category:(fCat&&fCat.value.trim())||'', short_desc:(fDesc&&fDesc.value)||'', base_price:parseFloat((fPrice&&fPrice.value)||'0'), ready_to_ship:!!(fReady&&fReady.checked), width_mm:parseFloat((fWidth&&fWidth.value)||'0'), height_mm:parseFloat((fHeight&&fHeight.value)||'0'), depth_mm:parseFloat((fDepth&&fDepth.value)||'0') };
+    const payload={ name:(fName&&fName.value.trim())||'', category:(fCat&&fCat.value.trim())||'', short_desc:(fDesc&&fDesc.value)||'', base_price:parseFloat((fPrice&&fPrice.value)||'0'), ready_to_ship:!!(fReady&&fReady.checked), width_mm:parseFloat((fWidth&&fWidth.value)||'0'), height_mm:parseFloat((fHeight&&fHeight.value)||'0'), depth_mm:parseFloat((fDepth&&fDepth.value)||'0'), observation:(fObservation&&fObservation.value)||'', grams:parseFloat((fGrams&&fGrams.value)||'0'), hours:parseFloat((fHours&&fHours.value)||'0'), gross_price:parseFloat((fGrossPrice&&fGrossPrice.value)||'0'), profit:parseFloat((fProfit&&fProfit.value)||'0') };
     if(!payload.name){ alert('Nombre requerido'); return; }
     if(payload.base_price<0){ alert('Precio inválido'); return; }
     let method='POST', url='/api/products'; if(slug){ method='PUT'; url='/api/products/'+encodeURIComponent(slug); }

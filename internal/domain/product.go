@@ -17,6 +17,11 @@ type Product struct {
 	WidthMM     float64   `gorm:"type:decimal(8,2);default:0"`
 	HeightMM    float64   `gorm:"type:decimal(8,2);default:0"`
 	DepthMM     float64   `gorm:"type:decimal(8,2);default:0"`
+	Observation string    `gorm:"type:text"`
+	Grams       float64   `gorm:"type:decimal(8,2);default:0"`
+	Hours       float64   `gorm:"type:decimal(8,2);default:0"`
+	Profit      float64   `gorm:"type:decimal(12,2);default:0"`
+	GrossPrice  float64   `gorm:"type:decimal(12,2);default:0"`
 	Images      []Image
 	Variants    []Variant
 	CreatedAt   time.Time

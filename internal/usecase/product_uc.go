@@ -35,6 +35,11 @@ func (uc *ProductUC) Create(ctx context.Context, p *domain.Product) error {
 	return uc.Products.Save(ctx, p)
 }
 
+func (uc *ProductUC) Update(ctx context.Context, p *domain.Product) error {
+	// No regeneramos el slug en actualizaciones
+	return uc.Products.Save(ctx, p)
+}
+
 func (uc *ProductUC) AddImages(ctx context.Context, productID uuid.UUID, imgs []domain.Image) error {
 	return uc.Products.AddImages(ctx, productID, imgs)
 }
