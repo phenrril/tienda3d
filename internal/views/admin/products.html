@@ -20,6 +20,15 @@
       </div>
       <label>Precio base<input type="number" step="0.01" min="0" name="base_price" id="pfPrice" required placeholder="0.00" /></label>
       <label class="row center" style="gap:.5rem"><input type="checkbox" name="ready_to_ship" id="pfReady" /> Listo para envío</label>
+      <label>Observación<textarea name="observation" id="pfObservation" placeholder="Notas internas"></textarea></label>
+      <div class="row" style="gap:.5rem">
+        <label style="flex:1">Gramos<input type="number" step="0.01" min="0" id="pfGrams" placeholder="0" /></label>
+        <label style="flex:1">Horas<input type="number" step="0.1" min="0" id="pfHours" placeholder="0" /></label>
+      </div>
+      <div class="row" style="gap:.5rem">
+        <label style="flex:1">Precio bruto<input type="number" step="0.01" min="0" id="pfGrossPrice" placeholder="0.00" /></label>
+        <label style="flex:1">Ganancia<input type="number" step="0.01" min="0" id="pfProfit" placeholder="0.00" /></label>
+      </div>
       <div class="uploader-block">
         <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;letter-spacing:.6px;color:var(--muted);text-transform:uppercase">Imágenes (opcional / arrastrar)
           <div id="dropZone" class="dropzone small" style="padding:18px 14px">
@@ -81,9 +90,9 @@
         {{end}}
       </select>
     </div>
-    <div style="overflow:auto">
-      <table class="table" id="prodTable" style="font-size:0.8rem;min-width:880px">
-        <thead><tr><th>Nombre</th><th>Slug</th><th>Precio</th><th>Categoría</th><th>W</th><th>H</th><th>D</th><th>Stock</th><th>Imgs</th><th style="text-align:right">Acciones</th></tr></thead>
+    <div>
+      <table class="table" id="prodTable" style="font-size:0.9rem;width:100%">
+        <thead><tr><th>Nombre</th><th>Slug</th><th>Precio</th><th>Categoría</th><th>W</th><th>H</th><th>D</th><th>Stock</th><th>Gramos</th><th>Horas</th><th>P. Bruto</th><th>Ganancia</th><th>Imgs</th><th style="text-align:right">Acciones</th></tr></thead>
         <tbody>
           {{range .Products}}
           <tr data-slug="{{.Slug}}" data-category="{{.Category}}">
@@ -95,6 +104,10 @@
             <td>{{printf "%.0f" .HeightMM}}</td>
             <td>{{printf "%.0f" .DepthMM}}</td>
             <td>{{if .ReadyToShip}}✔{{else}}-{{end}}</td>
+            <td>{{printf "%.0f" .Grams}}</td>
+            <td>{{printf "%.1f" .Hours}}</td>
+            <td>${{printf "%.2f" .GrossPrice}}</td>
+            <td>${{printf "%.2f" .Profit}}</td>
             <td>{{len .Images}}</td>
             <td style="text-align:right">
               <div class="table-actions">

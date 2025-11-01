@@ -613,6 +613,11 @@ func (s *Server) apiProducts(w http.ResponseWriter, r *http.Request) {
 			WidthMM     float64 `json:"width_mm"`
 			HeightMM    float64 `json:"height_mm"`
 			DepthMM     float64 `json:"depth_mm"`
+			Observation string  `json:"observation"`
+			Grams       float64 `json:"grams"`
+			Hours       float64 `json:"hours"`
+			Profit      float64 `json:"profit"`
+			GrossPrice  float64 `json:"gross_price"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "json", 400)
@@ -622,7 +627,7 @@ func (s *Server) apiProducts(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "datos", 400)
 			return
 		}
-		p := &domain.Product{Name: req.Name, Category: req.Category, ShortDesc: req.ShortDesc, BasePrice: req.BasePrice, ReadyToShip: req.ReadyToShip, WidthMM: req.WidthMM, HeightMM: req.HeightMM, DepthMM: req.DepthMM}
+		p := &domain.Product{Name: req.Name, Category: req.Category, ShortDesc: req.ShortDesc, BasePrice: req.BasePrice, ReadyToShip: req.ReadyToShip, WidthMM: req.WidthMM, HeightMM: req.HeightMM, DepthMM: req.DepthMM, Observation: req.Observation, Grams: req.Grams, Hours: req.Hours, Profit: req.Profit, GrossPrice: req.GrossPrice}
 		if err := s.products.Create(r.Context(), p); err != nil {
 			http.Error(w, "crear", 500)
 			return
@@ -671,6 +676,11 @@ func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {
 			WidthMM     *float64 `json:"width_mm"`
 			HeightMM    *float64 `json:"height_mm"`
 			DepthMM     *float64 `json:"depth_mm"`
+			Observation *string  `json:"observation"`
+			Grams       *float64 `json:"grams"`
+			Hours       *float64 `json:"hours"`
+			Profit      *float64 `json:"profit"`
+			GrossPrice  *float64 `json:"gross_price"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "json", 400)
@@ -700,7 +710,22 @@ func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {
 		if req.DepthMM != nil && *req.DepthMM >= 0 {
 			p.DepthMM = *req.DepthMM
 		}
-		if err := s.products.Create(r.Context(), p); err != nil {
+		if req.Observation != nil {
+			p.Observation = *req.Observation
+		}
+		if req.Grams != nil && *req.Grams >= 0 {
+			p.Grams = *req.Grams
+		}
+		if req.Hours != nil && *req.Hours >= 0 {
+			p.Hours = *req.Hours
+		}
+		if req.Profit != nil && *req.Profit >= 0 {
+			p.Profit = *req.Profit
+		}
+		if req.GrossPrice != nil && *req.GrossPrice >= 0 {
+			p.GrossPrice = *req.GrossPrice
+		}
+		if err := s.products.Update(r.Context(), p); err != nil {
 			http.Error(w, "save", 500)
 			return
 		}
@@ -1661,6 +1686,11 @@ func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 		wm, _ := strconv.ParseFloat(r.FormValue("width_mm"), 64)
 		hm, _ := strconv.ParseFloat(r.FormValue("height_mm"), 64)
 		dm, _ := strconv.ParseFloat(r.FormValue("depth_mm"), 64)
+		obs := r.FormValue("observation")
+		gr, _ := strconv.ParseFloat(r.FormValue("grams"), 64)
+		hr, _ := strconv.ParseFloat(r.FormValue("hours"), 64)
+		prof, _ := strconv.ParseFloat(r.FormValue("profit"), 64)
+		gross, _ := strconv.ParseFloat(r.FormValue("gross_price"), 64)
 		if wm < 0 {
 			wm = 0
 		}
@@ -1670,7 +1700,19 @@ func (s *Server) apiProductUpload(w http.ResponseWriter, r *http.Request) {
 		if dm < 0 {
 			dm = 0
 		}
-		p = &domain.Product{Name: name, Category: cat, ShortDesc: sdesc, BasePrice: bp, ReadyToShip: ready, WidthMM: wm, HeightMM: hm, DepthMM: dm}
+		if gr < 0 {
+			gr = 0
+		}
+		if hr < 0 {
+			hr = 0
+		}
+		if prof < 0 {
+			prof = 0
+		}
+		if gross < 0 {
+			gross = 0
+		}
+		p = &domain.Product{Name: name, Category: cat, ShortDesc: sdesc, BasePrice: bp, ReadyToShip: ready, WidthMM: wm, HeightMM: hm, DepthMM: dm, Observation: obs, Grams: gr, Hours: hr, Profit: prof, GrossPrice: gross}
 		if err := s.products.Create(r.Context(), p); err != nil {
 			log.Error().Err(err).Msg("crear producto")
 			http.Error(w, "crear", 500)
