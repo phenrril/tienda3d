@@ -32,8 +32,8 @@
   </div>
   <div class="pd-info">
     <div class="pd-badges">
-      {{if .Product.ReadyToShip}}<span class="pd-badge ready">✓ Listo para enviar</span>{{end}}
-      <span class="pd-badge guarantee">🛡️ Garantía</span>
+      <span class="pd-badge eco">🌱 Impresión 3D</span>
+      <span class="pd-badge custom">✨ Personalizable</span>
     </div>
     <h1 class="pd-title">{{.Product.Name}}</h1>
     <div class="pd-price-box">
@@ -51,6 +51,44 @@
       </a>
       <span id="addedMsg" class="added-msg" {{if ne .Added 1}}hidden{{end}}>{{if eq .Added 1}}✓ Agregado!{{end}}</span>
     </div>
+    <div class="pd-details">
+      <h2 class="pd-section-title">Sobre el producto</h2>
+      <p class="pd-desc">{{.Product.ShortDesc}}</p>
+      <div class="pd-specs">
+        <div class="spec-item">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          <div>
+            <div class="spec-label">Categoría</div>
+            <div class="spec-value">{{.Product.Category}}</div>
+          </div>
+        </div>
+        <div class="spec-item">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+          <div>
+            <div class="spec-label">Dimensiones aproximadas</div>
+            <div class="spec-value">{{printf "%.0f" .Product.WidthMM}} × {{printf "%.0f" .Product.HeightMM}} × {{printf "%.0f" .Product.DepthMM}} mm</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <form method="post" action="/cart" class="pd-form" id="pdForm">
+      <input type="hidden" name="slug" value="{{.Product.Slug}}" />
+      <div class="color-picker">
+        <h3 class="pd-section-title">Elegí tu color <span id="colorPreview" class="color-dot" style="vertical-align:middle;margin-left:8px"></span></h3>
+        <div class="cp-swatches" id="cpSwatches">
+          {{range $i,$c := .Colors}}
+            <button type="button" class="swatch {{if eq $i 0}}active{{end}}" data-color="{{$c}}" style="--c: {{colorhex $c}}" aria-label="Seleccionar color {{$c}}" role="radio" aria-checked="{{if eq $i 0}}true{{else}}false{{end}}"></button>
+          {{end}}
+          <button type="button" class="swatch swatch-other" data-color="" aria-label="Seleccionar otro color" title="Otro" role="radio" aria-checked="false"></button>
+        </div>
+        <div class="custom-color-row" id="customColorRow" style="display:none">
+          <input type="text" id="customColorInput" placeholder="Escribe el color (ej: rojo o #ff0000)" autocomplete="off" />
+        </div>
+        <input type="hidden" name="color" id="colorInput" value="{{.DefaultColor}}" aria-describedby="color-desc" />
+        <p id="color-desc" class="sr-only">Selecciona el color del producto</p>
+      </div>
+      
+    </form>
     <div class="trust-signals">
       <div class="trust-item">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -91,50 +129,12 @@
       </div>
       <span class="share-msg" id="shareMsg" role="status" aria-live="polite" style="display:none"></span>
     </div>
-    <div class="pd-details">
-      <h2 class="pd-section-title">Sobre el producto</h2>
-      <p class="pd-desc">{{.Product.ShortDesc}}</p>
-      <div class="pd-specs">
-        <div class="spec-item">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-          <div>
-            <div class="spec-label">Categoría</div>
-            <div class="spec-value">{{.Product.Category}}</div>
-          </div>
-        </div>
-        <div class="spec-item">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
-          <div>
-            <div class="spec-label">Dimensiones aproximadas</div>
-            <div class="spec-value">{{printf "%.0f" .Product.WidthMM}} × {{printf "%.0f" .Product.HeightMM}} × {{printf "%.0f" .Product.DepthMM}} mm</div>
-          </div>
-        </div>
-      </div>
-    </div>
     <div class="pd-note" role="note">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
       <div>
         <strong>Importante:</strong> el tiempo de impresión depende del tamaño de cada pieza. Para cualquier consulta, escribinos por <a href="https://wa.me/5493416219815" target="_blank" rel="noopener">WhatsApp</a>.
       </div>
     </div>
-    <form method="post" action="/cart" class="pd-form" id="pdForm">
-      <input type="hidden" name="slug" value="{{.Product.Slug}}" />
-      <div class="color-picker">
-        <h3 class="pd-section-title">Elegí tu color <span id="colorPreview" class="color-dot" style="vertical-align:middle;margin-left:8px"></span></h3>
-        <div class="cp-swatches" id="cpSwatches">
-          {{range $i,$c := .Colors}}
-            <button type="button" class="swatch {{if eq $i 0}}active{{end}}" data-color="{{$c}}" style="--c: {{colorhex $c}}" aria-label="Seleccionar color {{$c}}" role="radio" aria-checked="{{if eq $i 0}}true{{else}}false{{end}}"></button>
-          {{end}}
-          <button type="button" class="swatch swatch-other" data-color="" aria-label="Seleccionar otro color" title="Otro" role="radio" aria-checked="false"></button>
-        </div>
-        <div class="custom-color-row" id="customColorRow" style="display:none">
-          <input type="text" id="customColorInput" placeholder="Escribe el color (ej: rojo o #ff0000)" autocomplete="off" />
-        </div>
-        <input type="hidden" name="color" id="colorInput" value="{{.DefaultColor}}" aria-describedby="color-desc" />
-        <p id="color-desc" class="sr-only">Selecciona el color del producto</p>
-      </div>
-      
-    </form>
     <div class="pd-mobile-sticky" id="pdMobileSticky" style="display:none">
       <div class="sticky-content">
         <div class="sticky-info">
