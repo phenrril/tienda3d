@@ -15,26 +15,25 @@
 </form>
 
 <div class="mobile-actions">
-  <button class="btn-filter" aria-expanded="false" aria-controls="filterDrawer">Filtrar</button>
+  <button class="btn-filter" aria-expanded="false" aria-controls="filterSheet">Filtrar</button>
   <button class="btn-sort" aria-expanded="false" aria-controls="sortSheet">Ordenar</button>
-  <noscript><style>.filters-row{display:block!important}</style></noscript>
 </div>
 
-<aside id="filterDrawer" class="drawer" hidden aria-hidden="true">
-  <form id="filtersForm" method="get" action="/products" class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
-    <header class="drawer-head">
-      <h2 id="drawerTitle">Filtrar</h2>
-      <button type="button" class="drawer-close" aria-label="Cerrar">×</button>
+<div id="filterSheet" class="sheet" hidden aria-hidden="true">
+  <form id="filtersForm" method="get" action="/products">
+    <header class="sheet-head">
+      <h2>Filtrar</h2>
+      <button type="button" class="sheet-close" aria-label="Cerrar">×</button>
     </header>
-
-    <div class="drawer-body">
+    
+    <div style="margin-top:16px;display:grid;gap:16px">
       <div class="field">
         <label for="q">Buscar por nombre</label>
-        <input id="q" type="text" name="q" value="{{.Query}}" placeholder="Buscar..." />
+        <input id="q" type="text" name="q" value="{{.Query}}" placeholder="Buscar..." style="width:100%;height:44px" />
       </div>
       <div class="field">
         <label for="category">Categoría</label>
-        <select id="category" name="category">
+        <select id="category" name="category" style="width:100%;height:44px">
           <option value="">Todas las categorías</option>
           {{range .Categories}}
             <option value="{{.}}" {{if eq $.Category .}}selected{{end}}>{{.}}</option>
@@ -42,14 +41,14 @@
         </select>
       </div>
       <input type="hidden" id="sortInput" name="sort" value="{{.Sort}}">
+      
+      <div style="display:flex;gap:12px;margin-top:8px">
+        <button type="submit" class="btn-primary" style="flex:1;height:44px">Aplicar</button>
+        <a class="link-reset" href="/products" style="align-self:center">Limpiar</a>
+      </div>
     </div>
-
-    <footer class="drawer-foot">
-      <button type="submit" class="btn-primary">Aplicar</button>
-      <a class="link-reset" href="/products">Limpiar</a>
-    </footer>
   </form>
-</aside>
+</div>
 
 <div id="sortSheet" class="sheet" hidden aria-hidden="true">
   <header class="sheet-head">
