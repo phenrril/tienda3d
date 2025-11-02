@@ -137,7 +137,7 @@ body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantar
 .card-price{font-size:20px;font-weight:800;color:#fff}
 .card-ready-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;background:#064e3b;color:#34d399;font-size:11px;font-weight:600;border-radius:6px;border:1px solid #065f46}
 .card-media{position:relative;background:#0f1822;min-height:150px;display:flex;align-items:center;justify-content:center}
-.card-media img{width:100%;height:180px;object-fit:contain;display:block}
+.card-media img{width:100%;height:100%;object-fit:cover;object-position:center;display:block}
 .placeholder{color:#64748b}
 .badges{position:absolute;top:8px;left:8px;display:flex;gap:6px}
 .badge{font-size:11px;padding:4px 8px;border-radius:999px;background:#1e293b;color:#cbd5e1;border:1px solid #334155}
@@ -441,7 +441,7 @@ body.drawer-open .drawer{pointer-events:auto;opacity:1}
 
 /* Aspect ratio 1:1 */
 .ar-1-1{aspect-ratio:1/1;overflow:hidden;border-radius:18px;background:#0f172a}
-.card-img{width:100%;height:100%;object-fit:contain;display:block}
+.card-img{width:100%;height:100%;object-fit:cover;object-position:center;display:block}
 
 /* Full width CTA */
 .btn-full{width:100%}
