@@ -67,46 +67,60 @@
   document.addEventListener('keydown',e=>{if(e.key==='Escape' && bd && !bd.hidden) close();});
 })();
 
-// Products drawer/sheet + chips + load more
+// Products sheet + chips + load more
 (function(){
   const filterBtn=document.querySelector('.btn-filter');
   const sortBtn=document.querySelector('.btn-sort');
-  const drawer=document.getElementById('filterDrawer');
-  const drawerClose=drawer?drawer.querySelector('.drawer-close'):null;
-  const panel=drawer?drawer.querySelector('.drawer-panel'):null;
-  const sheet=document.getElementById('sortSheet');
+  const filterSheet=document.getElementById('filterSheet');
+  const filterSheetClose=filterSheet?filterSheet.querySelector('.sheet-close'):null;
+  const sortSheet=document.getElementById('sortSheet');
+  const sortSheetClose=sortSheet?sortSheet.querySelector('.sheet-close'):null;
   const form=document.getElementById('filtersForm');
   const sortInput=document.getElementById('sortInput');
 
-  function openDrawer(){
-    if(!drawer) return;
-    drawer.hidden=false;
-    drawer.setAttribute('aria-hidden','false');
+  function openFilterSheet(){
+    if(!filterSheet) return;
+    filterSheet.hidden=false;
     filterBtn&&filterBtn.setAttribute('aria-expanded','true');
-    document.body.classList.add('drawer-open');
-    const first=panel&&panel.querySelector('input, select, button');
-    if(first) first.focus();
   }
-  function closeDrawer(){
-    if(!drawer) return;
-    drawer.hidden=true;
-    drawer.setAttribute('aria-hidden','true');
+  function closeFilterSheet(){
+    if(!filterSheet) return;
+    filterSheet.hidden=true;
     filterBtn&&filterBtn.setAttribute('aria-expanded','false');
-    document.body.classList.remove('drawer-open');
   }
-  function openSheet(){ if(!sheet) return; sheet.hidden=false; sortBtn&&sortBtn.setAttribute('aria-expanded','true'); }
-  function closeSheet(){ if(!sheet) return; sheet.hidden=true;  sortBtn&&sortBtn.setAttribute('aria-expanded','false'); }
+  function openSortSheet(){
+    if(!sortSheet) return;
+    sortSheet.hidden=false;
+    sortBtn&&sortBtn.setAttribute('aria-expanded','true');
+  }
+  function closeSortSheet(){
+    if(!sortSheet) return;
+    sortSheet.hidden=true;
+    sortBtn&&sortBtn.setAttribute('aria-expanded','false');
+  }
 
-  filterBtn&&filterBtn.addEventListener('click',openDrawer);
-  drawerClose&&drawerClose.addEventListener('click',closeDrawer);
-  sortBtn&&sortBtn.addEventListener('click',()=>{ if(sheet&&sheet.hidden){ openSheet(); } else { closeSheet(); } });
-  window.addEventListener('keydown',(e)=>{
-    if(e.key==='Escape'){
-      if(drawer&&!drawer.hidden) closeDrawer();
-      if(sheet&&!sheet.hidden) closeSheet();
+  filterBtn&&filterBtn.addEventListener('click',()=>{
+    if(filterSheet&&filterSheet.hidden){
+      openFilterSheet();
+    }else{
+      closeFilterSheet();
     }
   });
-  if(drawer){ drawer.addEventListener('click',(e)=>{ if(e.target===drawer) closeDrawer(); }); }
+  filterSheetClose&&filterSheetClose.addEventListener('click',closeFilterSheet);
+  sortBtn&&sortBtn.addEventListener('click',()=>{
+    if(sortSheet&&sortSheet.hidden){
+      openSortSheet();
+    }else{
+      closeSortSheet();
+    }
+  });
+  sortSheetClose&&sortSheetClose.addEventListener('click',closeSortSheet);
+  window.addEventListener('keydown',(e)=>{
+    if(e.key==='Escape'){
+      if(filterSheet&&!filterSheet.hidden) closeFilterSheet();
+      if(sortSheet&&!sortSheet.hidden) closeSortSheet();
+    }
+  });
 
   // Ordenar: setear hidden input y enviar el form
   document.querySelectorAll('#sortSheet [data-sort]').forEach(btn=>{

@@ -408,14 +408,24 @@ body.drawer-open .drawer{pointer-events:auto;opacity:1}
 .drawer .field input,.drawer .field select{height:44px}
 
 /* Sheet bottom */
-.sheet{position:fixed;left:0;right:0;bottom:0;background:#0f172a;border-top-left-radius:18px;border-top-right-radius:18px;border:1px solid #1e293b;padding:12px;z-index:120;pointer-events:none;opacity:0;transition:opacity .25s}
+.sheet{position:fixed;left:0;right:0;bottom:0;background:#0f172a;border-top-left-radius:18px;border-top-right-radius:18px;border:1px solid #1e293b;padding:12px;z-index:120;pointer-events:none;opacity:0;transition:opacity .25s;max-height:80vh;overflow-y:auto}
 .sheet[hidden]{display:none}
 .sheet:not([hidden]){pointer-events:auto;opacity:1}
-.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
+.sheet-head h2{margin:0;font-size:18px;font-weight:600}
+.sheet-close{background:#12202c;border:1px solid var(--border);color:var(--text);width:40px;height:40px;border-radius:10px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;padding:0}
 .sort-list{display:grid;gap:8px;list-style:none;margin:8px 0 0;padding:0}
 .sort-list li{border-bottom:1px solid #223140}
 .sort-list button{width:100%;min-height:44px;border-radius:10px;text-align:left;padding:10px 12px;background:none;border:0;color:var(--text);font:inherit;cursor:pointer}
 .sort-list button:hover{background:#1b2a38}
+/* Filter sheet actions - limitar ancho en desktop */
+#filterSheet .field input,#filterSheet .field select{max-width:100%}
+#filterSheet form > div:last-child{max-width:100%}
+@media (min-width:821px){
+  .sheet{max-width:520px;left:50%;margin-left:-260px;padding:20px 24px}
+  #filterSheet form > div:last-child{display:flex;justify-content:center;max-width:400px;margin-left:auto;margin-right:auto}
+  #filterSheet form > div:last-child .btn-primary{flex:0 1 auto;min-width:140px;max-width:200px}
+}
 
 /* Cards responsive cols */
 @media (max-width:767.98px){
