@@ -122,7 +122,7 @@ body{font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantar
 
 .card-link{text-decoration:none;color:inherit;display:flex;flex-direction:column;height:100%}
 .card-media--featured{position:relative;overflow:hidden}
-.card-media--featured img{transition:transform .4s ease}
+.card-media--featured img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;transition:transform .4s ease}
 .card--featured:hover .card-media--featured img{transform:scale(1.08)}
 .card-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.8),transparent 50%);display:flex;align-items:flex-end;justify-content:center;padding:16px;opacity:0;transition:opacity .3s}
 .card--featured:hover .card-overlay{opacity:1}

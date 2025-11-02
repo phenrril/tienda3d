@@ -128,13 +128,14 @@
     {{range .Products}}
     <div class="card card--featured">
       <a href="/product/{{.Slug}}" class="card-link">
-        <div class="card-media card-media--featured">
+        <div class="card-media card-media--featured ar-1-1">
           {{if .Images}}
             <img src="{{img (index .Images 0).URL}}"
                  alt="{{if (index .Images 0).Alt}}{{(index .Images 0).Alt}}{{else}}{{.Name}}{{end}}"
                  loading="lazy" decoding="async"
                  srcset="{{img (index .Images 0).URL}} 300w, {{imgw (index .Images 0).URL 480}} 480w, {{imgw (index .Images 0).URL 640}} 640w"
-                 sizes="(max-width:480px) 92vw, (max-width:768px) 44vw, 300px" />
+                 sizes="(max-width:480px) 92vw, (max-width:768px) 44vw, 300px"
+                 class="card-img" />
           {{else}}<div class="placeholder">IMG</div>{{end}}
           <div class="card-overlay">
             <span class="card-overlay-text">Ver detalles</span>
