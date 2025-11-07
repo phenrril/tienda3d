@@ -82,6 +82,10 @@ type FileStorage interface {
 	SaveImage(ctx context.Context, filename string, data []byte) (string, error)
 }
 
+type EmailService interface {
+	SendOrderConfirmation(ctx context.Context, order *Order) error
+}
+
 type Clock interface{ Now() time.Time }
 
 type RealClock struct{}

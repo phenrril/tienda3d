@@ -27,7 +27,22 @@ func main() {
 
 	dsn := os.Getenv("DB_DSN")
 	if dsn == "" {
-		dsn = "host=localhost user=postgres password=postgres dbname=tienda3d port=5432 sslmode=disable"
+		// Construir DSN desde variables individuales si están disponibles
+		host := os.Getenv("DB_HOST")
+		port := os.Getenv("DB_PORT")
+		user := os.Getenv("DB_USER")
+		password := os.Getenv("DB_PASSWORD")
+		dbname := os.Getenv("DB_NAME")
+
+		if host != "" && user != "" && password != "" && dbname != "" {
+			if port == "" {
+				port = "5432"
+			}
+			dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable", host, user, password, dbname, port)
+		} else {
+			// Fallback a localhost solo si no hay variables individuales
+			dsn = "host=localhost user=postgres password=postgres dbname=tienda3d port=5432 sslmode=disable"
+		}
 	}
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {

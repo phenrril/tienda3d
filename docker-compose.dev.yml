@@ -19,12 +19,12 @@ services:
     restart: unless-stopped
 
   app:
-    build: ../..
+    build: .
     container_name: tienda3d_app
     env_file:
       - .env
     environment:
-
+      DB_DSN: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
       DB_HOST: db
       DB_PORT: ${DB_PORT:-5432}
       DB_USER: ${POSTGRES_USER}
@@ -47,21 +47,22 @@ services:
       retries: 10
     restart: unless-stopped
 
-  caddy:
-    image: caddy:2.7
-    container_name: tienda3d_caddy
-    depends_on:
-      - app
-    ports:
-      - "127.0.0.1:80:80"
-      - "127.0.0.1:443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    restart: unless-stopped
+  # Caddy comentado para desarrollo - la app expone directamente el puerto 8080
+  # caddy:
+  #   image: caddy:2.7
+  #   container_name: tienda3d_caddy
+  #   depends_on:
+  #     - app
+  #   ports:
+  #     - "127.0.0.1:80:80"
+  #     - "127.0.0.1:443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #   restart: unless-stopped
 
 volumes:
   db_data: {}
-  caddy_data: {}
-  caddy_config: {}
+  # caddy_data: {}
+  # caddy_config: {}

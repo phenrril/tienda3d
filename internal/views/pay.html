@@ -21,6 +21,15 @@
       <div style="padding:12px 14px;border-radius:12px;background:{{if .Success}}#064e3b{{else}}#3f1d1d{{end}};border:1px solid {{if .Success}}#10b981{{else}}#ef4444{{end}};color:#fff;font-weight:600">{{.StatusMsg}}</div>
     {{end}}
   {{end}}
+  <div style="padding:16px 18px;border-radius:14px;background:linear-gradient(135deg,#1d4ed8 0%,#1e3a8a 100%);color:#fff;border:1px solid rgba(255,255,255,0.2);box-shadow:0 12px 24px rgba(30,64,175,0.35);display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;gap:12px;font-size:18px;font-weight:700">
+      <span style="font-size:26px">📬</span>
+      ¡Revisá tu correo!
+    </div>
+    <p style="margin:0;font-size:15px;line-height:1.6">
+      Te enviamos la confirmación de tu pedido a <strong>{{.Order.Email}}</strong>. Si no lo ves en tu bandeja de entrada en los próximos minutos, mirá en la carpeta de <em>Spam</em> o <em>Promociones</em>, y agreganos como contacto para recibir las novedades.
+    </p>
+  </div>
   {{if .IsTransferenciaPending}}
   <div style="background:linear-gradient(135deg, #1a2b3e 0%, #0f1b2d 100%);border:2px solid #10b981;border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:0 4px 20px rgba(16,185,129,0.2)">
     <h2 style="margin:0;font-size:24px;color:#fff">📋 Instrucciones para Transferencia</h2>
