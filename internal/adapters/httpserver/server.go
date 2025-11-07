@@ -1520,7 +1520,7 @@ func (s *Server) handlePaySimulated(w http.ResponseWriter, r *http.Request) {
 
 	// Determinar mensaje según método de pago
 	if o.PaymentMethod == "efectivo" {
-		msg = "¡Gracias por tu compra! El pago en efectivo se confirmará al retirar el pedido. Recibirás una notificación con los detalles."
+		msg = "¡Pedido recibido! Te contactaremos pronto para coordinar el pago en efectivo y el retiro de tu pedido."
 		success = false // Cambiar a false para mostrar estado pendiente
 	} else if o.PaymentMethod == "transferencia" || o.MPStatus == "transferencia_pending" || (o.MPStatus == "transferencia_pending" && status == "pending") {
 		msg = "Pago pendiente de confirmación. Por favor, realiza la transferencia y envía el comprobante por WhatsApp."
@@ -1556,7 +1556,7 @@ func (s *Server) handlePaySimulated(w http.ResponseWriter, r *http.Request) {
 		if success && msg == "" {
 			msg = "Pago aprobado. Gracias por tu compra."
 		} else if msg == "" {
-			msg = "Pago pendiente / simulado"
+			msg = "Tu pedido está siendo procesado. Te notificaremos cuando esté listo."
 		}
 	}
 
@@ -2549,7 +2549,7 @@ func (s *Server) sendOrderNotify(o *domain.Order, success bool) {
 			_ = sendOrderEmail(o, success)
 		}
 	}
-	
+
 	// Enviar email de confirmación al comprador
 	if s.emailService != nil {
 		if err := s.emailService.SendOrderConfirmation(context.Background(), o); err != nil {
