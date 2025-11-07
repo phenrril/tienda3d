@@ -13,6 +13,7 @@ import (
 	"golang.org/x/oauth2/google"
 	"gorm.io/gorm"
 
+	"github.com/phenrril/tienda3d/internal/adapters/email/smtp"
 	"github.com/phenrril/tienda3d/internal/adapters/httpserver"
 	"github.com/phenrril/tienda3d/internal/adapters/payments/mercadopago"
 	"github.com/phenrril/tienda3d/internal/adapters/repo/postgres"
@@ -37,6 +38,7 @@ type App struct {
 	Storage             domain.FileStorage
 	Customers           domain.CustomerRepo
 	OAuthConfig         *oauth2.Config
+	EmailService        domain.EmailService
 }
 
 func NewApp(db *gorm.DB) (*App, error) {
@@ -96,6 +98,9 @@ func NewApp(db *gorm.DB) (*App, error) {
 	// Crear repositorio de WhatsApp
 	whatsappRepo := postgres.NewWhatsAppRepo(db)
 
+	// Inicializar servicio de email
+	emailService := smtp.NewSMTPService()
+
 	app := &App{}
 	app.ProductUC = &usecase.ProductUC{Products: prodRepo}
 	app.OrderUC = &usecase.OrderUC{Orders: orderRepo, Products: prodRepo}
@@ -112,6 +117,7 @@ func NewApp(db *gorm.DB) (*App, error) {
 	app.Storage = storage
 	app.Customers = custRepo
 	app.OAuthConfig = oauthCfg
+	app.EmailService = emailService
 
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
@@ -181,7 +187,7 @@ func NewApp(db *gorm.DB) (*App, error) {
 }
 
 func (a *App) HTTPHandler() http.Handler {
-	return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.WhatsAppUC, a.ModelRepo, a.Storage, a.Customers, a.OAuthConfig, a.FeaturedProductRepo)
+	return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.WhatsAppUC, a.ModelRepo, a.Storage, a.Customers, a.OAuthConfig, a.FeaturedProductRepo, a.EmailService)
 }
 
 func (a *App) MigrateAndSeed() error {

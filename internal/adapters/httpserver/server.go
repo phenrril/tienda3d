@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -45,6 +46,7 @@ type Server struct {
 	storage          domain.FileStorage
 	customers        domain.CustomerRepo
 	oauthCfg         *oauth2.Config
+	emailService     domain.EmailService
 
 	adminAllowed map[string]struct{}
 	adminSecret  []byte
@@ -52,8 +54,8 @@ type Server struct {
 
 var emailRe = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
 
-func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config, fp domain.FeaturedProductRepo) http.Handler {
-	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, models: m, featuredProducts: fp, storage: fs, customers: customers, oauthCfg: oauthCfg, mux: http.NewServeMux()}
+func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config, fp domain.FeaturedProductRepo, emailSvc domain.EmailService) http.Handler {
+	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, models: m, featuredProducts: fp, storage: fs, customers: customers, oauthCfg: oauthCfg, emailService: emailSvc, mux: http.NewServeMux()}
 
 	allowed := map[string]struct{}{}
 	if raw := os.Getenv("ADMIN_ALLOWED_EMAILS"); raw != "" {
@@ -980,7 +982,7 @@ func (s *Server) webhookMP(w http.ResponseWriter, r *http.Request) {
 		log.Error().Err(err).Msg("guardar orden webhook")
 	}
 	if notify {
-		go sendOrderNotify(o, true)
+		go s.sendOrderNotify(o, true)
 	}
 	w.WriteHeader(200)
 }
@@ -1420,7 +1422,7 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 		o.Status = domain.OrderStatusAwaitingPay
 		o.MPStatus = "efectivo_pending"
 		_ = s.orders.Orders.Save(r.Context(), o)
-		sendOrderNotify(o, false) // Enviar con success=false para mostrar PENDIENTE
+		s.sendOrderNotify(o, false) // Enviar con success=false para mostrar PENDIENTE
 		writeCart(w, cartPayload{})
 		http.Redirect(w, r, "/pay/"+o.ID.String()+"?status=pending", 302)
 	case "transferencia":
@@ -1428,7 +1430,7 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 		o.Status = domain.OrderStatusAwaitingPay
 		o.MPStatus = "transferencia_pending"
 		_ = s.orders.Orders.Save(r.Context(), o)
-		sendOrderNotify(o, false)
+		s.sendOrderNotify(o, false)
 		writeCart(w, cartPayload{})
 		http.Redirect(w, r, "/pay/"+o.ID.String()+"?status=pending", 302)
 	case "mercadopago":
@@ -1539,7 +1541,7 @@ func (s *Server) handlePaySimulated(w http.ResponseWriter, r *http.Request) {
 				if !o.Notified {
 					o.Notified = true
 					_ = s.orders.Orders.Save(r.Context(), o)
-					go sendOrderNotify(o, true)
+					go s.sendOrderNotify(o, true)
 				} else {
 					_ = s.orders.Orders.Save(r.Context(), o)
 				}
@@ -2539,11 +2541,19 @@ func sendOrderTelegram(o *domain.Order, success bool) error {
 	return lastErr
 }
 
-func sendOrderNotify(o *domain.Order, success bool) {
+func (s *Server) sendOrderNotify(o *domain.Order, success bool) {
+	// Notificar al admin por Telegram
 	if err := sendOrderTelegram(o, success); err != nil {
 		log.Warn().Err(err).Msg("telegram notif fallo")
 		if os.Getenv("SMTP_HOST") != "" {
 			_ = sendOrderEmail(o, success)
+		}
+	}
+	
+	// Enviar email de confirmación al comprador
+	if s.emailService != nil {
+		if err := s.emailService.SendOrderConfirmation(context.Background(), o); err != nil {
+			log.Error().Err(err).Str("order_id", o.ID.String()).Msg("error enviando email al comprador")
 		}
 	}
 }
