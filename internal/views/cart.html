@@ -175,5 +175,34 @@
   </div>
   {{end}}
 </div>
+
+<!-- Popup de confirmación de compra -->
+<div id="confirmPurchaseModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:center;justify-content:center;padding:20px;flex-direction:column">
+  <div style="background:var(--panel);border-radius:20px;border:1px solid var(--border);max-width:500px;width:100%;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+    <h2 style="margin:0 0 20px;font-size:24px;font-weight:700;color:var(--text)">Confirmar compra</h2>
+    <p style="margin:0 0 24px;font-size:16px;color:var(--muted);line-height:1.6">
+      ¿Estás seguro de que deseas finalizar tu compra?
+    </p>
+    <div style="background:var(--bg);border-radius:12px;padding:20px;margin-bottom:24px;border:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:16px;color:var(--muted)">Cantidad de productos:</span>
+        <span id="confirmProductCount" style="font-size:18px;font-weight:700;color:var(--text)">0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;border-top:2px solid var(--border);padding-top:12px">
+        <span style="font-size:18px;font-weight:700;color:var(--text)">Total:</span>
+        <span id="confirmTotal" style="font-size:24px;font-weight:700;color:var(--primary)">$0.00</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;justify-content:flex-end">
+      <button id="confirmCancelBtn" style="padding:12px 24px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:16px;font-weight:600;cursor:pointer;transition:background 0.2s">
+        Cancelar
+      </button>
+      <button id="confirmPurchaseBtn" style="padding:12px 24px;border-radius:12px;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;font-size:16px;font-weight:700;cursor:pointer;border:none;box-shadow:0 4px 12px rgba(99,102,241,0.3)">
+        Confirmar compra
+      </button>
+    </div>
+  </div>
+</div>
+
 {{template "layout_end" .}}
 {{end}}

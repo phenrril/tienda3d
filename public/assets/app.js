@@ -241,6 +241,62 @@
   paymentRadios.forEach(r=>r.addEventListener('change',calcCost));
   provinceSelect && provinceSelect.addEventListener('change',calcCost);
   calcCost();
+  
+  // Popup de confirmación de compra
+  const modal=document.getElementById('confirmPurchaseModal');
+  const confirmTotal=document.getElementById('confirmTotal');
+  const confirmProductCount=document.getElementById('confirmProductCount');
+  const confirmBtn=document.getElementById('confirmPurchaseBtn');
+  const cancelBtn=document.getElementById('confirmCancelBtn');
+  if(modal && confirmTotal && confirmProductCount && confirmBtn && cancelBtn){
+    let shouldSubmit=false;
+    function countProducts(){
+      const rows=document.querySelectorAll('.cart-table tbody tr');
+      let totalQty=0;
+      rows.forEach(row=>{
+        const qtySpan=row.querySelector('span[style*="min-width:36px"]');
+        if(qtySpan){
+          const qty=parseInt(qtySpan.textContent.trim())||0;
+          totalQty+=qty;
+        }
+      });
+      return totalQty;
+    }
+    function getTotal(){
+      if(!finalTotalEl) return '$0.00';
+      return finalTotalEl.textContent.trim();
+    }
+    function showModal(){
+      const total=getTotal();
+      const productCount=countProducts();
+      confirmTotal.textContent=total;
+      confirmProductCount.textContent=productCount+(productCount===1?' producto':' productos');
+      modal.style.display='flex';
+      document.body.style.overflow='hidden';
+    }
+    function hideModal(){
+      modal.style.display='none';
+      document.body.style.overflow='';
+    }
+    form.addEventListener('submit',function(e){
+      if(!shouldSubmit){
+        e.preventDefault();
+        showModal();
+      }
+    });
+    confirmBtn.addEventListener('click',function(){
+      shouldSubmit=true;
+      hideModal();
+      form.submit();
+    });
+    cancelBtn.addEventListener('click',hideModal);
+    modal.addEventListener('click',function(e){
+      if(e.target===modal) hideModal();
+    });
+    document.addEventListener('keydown',function(e){
+      if(e.key==='Escape' && modal.style.display==='flex') hideModal();
+    });
+  }
 })();
 
 // Registrar Service Worker en idle para no bloquear carga
