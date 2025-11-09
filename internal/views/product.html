@@ -37,7 +37,7 @@
     </div>
     <h1 class="pd-title">{{.Product.Name}}</h1>
     <div class="pd-price-box">
-      <div class="pd-price">${{printf "%.2f" .Product.BasePrice}}</div>
+      <div class="pd-price">${{formatPrice .Product.BasePrice}}</div>
       <div class="pd-price-note">Precio base</div>
     </div>
     <div class="pd-actions">
@@ -137,7 +137,7 @@
     <div class="pd-mobile-sticky" id="pdMobileSticky" style="display:none">
       <div class="sticky-content">
         <div class="sticky-info">
-          <div class="sticky-price">${{printf "%.2f" .Product.BasePrice}}</div>
+          <div class="sticky-price">${{formatPrice .Product.BasePrice}}</div>
           <div class="sticky-name">{{.Product.Name}}</div>
         </div>
         <button class="btn-primary btn-sticky" type="button" onclick="document.querySelector('.pd-form').scrollIntoView({behavior:'smooth',block:'center'})">

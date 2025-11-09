@@ -14,7 +14,7 @@
       </a>
       <button type="button" class="btn-secondary btn-hero-secondary" id="btnHowBuy">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+          <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9l2 2 4-4"/>
         </svg>
         <span>Cómo comprar</span>
       </button>
@@ -102,7 +102,7 @@
     <h2 id="howBuyTitle" class="modal-title">Cómo comprar</h2>
     <ol class="modal-steps">
       <li><strong>Elegí:</strong> Abrí el catálogo y seleccioná el producto que te gusta.</li>
-      <li><strong>Personalizá:</strong> Ajustá color / material (si aplica) y agregalo al carrito.</li>
+      <li><strong>Personalizá:</strong> Ajustá color y agregalo al carrito.</li>
       <li><strong>Confirmá y pagá:</strong> Completá tus datos, elegí envío o retiro y generá el pago seguro (Mercado Pago).</li>
       <li><strong>Listo:</strong> Procesamos producción / envío. ¿Modelo propio? Pedí cotización o escribinos por <a class="link" href="https://wa.me/5493416219815" target="_blank" rel="noopener">WhatsApp</a>.</li>
     </ol>
@@ -145,7 +145,7 @@
           <div class="card-category-badge">{{.Category}}</div>
           <h3 class="card-title card-title--featured">{{.Name}}</h3>
           <div class="card-price-row">
-            <span class="card-price">${{printf "%.0f" .BasePrice}}</span>
+            <span class="card-price">${{formatPrice .BasePrice}}</span>
             {{if .ReadyToShip}}<span class="card-ready-badge">✓ Listo</span>{{end}}
           </div>
         </div>

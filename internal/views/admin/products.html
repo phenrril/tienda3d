@@ -98,7 +98,7 @@
           <tr data-slug="{{.Slug}}" data-category="{{.Category}}">
             <td>{{.Name}}</td>
             <td style="font-family:monospace">{{.Slug}}</td>
-            <td>${{printf "%.2f" .BasePrice}}</td>
+            <td>${{formatPrice .BasePrice}}</td>
             <td>{{.Category}}</td>
             <td>{{printf "%.0f" .WidthMM}}</td>
             <td>{{printf "%.0f" .HeightMM}}</td>
@@ -106,8 +106,8 @@
             <td>{{if .ReadyToShip}}✔{{else}}-{{end}}</td>
             <td>{{printf "%.0f" .Grams}}</td>
             <td>{{printf "%.1f" .Hours}}</td>
-            <td>${{printf "%.2f" .GrossPrice}}</td>
-            <td>${{printf "%.2f" .Profit}}</td>
+            <td>${{formatPrice .GrossPrice}}</td>
+            <td>${{formatPrice .Profit}}</td>
             <td>{{len .Images}}</td>
             <td style="text-align:right">
               <div class="table-actions">
