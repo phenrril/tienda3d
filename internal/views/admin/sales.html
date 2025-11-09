@@ -18,10 +18,10 @@
 </form>
 <section class="grid" style="margin-top:1.2rem;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px">
   <div class="kpi"><h3>Órdenes</h3><strong>{{.OrdersCount}}</strong></div>
-  <div class="kpi"><h3>Ingresos Totales</h3><strong>${{printf "%.2f" .TotalRevenue}}</strong></div>
-  <div class="kpi"><h3>Ingresos Items</h3><strong>${{printf "%.2f" .ItemsRevenue}}</strong></div>
-  <div class="kpi"><h3>Ingresos Envíos</h3><strong>${{printf "%.2f" .ShippingRevenue}}</strong></div>
-  <div class="kpi"><h3>Ticket Prom.</h3><strong>${{printf "%.2f" .AvgOrderValue}}</strong></div>
+  <div class="kpi"><h3>Ingresos Totales</h3><strong>${{formatPrice .TotalRevenue}}</strong></div>
+  <div class="kpi"><h3>Ingresos Items</h3><strong>${{formatPrice .ItemsRevenue}}</strong></div>
+  <div class="kpi"><h3>Ingresos Envíos</h3><strong>${{formatPrice .ShippingRevenue}}</strong></div>
+  <div class="kpi"><h3>Ticket Prom.</h3><strong>${{formatPrice .AvgOrderValue}}</strong></div>
 </section>
 <div class="grid" style="margin-top:1.5rem;grid-template-columns:340px 1fr;gap:1.5rem;align-items:start">
   <div class="admin-card" style="padding:16px">
@@ -44,12 +44,12 @@
     <h2 style="margin:0 0 12px;font-size:16px">Top Productos</h2>
     <table class="table" style="font-size:.8rem">
       <thead><tr><th>Producto</th><th>Cant.</th><th>Ingresos</th></tr></thead>
-      <tbody>{{range .TopProducts}}<tr><td>{{.Title}}</td><td>{{.Qty}}</td><td>${{printf "%.2f" .Revenue}}</td></tr>{{end}}</tbody>
+      <tbody>{{range .TopProducts}}<tr><td>{{.Title}}</td><td>{{.Qty}}</td><td>${{formatPrice .Revenue}}</td></tr>{{end}}</tbody>
     </table>
     <h2 style="margin:20px 0 12px;font-size:16px">Serie Diario</h2>
     <table class="table" style="font-size:.75rem">
       <thead><tr><th>Día</th><th>Órdenes</th><th>Ingresos</th></tr></thead>
-      <tbody>{{range .DailySeries}}<tr><td>{{.Day}}</td><td>{{.Orders}}</td><td>${{printf "%.2f" .Revenue}}</td></tr>{{end}}</tbody>
+      <tbody>{{range .DailySeries}}<tr><td>{{.Day}}</td><td>{{.Orders}}</td><td>${{formatPrice .Revenue}}</td></tr>{{end}}</tbody>
     </table>
   </div>
 </div>

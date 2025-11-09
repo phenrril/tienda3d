@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -175,6 +176,29 @@ func NewApp(db *gorm.DB) (*App, error) {
 			}
 			base = strings.ReplaceAll(base, " ", "%20")
 			return fmt.Sprintf("%s?w=%d", base, w)
+		},
+		// formatPrice: formatea un número con puntos de miles (ej: 1000 -> "1.000", 1234.56 -> "1.234.56")
+		"formatPrice": func(n float64) string {
+			// Formatear con 2 decimales
+			str := strconv.FormatFloat(n, 'f', 2, 64)
+			parts := strings.Split(str, ".")
+			intStr := parts[0]
+			decStr := parts[1]
+			
+			// Agregar puntos de miles a la parte entera
+			var result strings.Builder
+			for i, r := range intStr {
+				if i > 0 && (len(intStr)-i)%3 == 0 {
+					result.WriteString(".")
+				}
+				result.WriteRune(r)
+			}
+			
+			// Si los decimales son "00", no mostrarlos
+			if decStr == "00" {
+				return result.String()
+			}
+			return result.String() + "." + decStr
 		},
 	}
 	tmpl, err := template.New("layout").Funcs(funcMap).ParseFS(views.FS, "*.html", "admin/*.html")

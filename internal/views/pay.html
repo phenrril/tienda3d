@@ -46,7 +46,7 @@
         <span style="font-size:24px">💰</span>
         <div style="flex:1">
           <div style="font-size:12px;color:#94a3b8;text-transform:uppercase">Monto a transferir</div>
-          <div style="font-size:28px;color:#fff;font-weight:bold">${{printf "%.2f" .Order.Total}}</div>
+          <div style="font-size:28px;color:#fff;font-weight:bold">${{formatPrice .Order.Total}}</div>
         </div>
       </div>
     </div>
@@ -73,13 +73,13 @@
     <div><strong>Método:</strong> {{if eq .Order.ShippingMethod "envio"}}Envío{{else if eq .Order.ShippingMethod "cadete"}}Cadete (Rosario){{else}}Retiro{{end}}</div>
     {{if or (eq .Order.ShippingMethod "envio") (eq .Order.ShippingMethod "cadete") }}
       <div><strong>Dirección:</strong> {{.Order.Address}} {{if .Order.PostalCode}}({{.Order.PostalCode}} – {{.Order.Province}}){{end}}</div>
-      <div><strong>Costo envío:</strong> ${{printf "%.2f" .Order.ShippingCost}}</div>
+      <div><strong>Costo envío:</strong> ${{formatPrice .Order.ShippingCost}}</div>
     {{end}}
-    <div><strong>Total:</strong> ${{printf "%.2f" .Order.Total}}</div>
+    <div><strong>Total:</strong> ${{formatPrice .Order.Total}}</div>
     <div style="margin-top:6px"><strong>Items:</strong></div>
     <ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px">
       {{range .Order.Items}}
-        <li>{{.Title}} x{{.Qty}} — ${{printf "%.2f" .UnitPrice}} {{if .Color}}<span style="display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid #000;vertical-align:middle;background:{{.Color}}"></span>{{end}}</li>
+        <li>{{.Title}} x{{.Qty}} — ${{formatPrice .UnitPrice}} {{if .Color}}<span style="display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid #000;vertical-align:middle;background:{{.Color}}"></span>{{end}}</li>
       {{end}}
     </ul>
   </div>

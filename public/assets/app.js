@@ -6,6 +6,29 @@
 // - Carrito: cálculo de envío
 // - SW registration (idle)
 
+// Función helper para formatear precios con puntos de miles
+function formatPrice(num) {
+  const str = num.toFixed(2);
+  const parts = str.split('.');
+  const intStr = parts[0];
+  const decStr = parts[1];
+  
+  // Agregar puntos de miles a la parte entera
+  let result = '';
+  for (let i = 0; i < intStr.length; i++) {
+    if (i > 0 && (intStr.length - i) % 3 === 0) {
+      result += '.';
+    }
+    result += intStr[i];
+  }
+  
+  // Si los decimales son "00", no mostrarlos
+  if (decStr === '00') {
+    return result;
+  }
+  return result + '.' + decStr;
+}
+
 // Nav drawer
 (function(){
   const btn=document.querySelector('.nav-toggle');
@@ -222,20 +245,20 @@
       setRequired(phone,true); setRequired(addrCadete,true);
       cost=CADETE_COST;
     }
-    if(shipCostEl) shipCostEl.textContent='$'+cost.toFixed(2);
+    if(shipCostEl) shipCostEl.textContent='$'+formatPrice(cost);
     const withShip=(base+cost);
     const discount=((paymentMethod==='efectivo'||paymentMethod==='transferencia')? withShip*0.1 : 0);
     if(discountRow){
       if(discount>0){
         discountRow.style.display='flex';
-        if(discountEl) discountEl.textContent='-$'+discount.toFixed(2);
+        if(discountEl) discountEl.textContent='-$'+formatPrice(discount);
       } else {
         discountRow.style.display='none';
-        if(discountEl) discountEl.textContent='$0.00';
+        if(discountEl) discountEl.textContent='$0';
       }
     }
     const final=(withShip-discount);
-    if(finalTotalEl) finalTotalEl.textContent='$'+final.toFixed(2);
+    if(finalTotalEl) finalTotalEl.textContent='$'+formatPrice(final);
   }
   shipRadios.forEach(r=>r.addEventListener('change',calcCost));
   paymentRadios.forEach(r=>r.addEventListener('change',calcCost));
@@ -776,14 +799,14 @@ if ('serviceWorker' in navigator) {
       const out=await res.json();
       if(resultEl){
         const rows=[
-          ['Material', `$${out.precio_material.toFixed(2)}`],
-          ['Luz', `$${out.precio_luz.toFixed(2)}`],
-          ['Error', `$${out.margen_de_error.toFixed(2)}`],
-          ['Subtotal s/ins.', `$${out.subtotal_sin_insumos.toFixed(2)}`],
-          ['Total s/ins.', `$${out.total_sin_insumos.toFixed(2)}`],
-          ['Insumos', `$${out.insumos.toFixed(2)}`],
-          ['Total a cobrar', `$${out.total_a_cobrar.toFixed(2)}`],
-          ['Precio ML', `$${out.precio_mercadolibre.toFixed(2)}`],
+          ['Material', `$${formatPrice(out.precio_material)}`],
+          ['Luz', `$${formatPrice(out.precio_luz)}`],
+          ['Error', `$${formatPrice(out.margen_de_error)}`],
+          ['Subtotal s/ins.', `$${formatPrice(out.subtotal_sin_insumos)}`],
+          ['Total s/ins.', `$${formatPrice(out.total_sin_insumos)}`],
+          ['Insumos', `$${formatPrice(out.insumos)}`],
+          ['Total a cobrar', `$${formatPrice(out.total_a_cobrar)}`],
+          ['Precio ML', `$${formatPrice(out.precio_mercadolibre)}`],
           ['Horas', `${out.horas.toFixed(2)} h`],
           ['Filamento', `${out.filamento_kg.toFixed(2)} kg`],
         ];
@@ -831,7 +854,7 @@ if ('serviceWorker' in navigator) {
       name.textContent=item.name;
       name.style.cssText='font-weight:600;margin-bottom:2px';
       const meta=document.createElement('div');
-      meta.textContent=item.category+' • $'+item.price.toFixed(0);
+      meta.textContent=item.category+' • $'+formatPrice(item.price);
       meta.style.cssText='font-size:12px;color:#94a3b8';
       info.appendChild(name);
       info.appendChild(meta);

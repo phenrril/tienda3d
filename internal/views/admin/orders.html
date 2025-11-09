@@ -17,7 +17,7 @@
       <td style="font-family:monospace">{{.ID}}</td>
       <td>{{.Email}}</td>
       <td>{{.Status}}</td>
-      <td>${{printf "%.2f" .Total}}</td>
+      <td>${{formatPrice .Total}}</td>
       <td>{{.MPStatus}}</td>
       <td>{{.CreatedAt}}</td>
     </tr>

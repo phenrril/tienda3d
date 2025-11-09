@@ -50,7 +50,7 @@
                   </div>
                 </form>
               </td>
-              <td style="padding:20px;text-align:right;vertical-align:middle;font-weight:600;color:var(--primary)">${{printf "%.2f" .Subtotal}}</td>
+              <td style="padding:20px;text-align:right;vertical-align:middle;font-weight:600;color:var(--primary)">${{formatPrice .Subtotal}}</td>
               <td style="padding:20px;width:50px;vertical-align:middle">
                 <form method="post" action="/cart/remove">
                   <input type="hidden" name="slug" value="{{.Slug}}" />
@@ -147,7 +147,7 @@
         <div style="padding:20px;background:var(--bg);border-radius:16px;border:1px solid var(--border)">
           <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px;color:var(--muted)">
             <span>Subtotal</span>
-            <span id="subtotalVal" style="color:var(--text);font-weight:500">${{printf "%.2f" .Total}}</span>
+            <span id="subtotalVal" style="color:var(--text);font-weight:500">${{formatPrice .Total}}</span>
           </div>
           <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px;color:var(--muted)">
             <span>Costo de envío</span>
@@ -159,7 +159,7 @@
           </div>
           <div style="border-top:2px solid var(--border);padding-top:12px;margin-top:12px;display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:18px;font-weight:700">Total</span>
-            <span id="finalTotal" style="font-size:24px;font-weight:700;color:var(--primary)">${{printf "%.2f" .Total}}</span>
+            <span id="finalTotal" style="font-size:24px;font-weight:700;color:var(--primary)">${{formatPrice .Total}}</span>
           </div>
         </div>
 
