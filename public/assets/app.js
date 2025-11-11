@@ -247,7 +247,7 @@ function formatPrice(num) {
     }
     if(shipCostEl) shipCostEl.textContent='$'+formatPrice(cost);
     const withShip=(base+cost);
-    const discount=((paymentMethod==='efectivo'||paymentMethod==='transferencia')? withShip*0.1 : 0);
+    const discount=(paymentMethod==='transferencia'? withShip*0.1 : 0);
     if(discountRow){
       if(discount>0){
         discountRow.style.display='flex';
