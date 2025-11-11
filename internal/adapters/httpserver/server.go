@@ -1402,9 +1402,9 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 	o.ShippingCost = shippingCost
 	subtotal := itemsTotal + shippingCost
 
-	// Aplicar descuento para efectivo y transferencia (10%)
+	// Aplicar descuento para transferencia (10%)
 	discountAmount := 0.0
-	if paymentMethod == "efectivo" || paymentMethod == "transferencia" {
+	if paymentMethod == "transferencia" {
 		discountAmount = subtotal * 0.1
 	}
 	o.DiscountAmount = discountAmount
@@ -2413,7 +2413,7 @@ func sendOrderEmail(o *domain.Order, success bool) error {
 	// Método de pago
 	paymentMethod := "Mercado Pago"
 	if o.PaymentMethod == "efectivo" {
-		paymentMethod = "Efectivo (10% OFF)"
+		paymentMethod = "Efectivo"
 	} else if o.PaymentMethod == "transferencia" {
 		paymentMethod = "Transferencia (10% OFF)"
 	}
@@ -2483,7 +2483,7 @@ func sendOrderTelegram(o *domain.Order, success bool) error {
 	// Método de pago
 	paymentMethod := "Mercado Pago"
 	if o.PaymentMethod == "efectivo" {
-		paymentMethod = "Efectivo (10% OFF)"
+		paymentMethod = "Efectivo"
 	} else if o.PaymentMethod == "transferencia" {
 		paymentMethod = "Transferencia (10% OFF)"
 	}
