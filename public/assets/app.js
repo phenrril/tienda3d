@@ -6,6 +6,37 @@
 // - Carrito: cálculo de envío
 // - SW registration (idle)
 
+// Sistema de notificaciones Toast
+function showToast(message, type = 'info', duration = 3500) {
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.style.cssText = `position:fixed;top:20px;right:20px;z-index:99999;padding:16px 24px;border-radius:12px;font-weight:600;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,0.4);display:flex;align-items:center;gap:12px;min-width:300px;max-width:500px;animation:slideInRight 0.3s ease-out;backdrop-filter:blur(8px)`;
+  
+  const colors = {
+    success: 'background:linear-gradient(135deg,#10b981,#059669);color:white',
+    error: 'background:linear-gradient(135deg,#ef4444,#dc2626);color:white',
+    warning: 'background:linear-gradient(135deg,#f59e0b,#d97706);color:white',
+    info: 'background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white'
+  };
+  
+  const icons = {
+    success: '✓',
+    error: '✕',
+    warning: '⚠',
+    info: 'ℹ'
+  };
+  
+  toast.style.cssText += colors[type] || colors.info;
+  toast.innerHTML = `<span style="font-size:20px">${icons[type] || icons.info}</span><span>${message}</span>`;
+  
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.animation = 'slideOutRight 0.3s ease-out';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
 // Función helper para formatear precios con puntos de miles
 function formatPrice(num) {
   const str = num.toFixed(2);
@@ -655,21 +686,64 @@ if ('serviceWorker' in navigator) {
 
   form.addEventListener('submit', async e=>{
     e.preventDefault();
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if(submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Guardando...';
+    }
+    
     const slug=(fSlug&&fSlug.value.trim())||'';
     const payload={ name:(fName&&fName.value.trim())||'', category:(fCat&&fCat.value.trim())||'', short_desc:(fDesc&&fDesc.value)||'', base_price:parseFloat((fPrice&&fPrice.value)||'0'), ready_to_ship:!!(fReady&&fReady.checked), width_mm:parseFloat((fWidth&&fWidth.value)||'0'), height_mm:parseFloat((fHeight&&fHeight.value)||'0'), depth_mm:parseFloat((fDepth&&fDepth.value)||'0'), observation:(fObservation&&fObservation.value)||'', grams:parseFloat((fGrams&&fGrams.value)||'0'), hours:parseFloat((fHours&&fHours.value)||'0'), gross_price:parseFloat((fGrossPrice&&fGrossPrice.value)||'0'), profit:parseFloat((fProfit&&fProfit.value)||'0') };
-    if(!payload.name){ alert('Nombre requerido'); return; }
-    if(payload.base_price<0){ alert('Precio inválido'); return; }
-    let method='POST', url='/api/products'; if(slug){ method='PUT'; url='/api/products/'+encodeURIComponent(slug); }
-    const res=await fetch(url,{method, headers:Object.assign({'Content-Type':'application/json'}, token? {Authorization:'Bearer '+token}:{}) , body:JSON.stringify(payload)});
-    if(!res.ok){ alert('Error guardando'); return; }
-    const prod=await res.json(); const finalSlug=(prod&&prod.Slug)||slug;
-    if(imagesInput && imagesInput.files && imagesInput.files.length>0){
-      const fd=new FormData(); fd.append('existing_slug', finalSlug);
-      for(const f of imagesInput.files){ fd.append('images', f); }
-      const upRes=await fetch('/api/products/upload',{method:'POST', headers: token? {Authorization:'Bearer '+token}:{}, body:fd});
-      if(!upRes.ok){ alert('Producto guardado, pero error subiendo imágenes'); location.reload(); return; }
+    
+    if(!payload.name){ 
+      showToast('El nombre del producto es requerido', 'error');
+      if(submitBtn) { submitBtn.disabled = false; submitBtn.textContent = slug ? 'Actualizar' : 'Crear'; }
+      return; 
     }
-    location.reload();
+    if(payload.base_price<0){ 
+      showToast('El precio debe ser mayor o igual a cero', 'error');
+      if(submitBtn) { submitBtn.disabled = false; submitBtn.textContent = slug ? 'Actualizar' : 'Crear'; }
+      return; 
+    }
+    
+    let method='POST', url='/api/products'; 
+    if(slug){ method='PUT'; url='/api/products/'+encodeURIComponent(slug); }
+    
+    try {
+      const res=await fetch(url,{method, headers:Object.assign({'Content-Type':'application/json'}, token? {Authorization:'Bearer '+token}:{}) , body:JSON.stringify(payload)});
+      
+      if(!res.ok){ 
+        const errorText = await res.text().catch(() => 'Error desconocido');
+        showToast(`Error al guardar el producto: ${errorText}`, 'error', 5000);
+        if(submitBtn) { submitBtn.disabled = false; submitBtn.textContent = slug ? 'Actualizar' : 'Crear'; }
+        return; 
+      }
+      
+      const prod=await res.json(); 
+      const finalSlug=(prod&&prod.Slug)||slug;
+      
+      if(imagesInput && imagesInput.files && imagesInput.files.length>0){
+        showToast('Producto guardado, subiendo imágenes...', 'info', 2000);
+        const fd=new FormData(); 
+        fd.append('existing_slug', finalSlug);
+        for(const f of imagesInput.files){ fd.append('images', f); }
+        
+        const upRes=await fetch('/api/products/upload',{method:'POST', headers: token? {Authorization:'Bearer '+token}:{}, body:fd});
+        
+        if(!upRes.ok){ 
+          showToast('Producto guardado, pero hubo un error al subir las imágenes', 'warning', 4000);
+          setTimeout(() => location.reload(), 2000);
+          return; 
+        }
+      }
+      
+      showToast(`Producto ${slug ? 'actualizado' : 'creado'} exitosamente!`, 'success', 2000);
+      setTimeout(() => location.reload(), 1500);
+      
+    } catch(err) {
+      showToast('Error de conexión. Verificá tu internet e intentá nuevamente.', 'error', 5000);
+      if(submitBtn) { submitBtn.disabled = false; submitBtn.textContent = slug ? 'Actualizar' : 'Crear'; }
+    }
   });
 
   if(btnReset) btnReset.addEventListener('click', clear);
@@ -1166,4 +1240,348 @@ if ('serviceWorker' in navigator) {
   
   // Actualizar estado al cargar
   updateCarouselStatus();
+})();
+
+// ============================================
+// CART MOBILE OPTIMIZADO - INTERACCIONES
+// ============================================
+
+(function(){
+  // Elementos principales
+  const checkoutForm = document.getElementById('checkoutForm');
+  const stickyBottom = document.getElementById('cartStickyBottom');
+  const stickyToggle = document.getElementById('cartStickyToggle');
+  const stickyExpanded = document.getElementById('cartStickyExpanded');
+  
+  if(!checkoutForm) return; // No estamos en la página del carrito
+  
+  // ============ ACORDEÓN CHECKOUT ============
+  const sectionHeaders = document.querySelectorAll('.checkout-section-header');
+  
+  sectionHeaders.forEach(header => {
+    header.addEventListener('click', function(){
+      const section = this.getAttribute('data-toggle');
+      const content = this.nextElementSibling;
+      const isActive = this.classList.contains('active');
+      
+      if(!isActive) {
+        // Cerrar todas las secciones
+        sectionHeaders.forEach(h => {
+          h.classList.remove('active');
+          if(h.nextElementSibling) h.nextElementSibling.classList.remove('active');
+        });
+        
+        // Abrir la sección clickeada
+        this.classList.add('active');
+        content.classList.add('active');
+        
+        // Auto-focus en el primer input
+        setTimeout(() => {
+          const firstInput = content.querySelector('input:not([type="radio"]):not([type="hidden"]), select');
+          if(firstInput) firstInput.focus();
+        }, 400);
+      }
+    });
+  });
+  
+  // ============ STICKY BOTTOM BAR ============
+  if(stickyToggle && stickyBottom) {
+    stickyToggle.addEventListener('click', function(){
+      stickyBottom.classList.toggle('expanded');
+    });
+  }
+  
+  // ============ CAMPOS CONDICIONALES (Envío/Cadete) ============
+  const shippingRadios = document.querySelectorAll('input[name="shipping"]');
+  const cadeteGroup = document.getElementById('cadeteGroup');
+  const envioGroup = document.getElementById('envioGroup');
+  
+  shippingRadios.forEach(radio => {
+    radio.addEventListener('change', function(){
+      if(cadeteGroup) cadeteGroup.style.display = 'none';
+      if(envioGroup) envioGroup.style.display = 'none';
+      
+      if(this.value === 'cadete' && cadeteGroup) {
+        cadeteGroup.style.display = 'flex';
+      } else if(this.value === 'envio' && envioGroup) {
+        envioGroup.style.display = 'flex';
+      }
+      
+      updateTotals();
+    });
+  });
+  
+  // ============ CÁLCULO DE TOTALES ============
+  function updateTotals() {
+    const pcData = document.getElementById('pcData');
+    const provinceSelect = document.getElementById('provinceSelect');
+    const shippingMethod = document.querySelector('input[name="shipping"]:checked');
+    const paymentMethod = document.querySelector('input[name="payment_method"]:checked');
+    
+    // Obtener subtotal (suma de productos)
+    let subtotal = 0;
+    const subtotalEl = document.getElementById('subtotalVal');
+    if(subtotalEl) {
+      const text = subtotalEl.textContent.replace(/[$.,]/g, '');
+      subtotal = parseFloat(text) || 0;
+    }
+    
+    // Calcular costo de envío
+    let shipCost = 0;
+    if(shippingMethod) {
+      if(shippingMethod.value === 'cadete') {
+        shipCost = 5000;
+      } else if(shippingMethod.value === 'envio' && provinceSelect && pcData) {
+        const province = provinceSelect.value;
+        const provinceCostEl = pcData.querySelector(`[data-prov="${province}"]`);
+        if(provinceCostEl) {
+          shipCost = parseFloat(provinceCostEl.getAttribute('data-cost')) || 0;
+        }
+      }
+    }
+    
+    // Calcular descuento (10% en transferencia)
+    let discount = 0;
+    const discountRow = document.getElementById('discountRow');
+    const stickyDiscountRow = document.getElementById('stickyDiscountRow');
+    
+    if(paymentMethod && paymentMethod.value === 'transferencia') {
+      discount = subtotal * 0.1;
+      if(discountRow) discountRow.style.display = 'flex';
+      if(stickyDiscountRow) stickyDiscountRow.style.display = 'flex';
+    } else {
+      if(discountRow) discountRow.style.display = 'none';
+      if(stickyDiscountRow) stickyDiscountRow.style.display = 'none';
+    }
+    
+    // Calcular total final
+    const total = subtotal + shipCost - discount;
+    
+    // Actualizar todos los displays
+    const updateDisplay = (id, value) => {
+      const el = document.getElementById(id);
+      if(el) el.textContent = '$' + formatPrice(value);
+    };
+    
+    updateDisplay('shipCost', shipCost);
+    updateDisplay('discount', discount);
+    updateDisplay('finalTotal', total);
+    
+    // Sticky bar mobile
+    updateDisplay('stickyTotal', total);
+    updateDisplay('stickySubtotal', subtotal);
+    updateDisplay('stickyShipCost', shipCost);
+    updateDisplay('stickyDiscount', discount);
+  }
+  
+  // Escuchar cambios en método de pago y provincia
+  const paymentRadios = document.querySelectorAll('input[name="payment_method"]');
+  paymentRadios.forEach(radio => {
+    radio.addEventListener('change', updateTotals);
+  });
+  
+  const provinceSelect = document.getElementById('provinceSelect');
+  if(provinceSelect) {
+    provinceSelect.addEventListener('change', updateTotals);
+  }
+  
+  // Calcular totales al cargar
+  updateTotals();
+  
+  // ============ MICRO-INTERACCIONES ============
+  
+  // Animación al cambiar cantidad
+  const qtyForms = document.querySelectorAll('.cart-qty-form');
+  qtyForms.forEach(form => {
+    form.addEventListener('submit', function(e){
+      const card = this.closest('.cart-product-card');
+      if(card) {
+        card.classList.add('added');
+        setTimeout(() => card.classList.remove('added'), 400);
+      }
+      
+      const btn = e.submitter;
+      if(btn && btn.classList.contains('cart-qty-btn')) {
+        btn.classList.add('shake');
+        setTimeout(() => btn.classList.remove('shake'), 300);
+      }
+    });
+  });
+  
+  // Confirmación antes de eliminar (solo mobile)
+  if(window.innerWidth < 768) {
+    const removeForms = document.querySelectorAll('.cart-remove-form');
+    removeForms.forEach(form => {
+      form.addEventListener('submit', function(e){
+        e.preventDefault();
+        const card = this.closest('.cart-product-card');
+        const productName = card ? card.querySelector('.cart-product-name').textContent : 'este producto';
+        
+        if(confirm(`¿Eliminar ${productName} del carrito?`)) {
+          this.submit();
+        }
+      });
+    });
+  }
+  
+  // ============ VALIDACIÓN MEJORADA ============
+  checkoutForm.addEventListener('submit', function(e){
+    const shippingMethod = document.querySelector('input[name="shipping"]:checked');
+    
+    // Validar campos de cadete
+    if(shippingMethod && shippingMethod.value === 'cadete') {
+      const addressCadete = document.querySelector('input[name="address_cadete"]');
+      if(addressCadete && !addressCadete.value.trim()) {
+        e.preventDefault();
+        showToast('Por favor ingresá la dirección para el cadete', 'error');
+        addressCadete.focus();
+        return;
+      }
+    }
+    
+    // Validar campos de envío
+    if(shippingMethod && shippingMethod.value === 'envio') {
+      const province = document.querySelector('select[name="province"]');
+      const address = document.querySelector('input[name="address_envio"]');
+      const postalCode = document.querySelector('input[name="postal_code"]');
+      const dni = document.querySelector('input[name="dni"]');
+      
+      if(!province.value) {
+        e.preventDefault();
+        showToast('Por favor seleccioná una provincia', 'error');
+        province.focus();
+        return;
+      }
+      
+      if(!address.value.trim()) {
+        e.preventDefault();
+        showToast('Por favor ingresá la dirección de envío', 'error');
+        address.focus();
+        return;
+      }
+      
+      if(!postalCode.value.trim()) {
+        e.preventDefault();
+        showToast('Por favor ingresá el código postal', 'error');
+        postalCode.focus();
+        return;
+      }
+      
+      if(!dni.value.trim()) {
+        e.preventDefault();
+        showToast('Por favor ingresá tu DNI', 'error');
+        dni.focus();
+        return;
+      }
+    }
+    
+    // Mostrar loading en el botón
+    const submitBtn = this.querySelector('button[type="submit"]');
+    if(submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0110 10"/></svg><span>Procesando...</span>';
+    }
+  });
+  
+  // ============ FOMO DINÁMICO ============
+  const fomoBadge = document.querySelector('.cart-fomo-badge');
+  if(fomoBadge) {
+    // Simular cantidad de personas viendo (2-5 personas)
+    setInterval(() => {
+      const viewers = Math.floor(Math.random() * 4) + 2; // 2-5
+      const strong = fomoBadge.querySelector('strong');
+      if(strong) strong.textContent = viewers + ' personas';
+    }, 15000); // Cada 15 segundos
+  }
+  
+  // ============ SCROLL OPTIMIZATION ============
+  let lastScroll = 0;
+  let scrollTimeout;
+  
+  window.addEventListener('scroll', function(){
+    clearTimeout(scrollTimeout);
+    
+    scrollTimeout = setTimeout(() => {
+      const currentScroll = window.pageYOffset;
+      
+      // Auto-colapsar sticky bar si scrolleamos hacia arriba
+      if(stickyBottom && stickyBottom.classList.contains('expanded')) {
+        if(currentScroll < lastScroll) {
+          stickyBottom.classList.remove('expanded');
+        }
+      }
+      
+      lastScroll = currentScroll;
+    }, 100);
+  }, { passive: true });
+  
+})();
+
+// Animación de loading (spinner)
+const style = document.createElement('style');
+style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+document.head.appendChild(style);
+
+// ============================================
+// MODAL MAYORISTA
+// ============================================
+
+// Usar delegación de eventos para que funcione incluso si los elementos se cargan después
+document.addEventListener('click', function(e){
+  const btn = e.target.closest('#btnMayorista');
+  if(btn){
+    e.preventDefault();
+    e.stopPropagation();
+    const backdrop = document.getElementById('mayoristaBackdrop');
+    if(backdrop){
+      backdrop.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+  }
+  
+  const cerrar = e.target.closest('#mayoristaCerrar');
+  if(cerrar){
+    e.preventDefault();
+    e.stopPropagation();
+    const backdrop = document.getElementById('mayoristaBackdrop');
+    if(backdrop){
+      backdrop.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+  }
+  
+  const backdrop = e.target.closest('#mayoristaBackdrop');
+  if(backdrop && e.target === backdrop){
+    backdrop.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+});
+
+// Cerrar con tecla Escape
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){
+    const backdrop = document.getElementById('mayoristaBackdrop');
+    if(backdrop && backdrop.style.display === 'flex'){
+      backdrop.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+  }
+});
+
+// Asegurar que el modal esté oculto al cargar
+(function(){
+  function hideModal(){
+    const backdrop = document.getElementById('mayoristaBackdrop');
+    if(backdrop){
+      backdrop.style.display = 'none';
+    }
+  }
+  
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', hideModal);
+  } else {
+    hideModal();
+  }
+  
+  window.addEventListener('load', hideModal);
 })();
