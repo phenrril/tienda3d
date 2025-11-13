@@ -1,206 +1,348 @@
 {{define "cart.html"}}
 {{template "layout_start" .}}
-<div style="max-width:1200px;margin:0 auto;padding:20px">
-  <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:32px">
-    <a href="/products" class="btn-secondary" style="text-decoration:none;display:flex;align-items:center;gap:8px">
-      <span style="font-size:20px">←</span> <span>Seguir comprando</span>
-    </a>
-    <h1 style="margin:0;font-size:32px;font-weight:700">Carrito de compras</h1>
-    <div style="width:140px"></div>
-  </div>
-  
+
+<div class="cart-container">
   {{if not .Lines}}
-  <div style="text-align:center;padding:80px 20px;background:var(--panel);border-radius:20px;border:1px solid var(--border)">
-    <div style="font-size:80px;margin-bottom:20px">🛒</div>
-    <h2 style="margin:0 0 12px;font-size:28px;color:var(--text)">Tu carrito está vacío</h2>
-    <p style="margin:0 0 32px;color:var(--muted);font-size:16px">Agrega productos para comenzar tu pedido</p>
-    <a class="btn-primary" href="/products" style="text-decoration:none;display:inline-block;padding:14px 28px">Ver productos</a>
+  <!-- Carrito Vacío -->
+  <div class="cart-empty">
+    <div class="cart-empty-icon">🛒</div>
+    <h2 class="cart-empty-title">Tu carrito está vacío</h2>
+    <p class="cart-empty-text">Agrega productos para comenzar tu pedido</p>
+    <a class="btn-primary cart-empty-cta" href="/products">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+      </svg>
+      <span>Ver productos</span>
+    </a>
   </div>
   {{else}}
   
-  <div class="cart-grid" style="display:grid;grid-template-columns:1fr;gap:24px;align-items:start">
-    <!-- Items del carrito -->
-    <div>
-      <div style="background:var(--panel);border-radius:20px;border:1px solid var(--border);overflow:hidden;margin-bottom:20px">
-        <div style="padding:20px;background:var(--bg);border-bottom:1px solid var(--border)">
-          <h2 style="margin:0;font-size:20px;font-weight:600">{{len .Lines}} {{if eq (len .Lines) 1}}producto{{else}}productos{{end}}</h2>
-        </div>
-        <table class="cart-table">
-          <tbody>
-            {{range .Lines}}
-            <tr style="border-top:1px solid var(--border)">
-              <td style="padding:20px;width:60px">
-                {{if .Image}}<img src="{{.Image}}" alt="{{.Name}}" loading="lazy" style="width:60px;height:60px;object-fit:cover;border-radius:12px" />{{end}}
-              </td>
-              <td style="padding:20px">
-                <div style="font-weight:600;margin-bottom:6px">{{.Name}}</div>
-                <div style="display:flex;align-items:center;gap:8px">
-                  <div class="color-dot" style="background: {{colorhex .Color}};width:20px;height:20px;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.2)"></div>
-                  <span style="font-size:13px;color:var(--muted)">{{.Color}}</span>
-                </div>
-              </td>
-              <td style="padding:20px;text-align:right;vertical-align:middle">
-                <form method="post" action="/cart/update">
-                  <input type="hidden" name="slug" value="{{.Slug}}" />
-                  <input type="hidden" name="color" value="{{.Color}}" />
-                  <div style="display:flex;align-items:center;gap:10px;justify-content:flex-end">
-                    <button name="op" value="dec" type="submit" style="width:36px;height:36px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--text);cursor:pointer;font-size:18px;font-weight:600">-</button>
-                    <span style="min-width:36px;text-align:center;font-weight:700">{{.Qty}}</span>
-                    <button name="op" value="inc" type="submit" style="width:36px;height:36px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--text);cursor:pointer;font-size:18px;font-weight:600">+</button>
-                  </div>
-                </form>
-              </td>
-              <td style="padding:20px;text-align:right;vertical-align:middle;font-weight:600;color:var(--primary)">${{formatPrice .Subtotal}}</td>
-              <td style="padding:20px;width:50px;vertical-align:middle">
-                <form method="post" action="/cart/remove">
-                  <input type="hidden" name="slug" value="{{.Slug}}" />
-                  <input type="hidden" name="color" value="{{.Color}}" />
-                  <button type="submit" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:24px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:10px;transition:background 0.2s" title="Eliminar" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='none'">×</button>
-                </form>
-              </td>
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
-      </div>
+  <!-- Progress Bar Minimalista -->
+  <div class="cart-progress">
+    <div class="cart-progress-dot active"></div>
+    <div class="cart-progress-line"></div>
+    <div class="cart-progress-dot"></div>
+    <div class="cart-progress-line"></div>
+    <div class="cart-progress-dot"></div>
+  </div>
+  
+  <!-- Header Mobile Optimizado -->
+  <div class="cart-header-mobile">
+    <a href="/products" class="cart-back-btn">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    <div class="cart-header-info">
+      <h1>Mi Carrito</h1>
+      <span class="cart-items-count">{{len .Lines}} {{if eq (len .Lines) 1}}producto{{else}}productos{{end}}</span>
     </div>
+    <div class="cart-header-spacer"></div>
+  </div>
 
-    <!-- Formulario de checkout -->
-    <div class="cart-form-sticky">
-      <form method="post" action="/cart/checkout" id="checkoutForm" style="background:var(--panel);border-radius:20px;border:1px solid var(--border);padding:24px;display:flex;flex-direction:column;gap:24px">
-        <h2 style="margin:0;font-size:22px;font-weight:700">Finalizar pedido</h2>
+  <!-- FOMO Badge -->
+  <div class="cart-fomo-badge">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+    </svg>
+    <span><strong>3 personas</strong> están viendo estos productos ahora</span>
+  </div>
+
+  <!-- Product Cards (reemplaza tabla) -->
+  <div class="cart-products">
+    {{range $index, $line := .Lines}}
+    <div class="cart-product-card" data-slug="{{$line.Slug}}" data-color="{{$line.Color}}">
+      <div class="cart-product-image">
+        {{if $line.Image}}
+        <img src="{{$line.Image}}" alt="{{$line.Name}}" loading="lazy" />
+        {{else}}
+        <div class="cart-product-placeholder">IMG</div>
+        {{end}}
+      </div>
+      
+      <div class="cart-product-info">
+        <h3 class="cart-product-name">{{$line.Name}}</h3>
+        <div class="cart-product-color">
+          <span class="color-dot" style="background:{{colorhex $line.Color}}"></span>
+          <span>{{$line.Color}}</span>
+        </div>
+        <div class="cart-product-price">${{formatPrice $line.Subtotal}}</div>
+      </div>
+      
+      <div class="cart-product-actions">
+        <form method="post" action="/cart/update" class="cart-qty-form">
+          <input type="hidden" name="slug" value="{{$line.Slug}}" />
+          <input type="hidden" name="color" value="{{$line.Color}}" />
+          <button type="submit" name="op" value="dec" class="cart-qty-btn cart-qty-minus" aria-label="Disminuir cantidad">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3">
+              <path d="M5 12h14"/>
+            </svg>
+          </button>
+          <span class="cart-qty-value">{{$line.Qty}}</span>
+          <button type="submit" name="op" value="inc" class="cart-qty-btn cart-qty-plus" aria-label="Aumentar cantidad">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </button>
+        </form>
         
-        <!-- Datos personales -->
-        <div style="display:flex;flex-direction:column;gap:16px">
-          <h3 style="margin:0;font-size:15px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted)">Datos de contacto</h3>
-          <input type="text" name="name" placeholder="Nombre completo *" required style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px" />
-          <input type="email" name="email" placeholder="Email *" required style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px" />
-          <input type="text" name="phone" placeholder="Teléfono" style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px" />
-        </div>
+        <form method="post" action="/cart/remove" class="cart-remove-form">
+          <input type="hidden" name="slug" value="{{$line.Slug}}" />
+          <input type="hidden" name="color" value="{{$line.Color}}" />
+          <button type="submit" class="cart-remove-btn" aria-label="Eliminar producto">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+      
+      <!-- Swipe indicator for mobile -->
+      <div class="cart-swipe-hint">Deslizá para eliminar →</div>
+    </div>
+    {{end}}
+  </div>
 
-        <!-- Método de entrega -->
-        <div style="display:flex;flex-direction:column;gap:16px;padding:20px;background:var(--bg);border-radius:16px;border:1px solid var(--border)">
-          <h3 style="margin:0;font-size:16px;font-weight:600">Método de entrega</h3>
-          <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--panel);border-radius:12px;border:2px solid var(--border);cursor:pointer;transition:border-color 0.2s">
-            <input type="radio" name="shipping" value="retiro" checked />
-            <span style="flex:1">
-              <div style="font-weight:600">Retiro en local</div>
-              <div style="font-size:13px;color:var(--muted)">Sin costo adicional</div>
-            </span>
-          </label>
-          <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--panel);border-radius:12px;border:2px solid var(--border);cursor:pointer;transition:border-color 0.2s">
-            <input type="radio" name="shipping" value="cadete" />
-            <span style="flex:1">
-              <div style="font-weight:600">Cadete en Rosario</div>
-              <div style="font-size:13px;color:var(--muted)">$5,000</div>
-            </span>
-          </label>
-          <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--panel);border-radius:12px;border:2px solid var(--border);cursor:pointer;transition:border-color 0.2s">
-            <input type="radio" name="shipping" value="envio" />
-            <span style="flex:1">
-              <div style="font-weight:600">Envío a domicilio</div>
-              <div style="font-size:13px;color:var(--muted)">Según provincia</div>
-            </span>
-          </label>
-          
-          <div id="cadeteGroup" style="display:none;margin-top:12px;gap:12px;flex-direction:column">
-            <input type="text" name="address_cadete" placeholder="Dirección en Rosario" style="padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:14px;width:100%" />
-          </div>
-          <div id="envioGroup" style="display:none;margin-top:12px;gap:12px;flex-direction:column">
-            <select name="province" id="provinceSelect" style="padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:14px;width:100%">
-              <option value="">Seleccioná provincia</option>
-              {{range .Provinces}}<option value="{{.}}">{{.}}</option>{{end}}
-            </select>
-            <input type="text" name="address_envio" placeholder="Dirección completa" style="padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:14px;width:100%" />
-            <input type="text" name="postal_code" placeholder="Código postal" style="padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:14px;width:100%" />
-            <input type="text" name="dni" placeholder="DNI" style="padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:14px;width:100%" />
-          </div>
+  <!-- Formulario de Checkout - Acordeón -->
+  <form method="post" action="/cart/checkout" id="checkoutForm" class="cart-checkout-form">
+    
+    <!-- Sección 1: Datos de Contacto -->
+    <div class="checkout-section" data-section="contact">
+      <button type="button" class="checkout-section-header active" data-toggle="contact">
+        <div class="checkout-section-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
         </div>
-
-        <!-- Método de pago -->
-        <div style="display:flex;flex-direction:column;gap:16px;padding:20px;background:var(--bg);border-radius:16px;border:1px solid var(--border)">
-          <h3 style="margin:0;font-size:16px;font-weight:600">Método de pago</h3>
-          <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--panel);border-radius:12px;border:2px solid var(--border);cursor:pointer">
-            <input type="radio" name="payment_method" value="efectivo" checked />
-            <span style="flex:1">
-              <div style="font-weight:600">Efectivo</div>
-            </span>
-          </label>
-          <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--panel);border-radius:12px;border:2px solid var(--border);cursor:pointer">
-            <input type="radio" name="payment_method" value="transferencia" />
-            <span style="flex:1">
-              <div style="font-weight:600">Transferencia</div>
-              <div style="font-size:13px;color:#10b981;font-weight:600">10% de descuento</div>
-            </span>
-          </label>
-          <label style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--panel);border-radius:12px;border:2px solid var(--border);cursor:pointer">
-            <input type="radio" name="payment_method" value="mercadopago" />
-            <span style="flex:1">
-              <div style="font-weight:600">Mercado Pago</div>
-              <div style="font-size:13px;color:var(--muted)">Pago seguro en línea</div>
-            </span>
-          </label>
+        <div class="checkout-section-title">
+          <span class="checkout-section-number">1</span>
+          <span>Datos de contacto</span>
         </div>
+        <svg class="checkout-section-arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+      
+      <div class="checkout-section-content active">
+        <input type="text" name="name" placeholder="Nombre completo *" required class="checkout-input" />
+        <input type="email" name="email" placeholder="Email *" required class="checkout-input" />
+        <input type="tel" name="phone" placeholder="Teléfono *" required class="checkout-input" />
+      </div>
+    </div>
 
-        <!-- Resumen de costos -->
-        <div style="padding:20px;background:var(--bg);border-radius:16px;border:1px solid var(--border)">
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px;color:var(--muted)">
-            <span>Subtotal</span>
-            <span id="subtotalVal" style="color:var(--text);font-weight:500">${{formatPrice .Total}}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px;color:var(--muted)">
-            <span>Costo de envío</span>
-            <span id="shipCost" style="color:var(--text);font-weight:500">$0.00</span>
-          </div>
-          <div id="discountRow" style="display:none;justify-content:space-between;margin-bottom:12px;font-size:14px;color:#10b981">
-            <span>Descuento (10%)</span>
-            <span id="discount" style="font-weight:600">-$0.00</span>
-          </div>
-          <div style="border-top:2px solid var(--border);padding-top:12px;margin-top:12px;display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:18px;font-weight:700">Total</span>
-            <span id="finalTotal" style="font-size:24px;font-weight:700;color:var(--primary)">${{formatPrice .Total}}</span>
-          </div>
+    <!-- Sección 2: Método de Entrega -->
+    <div class="checkout-section" data-section="shipping">
+      <button type="button" class="checkout-section-header" data-toggle="shipping">
+        <div class="checkout-section-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/>
+          </svg>
         </div>
-
-        <div id="pcData" style="display:none">
-          {{range $k,$v := .ProvinceCosts}}<span data-prov="{{$k}}" data-cost="{{$v}}"></span>{{end}}
+        <div class="checkout-section-title">
+          <span class="checkout-section-number">2</span>
+          <span>Método de entrega</span>
         </div>
+        <svg class="checkout-section-arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+      
+      <div class="checkout-section-content">
+        <label class="checkout-radio-option">
+          <input type="radio" name="shipping" value="retiro" checked />
+          <div class="checkout-radio-content">
+            <div class="checkout-radio-icon">🏪</div>
+            <div class="checkout-radio-info">
+              <div class="checkout-radio-title">Retiro en local</div>
+              <div class="checkout-radio-subtitle">Gratis • Rosario</div>
+            </div>
+          </div>
+          <div class="checkout-radio-check">✓</div>
+        </label>
+        
+        <label class="checkout-radio-option">
+          <input type="radio" name="shipping" value="cadete" />
+          <div class="checkout-radio-content">
+            <div class="checkout-radio-icon">🏍️</div>
+            <div class="checkout-radio-info">
+              <div class="checkout-radio-title">Cadete en Rosario</div>
+              <div class="checkout-radio-subtitle">$5,000 • Entrega rápida</div>
+            </div>
+          </div>
+          <div class="checkout-radio-check">✓</div>
+        </label>
+        
+        <label class="checkout-radio-option">
+          <input type="radio" name="shipping" value="envio" />
+          <div class="checkout-radio-content">
+            <div class="checkout-radio-icon">📦</div>
+            <div class="checkout-radio-info">
+              <div class="checkout-radio-title">Envío a domicilio</div>
+              <div class="checkout-radio-subtitle">Según provincia</div>
+            </div>
+          </div>
+          <div class="checkout-radio-check">✓</div>
+        </label>
+        
+        <div id="cadeteGroup" class="checkout-conditional-fields" style="display:none">
+          <input type="text" name="address_cadete" placeholder="Dirección en Rosario" class="checkout-input" />
+        </div>
+        
+        <div id="envioGroup" class="checkout-conditional-fields" style="display:none">
+          <select name="province" id="provinceSelect" class="checkout-input">
+            <option value="">Seleccioná provincia</option>
+            {{range .Provinces}}<option value="{{.}}">{{.}}</option>{{end}}
+          </select>
+          <input type="text" name="address_envio" placeholder="Dirección completa" class="checkout-input" />
+          <input type="text" name="postal_code" placeholder="Código postal" class="checkout-input" />
+          <input type="text" name="dni" placeholder="DNI" class="checkout-input" />
+        </div>
+      </div>
+    </div>
 
-        <button type="submit" class="btn-primary" style="padding:16px;font-size:16px;font-weight:700;border-radius:12px;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);box-shadow:0 4px 12px rgba(99,102,241,0.3)">
-          Finalizar Compra
-        </button>
-      </form>
+    <!-- Sección 3: Método de Pago -->
+    <div class="checkout-section" data-section="payment">
+      <button type="button" class="checkout-section-header" data-toggle="payment">
+        <div class="checkout-section-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/>
+          </svg>
+        </div>
+        <div class="checkout-section-title">
+          <span class="checkout-section-number">3</span>
+          <span>Método de pago</span>
+        </div>
+        <svg class="checkout-section-arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+      
+      <div class="checkout-section-content">
+        <label class="checkout-radio-option">
+          <input type="radio" name="payment_method" value="efectivo" checked />
+          <div class="checkout-radio-content">
+            <div class="checkout-radio-icon">💵</div>
+            <div class="checkout-radio-info">
+              <div class="checkout-radio-title">Efectivo</div>
+              <div class="checkout-radio-subtitle">Pagar al recibir</div>
+            </div>
+          </div>
+          <div class="checkout-radio-check">✓</div>
+        </label>
+        
+        <label class="checkout-radio-option checkout-radio-discount">
+          <div class="checkout-discount-badge">-10%</div>
+          <input type="radio" name="payment_method" value="transferencia" />
+          <div class="checkout-radio-content">
+            <div class="checkout-radio-icon">🏦</div>
+            <div class="checkout-radio-info">
+              <div class="checkout-radio-title">Transferencia</div>
+              <div class="checkout-radio-subtitle">¡Ahorrá 10% en tu compra!</div>
+            </div>
+          </div>
+          <div class="checkout-radio-check">✓</div>
+        </label>
+        
+        <label class="checkout-radio-option">
+          <input type="radio" name="payment_method" value="mercadopago" />
+          <div class="checkout-radio-content">
+            <div class="checkout-radio-icon">💳</div>
+            <div class="checkout-radio-info">
+              <div class="checkout-radio-title">Mercado Pago</div>
+              <div class="checkout-radio-subtitle">Tarjeta de crédito/débito</div>
+            </div>
+          </div>
+          <div class="checkout-radio-check">✓</div>
+        </label>
+      </div>
+    </div>
+
+    <div id="pcData" style="display:none">
+      {{range $k,$v := .ProvinceCosts}}<span data-prov="{{$k}}" data-cost="{{$v}}"></span>{{end}}
+    </div>
+  </form>
+
+  <!-- Resumen Desktop (oculto en mobile, se muestra en sticky bar) -->
+  <div class="cart-summary-desktop">
+    <div class="cart-summary-header">Resumen de tu pedido</div>
+    <div class="cart-summary-row">
+      <span>Subtotal</span>
+      <span id="subtotalVal" class="summary-value">${{formatPrice .Total}}</span>
+    </div>
+    <div class="cart-summary-row">
+      <span>Envío</span>
+      <span id="shipCost" class="summary-value">$0.00</span>
+    </div>
+    <div class="cart-summary-row cart-summary-discount" id="discountRow" style="display:none">
+      <span>Descuento (10%)</span>
+      <span id="discount" class="summary-value">-$0.00</span>
+    </div>
+    <div class="cart-summary-total">
+      <span>Total</span>
+      <span id="finalTotal" class="summary-value">${{formatPrice .Total}}</span>
+    </div>
+    
+    <button type="submit" form="checkoutForm" class="cart-summary-cta">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9l2 2 4-4"/>
+      </svg>
+      <span>Confirmar Pedido</span>
+    </button>
+    
+    <div class="cart-trust-badges">
+      <div class="cart-trust-badge">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span>Compra segura</span>
+      </div>
+      <div class="cart-trust-badge">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <span>Datos protegidos</span>
+      </div>
     </div>
   </div>
+
+  <!-- Sticky Bottom Bar Mobile -->
+  <div class="cart-sticky-bottom" id="cartStickyBottom">
+    <button type="button" class="cart-sticky-toggle" id="cartStickyToggle">
+      <div class="cart-sticky-summary">
+        <span class="cart-sticky-label">Total</span>
+        <span class="cart-sticky-total" id="stickyTotal">${{formatPrice .Total}}</span>
+      </div>
+      <svg class="cart-sticky-arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 15l-6-6-6 6"/>
+      </svg>
+    </button>
+    
+    <div class="cart-sticky-expanded" id="cartStickyExpanded">
+      <div class="cart-sticky-breakdown">
+        <div class="cart-sticky-row">
+          <span>Subtotal</span>
+          <span id="stickySubtotal">${{formatPrice .Total}}</span>
+        </div>
+        <div class="cart-sticky-row">
+          <span>Envío</span>
+          <span id="stickyShipCost">$0.00</span>
+        </div>
+        <div class="cart-sticky-row cart-sticky-discount" id="stickyDiscountRow" style="display:none">
+          <span>Descuento</span>
+          <span id="stickyDiscount">-$0.00</span>
+        </div>
+      </div>
+    </div>
+    
+    <button type="submit" form="checkoutForm" class="cart-sticky-cta">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9l2 2 4-4"/>
+      </svg>
+      <span>Confirmar Pedido</span>
+    </button>
+  </div>
+
   {{end}}
-</div>
-
-<!-- Popup de confirmación de compra -->
-<div id="confirmPurchaseModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:center;justify-content:center;padding:20px;flex-direction:column">
-  <div style="background:var(--panel);border-radius:20px;border:1px solid var(--border);max-width:500px;width:100%;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
-    <h2 style="margin:0 0 20px;font-size:24px;font-weight:700;color:var(--text)">Confirmar compra</h2>
-    <p style="margin:0 0 24px;font-size:16px;color:var(--muted);line-height:1.6">
-      ¿Estás seguro de que deseas finalizar tu compra?
-    </p>
-    <div style="background:var(--bg);border-radius:12px;padding:20px;margin-bottom:24px;border:1px solid var(--border)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <span style="font-size:16px;color:var(--muted)">Cantidad de productos:</span>
-        <span id="confirmProductCount" style="font-size:18px;font-weight:700;color:var(--text)">0</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;border-top:2px solid var(--border);padding-top:12px">
-        <span style="font-size:18px;font-weight:700;color:var(--text)">Total:</span>
-        <span id="confirmTotal" style="font-size:24px;font-weight:700;color:var(--primary)">$0.00</span>
-      </div>
-    </div>
-    <div style="display:flex;gap:12px;justify-content:flex-end">
-      <button id="confirmCancelBtn" style="padding:12px 24px;border-radius:12px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:16px;font-weight:600;cursor:pointer;transition:background 0.2s">
-        Cancelar
-      </button>
-      <button id="confirmPurchaseBtn" style="padding:12px 24px;border-radius:12px;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;font-size:16px;font-weight:700;cursor:pointer;border:none;box-shadow:0 4px 12px rgba(99,102,241,0.3)">
-        Confirmar compra
-      </button>
-    </div>
-  </div>
 </div>
 
 {{template "layout_end" .}}
