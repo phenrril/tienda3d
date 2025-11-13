@@ -662,7 +662,7 @@ if ('serviceWorker' in navigator) {
     }
   }); }
 
-  // Filtro local por nombre, slug y categoría
+  // Filtro local por nombre, slug y categoría (case-insensitive mejorado)
   if(searchInput && tbl){
     const tbody=tbl.tBodies && tbl.tBodies[0];
     const categoryFilter=document.getElementById('categoryFilter');
@@ -670,18 +670,90 @@ if ('serviceWorker' in navigator) {
     
     function applyFilter(){
       const q=(searchInput.value||'').trim().toLowerCase();
-      const selCat=(categoryFilter && categoryFilter.value||'').trim();
+      const selCat=(categoryFilter && categoryFilter.value||'').trim().toLowerCase(); // ← CASE-INSENSITIVE
+      
+      let visibleCount = 0;
       rows().forEach(tr=>{
         const name=(tr.cells[0] && tr.cells[0].textContent||'').toLowerCase();
         const slug=(tr.cells[1] && tr.cells[1].textContent||'').toLowerCase();
-        const cat=(tr.getAttribute('data-category')||'').trim();
+        const cat=(tr.getAttribute('data-category')||'').trim().toLowerCase(); // ← CASE-INSENSITIVE
+        
         const matchText = !q || name.includes(q) || slug.includes(q);
-        const matchCat = !selCat || cat === selCat;
-        tr.style.display = (matchText && matchCat) ? '' : 'none';
+        const matchCat = !selCat || cat === selCat || (selCat === 'sin categoría' && !cat); // ← Incluye productos sin categoría
+        
+        const isVisible = matchText && matchCat;
+        tr.style.display = isVisible ? '' : 'none';
+        if(isVisible) visibleCount++;
       });
+      
+      // Actualizar contador
+      updateFilterCount(visibleCount, rows().length);
     }
+    
+    function updateFilterCount(visible, total){
+      let counterEl = document.getElementById('productsFilterCounter');
+      if(!counterEl){
+        counterEl = document.createElement('span');
+        counterEl.id = 'productsFilterCounter';
+        counterEl.style.cssText = 'font-size:13px;color:var(--muted);margin-left:8px';
+        const h2 = document.querySelector('.admin-card + div h2 span');
+        if(h2) h2.parentNode.appendChild(counterEl);
+      }
+      
+      const hasFilters = searchInput.value.trim() !== '' || (categoryFilter && categoryFilter.value !== '');
+      const btnClear = document.getElementById('btnClearFilters');
+      
+      if(hasFilters){
+        counterEl.textContent = `(${visible} de ${total})`;
+        counterEl.style.color = visible === 0 ? '#ef4444' : '#10b981';
+        if(btnClear) btnClear.style.display = 'inline-block';
+      } else {
+        counterEl.textContent = '';
+        if(btnClear) btnClear.style.display = 'none';
+      }
+      
+      // Mostrar mensaje si no hay resultados
+      if(visible === 0 && hasFilters){
+        showNoResultsMessage();
+      } else {
+        hideNoResultsMessage();
+      }
+    }
+    
+    function showNoResultsMessage(){
+      let msg = document.getElementById('noResultsMsg');
+      if(!msg){
+        msg = document.createElement('div');
+        msg.id = 'noResultsMsg';
+        msg.style.cssText = 'padding:40px 20px;text-align:center;background:var(--panel);border-radius:12px;margin:20px 0;border:1px solid var(--border)';
+        msg.innerHTML = '<div style="font-size:48px;margin-bottom:12px">🔍</div><div style="font-size:16px;font-weight:600;margin-bottom:8px;color:var(--text)">No se encontraron productos</div><div style="font-size:13px;color:var(--muted)">Intentá con otros términos de búsqueda o categoría</div>';
+        const table = document.getElementById('prodTable');
+        if(table) table.parentNode.insertBefore(msg, table);
+      }
+      msg.style.display = 'block';
+      const table = document.getElementById('prodTable');
+      if(table) table.style.display = 'none';
+    }
+    
+    function hideNoResultsMessage(){
+      const msg = document.getElementById('noResultsMsg');
+      if(msg) msg.style.display = 'none';
+      const table = document.getElementById('prodTable');
+      if(table) table.style.display = '';
+    }
+    
     searchInput.addEventListener('input', applyFilter);
     if(categoryFilter) categoryFilter.addEventListener('change', applyFilter);
+    
+    // Botón limpiar filtros
+    const btnClear = document.getElementById('btnClearFilters');
+    if(btnClear){
+      btnClear.addEventListener('click', function(){
+        searchInput.value = '';
+        if(categoryFilter) categoryFilter.value = '';
+        applyFilter();
+      });
+    }
   }
 
   form.addEventListener('submit', async e=>{
