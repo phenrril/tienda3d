@@ -1,9 +1,18 @@
 {{define "admin_products.html"}}
 {{template "layout_start" .}}
-<h1>Productos</h1>
-<nav class="admin-nav"><a href="/admin/products" class="active">Productos</a> | <a href="/admin/orders">Órdenes</a> | <a href="/admin/sales">Ventas</a> | <a href="/admin/destacada">Destacada</a> | <a href="/admin/costs">Calculadora</a> | <a href="/admin/logout">Salir</a></nav>
-<section class="grid" style="margin-top:1rem;grid-template-columns:420px 1fr;gap:2rem;align-items:start">
-  <div class="admin-card" style="padding:18px 20px 24px">
+<div class="admin-header">
+  <h1>Gestión de Productos</h1>
+  <nav class="admin-nav">
+    <a href="/admin/products" class="active">Productos</a>
+    <a href="/admin/orders">Órdenes</a>
+    <a href="/admin/sales">Ventas</a>
+    <a href="/admin/destacada">Destacada</a>
+    <a href="/admin/costs">Calculadora</a>
+    <a href="/admin/logout" class="admin-nav-logout">Salir</a>
+  </nav>
+</div>
+<section class="admin-products-grid">
+  <div class="admin-card admin-form-panel">
     <div class="row between center" style="margin-bottom:6px">
       <h2 style="margin:0;font-size:18px">Gestión de producto</h2>
       <span id="formMode" class="mode-badge create">Creación</span>
@@ -12,22 +21,25 @@
       <input type="hidden" name="slug" id="pfSlug" />
       <label>Nombre<input type="text" name="name" id="pfName" required placeholder="Nombre visible" /></label>
       <label>Categoría<input type="text" name="category" id="pfCategory" placeholder="(opcional)" /></label>
-      <label>Descripción corta<textarea name="short_desc" id="pfShort" placeholder="Resumen / marketing"></textarea></label>
-      <div class="row" style="gap:.5rem">
-        <label style="flex:1">Ancho (mm)<input type="number" step="0.1" min="0" id="pfWidth" placeholder="0" /></label>
-        <label style="flex:1">Alto (mm)<input type="number" step="0.1" min="0" id="pfHeight" placeholder="0" /></label>
-        <label style="flex:1">Profundidad (mm)<input type="number" step="0.1" min="0" id="pfDepth" placeholder="0" /></label>
+      <label>Descripción corta<textarea name="short_desc" id="pfShort" placeholder="Resumen / marketing" rows="3"></textarea></label>
+      <div class="admin-form-row">
+        <label class="admin-form-col">Ancho (mm)<input type="number" step="0.1" min="0" id="pfWidth" placeholder="0" /></label>
+        <label class="admin-form-col">Alto (mm)<input type="number" step="0.1" min="0" id="pfHeight" placeholder="0" /></label>
+        <label class="admin-form-col">Prof. (mm)<input type="number" step="0.1" min="0" id="pfDepth" placeholder="0" /></label>
       </div>
       <label>Precio base<input type="number" step="0.01" min="0" name="base_price" id="pfPrice" required placeholder="0.00" /></label>
-      <label class="row center" style="gap:.5rem"><input type="checkbox" name="ready_to_ship" id="pfReady" /> Listo para envío</label>
-      <label>Observación<textarea name="observation" id="pfObservation" placeholder="Notas internas"></textarea></label>
-      <div class="row" style="gap:.5rem">
-        <label style="flex:1">Gramos<input type="number" step="0.01" min="0" id="pfGrams" placeholder="0" /></label>
-        <label style="flex:1">Horas<input type="number" step="0.1" min="0" id="pfHours" placeholder="0" /></label>
+      <div class="admin-checkbox-label">
+        <input type="checkbox" name="ready_to_ship" id="pfReady" />
+        <span>Listo para envío</span>
       </div>
-      <div class="row" style="gap:.5rem">
-        <label style="flex:1">Precio bruto<input type="number" step="0.01" min="0" id="pfGrossPrice" placeholder="0.00" /></label>
-        <label style="flex:1">Ganancia<input type="number" step="0.01" min="0" id="pfProfit" placeholder="0.00" /></label>
+      <label>Observación<textarea name="observation" id="pfObservation" placeholder="Notas internas" rows="2"></textarea></label>
+      <div class="admin-form-row">
+        <label class="admin-form-col">Gramos<input type="number" step="0.01" min="0" id="pfGrams" placeholder="0" /></label>
+        <label class="admin-form-col">Horas<input type="number" step="0.1" min="0" id="pfHours" placeholder="0" /></label>
+      </div>
+      <div class="admin-form-row">
+        <label class="admin-form-col">P. Bruto<input type="number" step="0.01" min="0" id="pfGrossPrice" placeholder="0.00" /></label>
+        <label class="admin-form-col">Ganancia<input type="number" step="0.01" min="0" id="pfProfit" placeholder="0.00" /></label>
       </div>
       <div class="uploader-block">
         <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;letter-spacing:.6px;color:var(--muted);text-transform:uppercase">Imágenes (opcional / arrastrar)
@@ -80,35 +92,59 @@
     <p style="margin:14px 0 0;font-size:11px;color:var(--muted);line-height:1.4">Flujo: completar datos y (opcional) elegir imágenes. Al guardar, si es creación primero se crea el producto y luego se suben las imágenes seleccionadas. En edición podés cambiar datos y agregar nuevas imágenes (no reemplaza las existentes). Para remover imágenes viejas usar futura gestión de galería.</p>
   </div>
   <div>
-    <h2 style="margin:0 0 10px;font-size:18px">Listado ({{.Total}})</h2>
-    <div class="row" style="margin:0 0 8px;gap:8px">
-      <input type="text" id="prodSearch" placeholder="Buscar por nombre o slug..." aria-label="Buscar productos" style="width:260px;padding:8px 10px;border-radius:8px;border:1px solid #223140;background:#0b1520;color:#e5f0ff" />
-      <select id="categoryFilter" aria-label="Filtrar por categoría" style="padding:8px 10px;border-radius:8px;border:1px solid #223140;background:#0b1520;color:#e5f0ff">
-        <option value="">Todas las categorías</option>
+    <h2 style="margin:0 0 10px;font-size:18px;display:flex;align-items:center;gap:8px">
+      <span>Listado ({{.Total}})</span>
+      <button type="button" id="btnClearFilters" class="btn-secondary" style="padding:4px 10px;font-size:11px;display:none">Limpiar filtros</button>
+    </h2>
+    <div class="row" style="margin:0 0 12px;gap:8px;flex-wrap:wrap">
+      <input type="text" id="prodSearch" placeholder="Buscar por nombre o slug..." aria-label="Buscar productos" style="flex:1;min-width:200px;padding:10px 12px;border-radius:8px;border:1px solid #223140;background:#0b1520;color:#e5f0ff;font-size:14px" />
+      <select id="categoryFilter" aria-label="Filtrar por categoría" style="min-width:200px;padding:10px 12px;border-radius:8px;border:1px solid #223140;background:#0b1520;color:#e5f0ff;font-size:14px">
+        <option value="">🔍 Todas las categorías</option>
+        <option value="sin categoría">⚠️ Sin categoría</option>
         {{range .Categories}}
           <option value="{{.}}">{{.}}</option>
         {{end}}
       </select>
     </div>
-    <div>
-      <table class="table" id="prodTable" style="font-size:0.9rem;width:100%">
-        <thead><tr><th>Nombre</th><th>Slug</th><th>Precio</th><th>Categoría</th><th>W</th><th>H</th><th>D</th><th>Stock</th><th>Gramos</th><th>Horas</th><th>P. Bruto</th><th>Ganancia</th><th>Imgs</th><th style="text-align:right">Acciones</th></tr></thead>
+    <div class="admin-table-wrapper">
+      <table class="table admin-products-table" id="prodTable">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th class="hide-mobile">Slug</th>
+            <th>Precio</th>
+            <th>Categoría</th>
+            <th class="hide-mobile">W</th>
+            <th class="hide-mobile">H</th>
+            <th class="hide-mobile">D</th>
+            <th class="hide-small">Stock</th>
+            <th class="hide-mobile">Gramos</th>
+            <th class="hide-mobile">Horas</th>
+            <th class="hide-mobile">P. Bruto</th>
+            <th class="hide-mobile">Ganancia</th>
+            <th class="hide-small">Imgs</th>
+            <th style="text-align:right">Acciones</th>
+          </tr>
+        </thead>
         <tbody>
           {{range .Products}}
-          <tr data-slug="{{.Slug}}" data-category="{{.Category}}">
-            <td>{{.Name}}</td>
-            <td style="font-family:monospace">{{.Slug}}</td>
-            <td>${{formatPrice .BasePrice}}</td>
-            <td>{{.Category}}</td>
-            <td>{{printf "%.0f" .WidthMM}}</td>
-            <td>{{printf "%.0f" .HeightMM}}</td>
-            <td>{{printf "%.0f" .DepthMM}}</td>
-            <td>{{if .ReadyToShip}}✔{{else}}-{{end}}</td>
-            <td>{{printf "%.0f" .Grams}}</td>
-            <td>{{printf "%.1f" .Hours}}</td>
-            <td>${{formatPrice .GrossPrice}}</td>
-            <td>${{formatPrice .Profit}}</td>
-            <td>{{len .Images}}</td>
+          <tr data-slug="{{.Slug}}" data-category="{{.Category}}" class="admin-product-row">
+            <td class="admin-product-name">
+              <div style="font-weight:600">{{.Name}}</div>
+              <div class="show-mobile" style="font-size:11px;color:var(--muted);margin-top:2px">{{if .Category}}{{.Category}}{{else}}<span style="color:#f59e0b">Sin categoría</span>{{end}}</div>
+            </td>
+            <td class="hide-mobile" style="font-family:monospace;font-size:12px">{{.Slug}}</td>
+            <td style="font-weight:600">${{formatPrice .BasePrice}}</td>
+            <td class="hide-mobile">{{if .Category}}{{.Category}}{{else}}<span style="color:#f59e0b;font-size:12px">Sin cat.</span>{{end}}</td>
+            <td class="hide-mobile">{{printf "%.0f" .WidthMM}}</td>
+            <td class="hide-mobile">{{printf "%.0f" .HeightMM}}</td>
+            <td class="hide-mobile">{{printf "%.0f" .DepthMM}}</td>
+            <td class="hide-small">{{if .ReadyToShip}}<span style="color:#10b981">✔</span>{{else}}<span style="color:var(--muted)">-</span>{{end}}</td>
+            <td class="hide-mobile">{{printf "%.0f" .Grams}}</td>
+            <td class="hide-mobile">{{printf "%.1f" .Hours}}</td>
+            <td class="hide-mobile">${{formatPrice .GrossPrice}}</td>
+            <td class="hide-mobile">${{formatPrice .Profit}}</td>
+            <td class="hide-small">{{if gt (len .Images) 0}}<span style="color:#10b981">{{len .Images}}</span>{{else}}<span style="color:#ef4444">0</span>{{end}}</td>
             <td style="text-align:right">
               <div class="table-actions">
                 <button type="button" class="icon-btn action-images" data-act="images" title="Imágenes">🖼️</button>
