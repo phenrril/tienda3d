@@ -35,54 +35,6 @@
 {{with .SchemaJSON}}<script type="application/ld+json">{{.}}</script>{{end}}
 <!-- JS unificado de UI - deferido para no bloquear render -->
 <script type="module" src="/public/assets/app.js?v=7" defer></script>
-<!-- Script inline mínimo para modal mayorista (ejecuta inmediatamente) -->
-<script>
-(function(){
-  function setupMayorista(){
-    var btn = document.getElementById('btnMayorista');
-    var backdrop = document.getElementById('mayoristaBackdrop');
-    var cerrar = document.getElementById('mayoristaCerrar');
-    
-    if(!btn || !backdrop || !cerrar) return;
-    
-    backdrop.style.display = 'none';
-    
-    btn.onclick = function(e){
-      e.preventDefault();
-      backdrop.style.display = 'flex';
-      document.body.style.overflow = 'hidden';
-    };
-    
-    cerrar.onclick = function(e){
-      e.preventDefault();
-      backdrop.style.display = 'none';
-      document.body.style.overflow = '';
-    };
-    
-    backdrop.onclick = function(e){
-      if(e.target === backdrop){
-        backdrop.style.display = 'none';
-        document.body.style.overflow = '';
-      }
-    };
-    
-    document.addEventListener('keydown', function(e){
-      if(e.key === 'Escape' && backdrop.style.display === 'flex'){
-        backdrop.style.display = 'none';
-        document.body.style.overflow = '';
-      }
-    });
-  }
-  
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', setupMayorista);
-  } else {
-    setupMayorista();
-  }
-  
-  setTimeout(setupMayorista, 500);
-})();
-</script>
 </head>
 <body class="site">
 <header class="topbar">
@@ -104,12 +56,11 @@
     
     <button class="nav-toggle" aria-label="Abrir menú" aria-expanded="false">☰</button>
     <nav class="mainnav">
-      <a href="/products">Productos</a>
-      <a href="/cart">Carrito</a>
-      <button type="button" id="btnMayorista" class="btn-mayorista">
+      <a href="/products">🛍️ Productos</a>
+      <a href="/cart">🛒 Carrito</a>
+      <a href="https://wa.me/5493416620117?text=Buen%20día%2C%20quiero%20hacerte%20una%20consulta%20sobre%20los%20precios%20mayoristas" target="_blank" rel="noopener" class="btn-mayorista">
         <span style="margin-right:4px">🏢</span> Mayorista
-      </button>
-      <a class="whatsapp" href="https://wa.me/5493416219815" target="_blank" rel="noopener">WhatsApp</a>
+      </a>
     </nav>
   </div>
 </header>
@@ -146,41 +97,6 @@
   <img src="/public/assets/img/WhatsApp.svg" alt="WhatsApp" width="28" height="28" aria-hidden="true" />
 </a>
 
-<!-- Modal Ventas Mayoristas -->
-<div id="mayoristaBackdrop" class="modal-backdrop mayorista-backdrop">
-  <div class="modal mayorista-modal">
-    <div class="mayorista-modal-header">
-      <button type="button" id="mayoristaCerrar" class="mayorista-close-btn">×</button>
-      <div class="mayorista-modal-icon">🏢</div>
-      <h2 class="mayorista-modal-title">Ventas Mayoristas</h2>
-    </div>
-    <div class="mayorista-modal-content">
-      <p class="mayorista-modal-intro">
-        <strong class="mayorista-intro-highlight">¿Tenés un local o revendés productos?</strong><br>
-        Consultanos por nuestros <strong>precios especiales mayoristas</strong> y descuentos por volumen.
-      </p>
-      <div class="mayorista-benefits">
-        <h3 class="mayorista-benefits-title">Beneficios mayoristas:</h3>
-        <ul class="mayorista-benefits-list">
-          <li>✅ Descuentos por volumen</li>
-          <li>✅ Precios especiales para revendedores</li>
-          <li>✅ Stock prioritario</li>
-          <li>✅ Asesoramiento personalizado</li>
-          <li>✅ Envíos programados</li>
-        </ul>
-      </div>
-      <a href="https://wa.me/5493416219815?text=Hola%2C%20quiero%20consultar%20por%20precios%20mayoristas" target="_blank" rel="noopener" class="mayorista-cta">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-          <path d="M12.04 2c-5.52 0-10 4.46-10 9.97 0 1.76.46 3.48 1.34 5.01L2 22l5.2-1.36a9.96 9.96 0 0 0 4.84 1.23h.01c5.52 0 10-4.46 10-9.97 0-2.67-1.05-5.18-2.95-7.06A9.93 9.93 0 0 0 12.04 2Z"/>
-        </svg>
-        <span>Consultar por WhatsApp</span>
-      </a>
-      <p class="mayorista-modal-footer">
-        Respondemos de Lunes a Viernes de 9 a 18 hs
-      </p>
-    </div>
-  </div>
-</div>
 
 
 </body>
