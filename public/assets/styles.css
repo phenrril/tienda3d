@@ -35,11 +35,15 @@ body:has(.admin-header) .container.content{padding:0;max-width:100%}
 .hero-lead{animation:fadeInUp .6s ease .2s backwards}
 .hero-actions{display:flex;gap:10px;margin:12px 0 8px;animation:fadeInUp .6s ease .3s backwards;flex-wrap:wrap}
 .btn-hero,.btn-hero-secondary{display:inline-flex !important;align-items:center;justify-content:center;gap:8px;padding:14px 24px !important;font-size:15px;box-shadow:0 4px 14px rgba(0,0,0,.3);transition:all .2s}
-.btn-hero svg,.btn-hero-secondary svg{transition:transform .2s;flex-shrink:0}
-.btn-hero span,.btn-hero-secondary span{display:inline-block}
-.btn-hero:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(99,102,241,.5)}
-.btn-hero:hover svg{transform:scale(1.1) rotate(5deg)}
+.btn-hero{position:relative;overflow:hidden;padding:16px 32px !important;font-size:17px;font-weight:700;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);border:2px solid #818cf8;box-shadow:0 6px 24px rgba(99,102,241,.4),0 0 0 0 rgba(99,102,241,.6);animation:pulseGlow 2s ease-in-out infinite}
+.btn-hero::before{content:'';position:absolute;top:50%;left:50%;width:0;height:0;border-radius:50%;background:rgba(255,255,255,.4);transform:translate(-50%,-50%);transition:width .6s,height .6s}
+.btn-hero:hover::before{width:300px;height:300px}
+.btn-hero svg,.btn-hero-secondary svg{transition:transform .2s;flex-shrink:0;position:relative;z-index:1}
+.btn-hero span,.btn-hero-secondary span{display:inline-block;position:relative;z-index:1}
+.btn-hero:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 8px 32px rgba(99,102,241,.6),0 0 0 4px rgba(99,102,241,.2);animation:none}
+.btn-hero:hover svg{transform:scale(1.15) rotate(8deg)}
 .btn-hero-secondary:hover svg{transform:rotate(15deg)}
+@keyframes pulseGlow{0%,100%{box-shadow:0 6px 24px rgba(99,102,241,.4),0 0 0 0 rgba(99,102,241,.6)}50%{box-shadow:0 6px 32px rgba(99,102,241,.6),0 0 0 8px rgba(99,102,241,.3)}}
 
 /* Hero Features */
 .hero-features{display:flex;flex-wrap:wrap;gap:16px;margin-top:20px;animation:fadeInUp .6s ease .4s backwards}
@@ -518,6 +522,7 @@ body.drawer-open .drawer{pointer-events:auto;opacity:1}
 .pd-actions{animation:fadeInUp .4s ease .4s backwards}
 
 @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 
 /* Animación para carrusel de imágenes */
 .pd-carousel{animation:fadeIn .5s ease}
