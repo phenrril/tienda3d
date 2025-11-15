@@ -1828,7 +1828,7 @@ func (s *Server) handleAdminProducts(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/auth", 302)
 		return
 	}
-	list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 200})
+	list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 10000})
 	// Normalizar imágenes mostradas en admin (evita contadores inflados por huérfanas)
 	for i := range list {
 		list[i].Images = filterExistingProductImages(list[i].Images)
