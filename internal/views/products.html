@@ -93,18 +93,19 @@
   {{end}}
 </div>
 
-<div style="text-align:center;margin:12px 0">
-  <button id="loadMore" class="btn-secondary" data-next="{{if lt .Page .Pages}}?page={{add .Page 1}}&q={{.Query}}&category={{.Category}}&sort={{.Sort}}{{end}}" {{if not (lt .Page .Pages)}}disabled{{end}}>Cargar más</button>
-  <div id="loadMoreStatus" class="sr-only" aria-live="polite"></div>
+<!-- Scroll infinito -->
+<div id="infiniteScrollTrigger" style="height:1px;margin:20px 0" data-next="{{if lt .Page .Pages}}?page={{add .Page 1}}&q={{.Query}}&category={{.Category}}&sort={{.Sort}}{{end}}"></div>
+
+<div id="loadingIndicator" style="display:none;text-align:center;padding:20px">
+  <div style="display:inline-block;width:40px;height:40px;border:3px solid rgba(99,102,241,.3);border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite"></div>
+  <p style="color:var(--muted);margin-top:10px;font-size:14px">Cargando más productos...</p>
 </div>
 
-{{if and .Page .Pages}}
-<div class="pagination">
-  {{if gt .Page 1}}<a href="?page={{sub .Page 1}}&q={{.Query}}&category={{.Category}}&sort={{.Sort}}" class="page-btn">‹ Anterior</a>{{end}}
-  <span>Página {{.Page}} / {{.Pages}}</span>
-  {{if lt .Page .Pages}}<a href="?page={{add .Page 1}}&q={{.Query}}&category={{.Category}}&sort={{.Sort}}" class="page-btn">Siguiente ›</a>{{end}}
+<div id="endMessage" style="display:none;text-align:center;padding:20px;color:var(--muted);font-size:14px">
+  Has visto todos los productos disponibles
 </div>
-{{end}}
+
+<div id="loadMoreStatus" class="sr-only" aria-live="polite"></div>
 
 <!-- JS movido a /public/assets/app.js -->
 {{template "layout_end" .}}

@@ -195,9 +195,11 @@ function formatPrice(num) {
     });
   });
 
-  const loadBtn=document.getElementById('loadMore');
   const cards=document.querySelector('.cards');
   const statusEl=document.getElementById('loadMoreStatus');
+  const infiniteScrollTrigger=document.getElementById('infiniteScrollTrigger');
+  const loadingIndicator=document.getElementById('loadingIndicator');
+  const endMessage=document.getElementById('endMessage');
   
   // Validación/rehuso de imágenes rotas en tarjetas de productos
   function chooseNextValidImage(imgEl){
@@ -219,14 +221,81 @@ function formatPrice(num) {
   // Aplicar a imágenes existentes
   document.querySelectorAll('.cards .card-img').forEach(img=>chooseNextValidImage(img));
   function announce(msg){if(statusEl){statusEl.textContent=msg;}}
-  if(loadBtn && cards){
-    loadBtn.addEventListener('click',async()=>{
-      const next=loadBtn.getAttribute('data-next');
-      if(!next){loadBtn.disabled=true;return}
-      const oldText=loadBtn.textContent; loadBtn.disabled=true; loadBtn.textContent='Cargando...'; announce('Cargando más productos');
-      try{const res=await fetch(next,{credentials:'same-origin'}); if(!res.ok) throw new Error('HTTP '+res.status); const html=await res.text(); const parser=new DOMParser(); const doc=parser.parseFromString(html,'text/html'); const newCards=doc.querySelectorAll('.cards > .card'); newCards.forEach(n=>{ cards.appendChild(n); const img=n.querySelector('.card-img'); if(img) chooseNextValidImage(img); }); const newBtn=doc.getElementById('loadMore'); const newNext=newBtn?newBtn.getAttribute('data-next'):''; const resultCount=document.querySelector('.result-count'); if(resultCount){ const currentCards=document.querySelectorAll('.cards > .card').length; const totalMatch=resultCount.textContent.match(/de (\d+)/); const total=totalMatch?totalMatch[1]:currentCards; resultCount.textContent=currentCards+' resultados de '+total; } if(newNext){loadBtn.setAttribute('data-next',newNext);loadBtn.disabled=false;loadBtn.textContent=oldText;announce('Se cargaron más productos');} else {loadBtn.setAttribute('data-next','');loadBtn.disabled=true;loadBtn.textContent='No hay más';announce('No hay más productos');}}
-      catch(err){loadBtn.disabled=false; loadBtn.textContent=oldText; announce('Error al cargar');}
+  
+  // Scroll infinito con Intersection Observer
+  if(infiniteScrollTrigger && cards){
+    let isLoading=false;
+    let hasMore=true;
+    
+    async function loadMoreProducts(){
+      if(isLoading || !hasMore) return;
+      
+      const next=infiniteScrollTrigger.getAttribute('data-next');
+      if(!next){
+        hasMore=false;
+        if(endMessage) endMessage.style.display='block';
+        return;
+      }
+      
+      isLoading=true;
+      if(loadingIndicator) loadingIndicator.style.display='block';
+      announce('Cargando más productos');
+      
+      try{
+        const res=await fetch(next,{credentials:'same-origin'});
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const html=await res.text();
+        const parser=new DOMParser();
+        const doc=parser.parseFromString(html,'text/html');
+        const newCards=doc.querySelectorAll('.cards > .card');
+        
+        newCards.forEach(n=>{
+          cards.appendChild(n);
+          const img=n.querySelector('.card-img');
+          if(img) chooseNextValidImage(img);
+        });
+        
+        const newTrigger=doc.getElementById('infiniteScrollTrigger');
+        const newNext=newTrigger?newTrigger.getAttribute('data-next'):'';
+        
+        const resultCount=document.querySelector('.result-count');
+        if(resultCount){
+          const currentCards=document.querySelectorAll('.cards > .card').length;
+          const totalMatch=resultCount.textContent.match(/de (\d+)/);
+          const total=totalMatch?totalMatch[1]:currentCards;
+          resultCount.textContent=currentCards+' resultados de '+total;
+        }
+        
+        if(newNext){
+          infiniteScrollTrigger.setAttribute('data-next',newNext);
+          announce('Se cargaron más productos');
+        } else {
+          hasMore=false;
+          infiniteScrollTrigger.setAttribute('data-next','');
+          if(endMessage) endMessage.style.display='block';
+          announce('No hay más productos para cargar');
+        }
+      } catch(err){
+        announce('Error al cargar');
+        console.error('Error loading products:', err);
+      } finally {
+        isLoading=false;
+        if(loadingIndicator) loadingIndicator.style.display='none';
+      }
+    }
+    
+    // Usar Intersection Observer para detectar cuando el usuario llega al trigger
+    const observer=new IntersectionObserver((entries)=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting && hasMore && !isLoading){
+          loadMoreProducts();
+        }
+      });
+    }, {
+      rootMargin:'400px' // Cargar cuando está a 400px de llegar al trigger
     });
+    
+    observer.observe(infiniteScrollTrigger);
   }
 })();
 
