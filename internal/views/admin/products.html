@@ -101,6 +101,7 @@
       <select id="categoryFilter" aria-label="Filtrar por categoría" style="min-width:200px;padding:10px 12px;border-radius:8px;border:1px solid #223140;background:#0b1520;color:#e5f0ff;font-size:14px">
         <option value="">🔍 Todas las categorías</option>
         <option value="sin categoría">⚠️ Sin categoría</option>
+        <option value="sin imagen">🖼️ Sin imagen</option>
         {{range .Categories}}
           <option value="{{.}}">{{.}}</option>
         {{end}}
@@ -128,7 +129,7 @@
         </thead>
         <tbody>
           {{range .Products}}
-          <tr data-slug="{{.Slug}}" data-category="{{.Category}}" class="admin-product-row">
+          <tr data-slug="{{.Slug}}" data-category="{{.Category}}" data-imgs-count="{{len .Images}}" class="admin-product-row">
             <td class="admin-product-name">
               <div style="font-weight:600">{{.Name}}</div>
               <div class="show-mobile" style="font-size:11px;color:var(--muted);margin-top:2px">{{if .Category}}{{.Category}}{{else}}<span style="color:#f59e0b">Sin categoría</span>{{end}}</div>

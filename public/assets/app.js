@@ -746,9 +746,19 @@ if ('serviceWorker' in navigator) {
         const name=(tr.cells[0] && tr.cells[0].textContent||'').toLowerCase();
         const slug=(tr.cells[1] && tr.cells[1].textContent||'').toLowerCase();
         const cat=(tr.getAttribute('data-category')||'').trim().toLowerCase(); // ← CASE-INSENSITIVE
+        const imgsCount=parseInt(tr.getAttribute('data-imgs-count')||'0', 10);
         
         const matchText = !q || name.includes(q) || slug.includes(q);
-        const matchCat = !selCat || cat === selCat || (selCat === 'sin categoría' && !cat); // ← Incluye productos sin categoría
+        let matchCat = true;
+        
+        // Filtro especial para "sin imagen"
+        if(selCat === 'sin imagen'){
+          matchCat = imgsCount === 0;
+        } else if(selCat === 'sin categoría'){
+          matchCat = !cat;
+        } else if(selCat){
+          matchCat = cat === selCat;
+        }
         
         const isVisible = matchText && matchCat;
         tr.style.display = isVisible ? '' : 'none';
