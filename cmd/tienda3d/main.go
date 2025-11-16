@@ -16,6 +16,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
+	"github.com/phenrril/tienda3d/internal/adapters/backup"
 	"github.com/phenrril/tienda3d/internal/app"
 )
 
@@ -25,24 +26,33 @@ func main() {
 	zerolog.TimeFieldFormat = time.RFC3339
 	zlog.Logger = zlog.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.Kitchen})
 
+	// Obtener variables de entorno de la base de datos
+	host := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbname := os.Getenv("DB_NAME")
+
+	if host == "" {
+		host = "localhost"
+	}
+	if dbPort == "" {
+		dbPort = "5432"
+	}
+	if user == "" {
+		user = "postgres"
+	}
+	if password == "" {
+		password = "postgres"
+	}
+	if dbname == "" {
+		dbname = "tienda3d"
+	}
+
 	dsn := os.Getenv("DB_DSN")
 	if dsn == "" {
-		// Construir DSN desde variables individuales si están disponibles
-		host := os.Getenv("DB_HOST")
-		port := os.Getenv("DB_PORT")
-		user := os.Getenv("DB_USER")
-		password := os.Getenv("DB_PASSWORD")
-		dbname := os.Getenv("DB_NAME")
-
-		if host != "" && user != "" && password != "" && dbname != "" {
-			if port == "" {
-				port = "5432"
-			}
-			dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable", host, user, password, dbname, port)
-		} else {
-			// Fallback a localhost solo si no hay variables individuales
-			dsn = "host=localhost user=postgres password=postgres dbname=tienda3d port=5432 sslmode=disable"
-		}
+		// Construir DSN desde variables individuales
+		dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable", host, user, password, dbname, dbPort)
 	}
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -56,6 +66,25 @@ func main() {
 	if err := application.MigrateAndSeed(); err != nil {
 		zlog.Fatal().Err(err).Msg("migrar/seed")
 	}
+
+	// Configurar servicio de backup
+	backupDir := os.Getenv("BACKUP_DIR")
+	if backupDir == "" {
+		backupDir = `C:\Users\server\Desktop\backup-db`
+	}
+	backupService := backup.NewService(backupDir, host, dbPort, user, password, dbname)
+	backupScheduler := backup.NewScheduler(backupService)
+
+	// Crear contexto para el scheduler de backup
+	backupCtx, backupCancel := context.WithCancel(context.Background())
+	defer backupCancel()
+
+	// Iniciar scheduler de backup
+	go func() {
+		if err := backupScheduler.Start(backupCtx); err != nil {
+			zlog.Error().Err(err).Msg("error iniciando scheduler de backup")
+		}
+	}()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -92,6 +121,11 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
+
+	// Detener scheduler de backup
+	backupCancel()
+	backupScheduler.Stop()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = server.Shutdown(ctx)

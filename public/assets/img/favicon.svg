@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Bolsa naranja (fondo) -->
+  <path d="M10 9 L10 12 C10 13 11 14 12 14 L14 14 C15 14 16 13 16 12 L16 9" 
+        fill="#f97316" stroke="#d97706" stroke-width="0.8" opacity="0.9"/>
+  <rect x="9" y="12" width="8" height="10" rx="1" fill="#f97316" stroke="#d97706" stroke-width="0.8" opacity="0.9"/>
+  <path d="M10 9 L10 11 M16 9 L16 11" stroke="#d97706" stroke-width="1" stroke-linecap="round"/>
+  
+  <!-- Bolsa azul (primer plano) -->
+  <path d="M16 7 L16 10 C16 11 17 12 18 12 L20 12 C21 12 22 11 22 10 L22 7" 
+        fill="#60a5fa" stroke="#3b82f6" stroke-width="0.8"/>
+  <rect x="15" y="10" width="8" height="10" rx="1" fill="#60a5fa" stroke="#3b82f6" stroke-width="0.8"/>
+  <path d="M16 7 L16 9 M22 7 L22 9" stroke="#3b82f6" stroke-width="1" stroke-linecap="round"/>
+</svg>
+
