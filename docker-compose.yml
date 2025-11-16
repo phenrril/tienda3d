@@ -3,6 +3,7 @@ networks:
     internal: true
   edge_net:
     driver: bridge
+    name: tienda3d_edge_net  
 
 volumes:
   app_db_data:
