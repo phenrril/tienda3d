@@ -11,30 +11,88 @@ import (
 )
 
 type Service struct {
-	backupDir    string
-	dbHost       string
-	dbPort       string
-	dbUser       string
-	dbPassword   string
-	dbName       string
-	initialized  bool
-	firstRunDone bool
+	backupDir     string
+	dbHost        string
+	dbPort        string
+	dbUser        string
+	dbPassword    string
+	dbName        string
+	containerName string
+	initialized   bool
+	firstRunDone  bool
 }
 
 func NewService(backupDir, dbHost, dbPort, dbUser, dbPassword, dbName string) *Service {
-	return &Service{
-		backupDir:   backupDir,
-		dbHost:      dbHost,
-		dbPort:      dbPort,
-		dbUser:      dbUser,
-		dbPassword:  dbPassword,
-		dbName:      dbName,
-		initialized: false,
+	containerName := os.Getenv("DB_CONTAINER_NAME")
+	if containerName == "" {
+		containerName = "tienda3d_db"
 	}
+	return &Service{
+		backupDir:     backupDir,
+		dbHost:        dbHost,
+		dbPort:        dbPort,
+		dbUser:        dbUser,
+		dbPassword:    dbPassword,
+		dbName:        dbName,
+		containerName: containerName,
+		initialized:   false,
+	}
+}
+
+// VerifyDockerAccess verifica que Docker esté disponible y que se pueda acceder al contenedor
+func (s *Service) VerifyDockerAccess() error {
+	// Verificar que docker está disponible
+	if _, err := exec.LookPath("docker"); err != nil {
+		return fmt.Errorf("docker no está disponible en el PATH: %w", err)
+	}
+
+	// Verificar que docker está corriendo
+	cmd := exec.Command("docker", "ps")
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("no se puede ejecutar docker ps (¿está Docker corriendo?): %w", err)
+	}
+
+	// Verificar que el contenedor existe y está corriendo
+	cmd = exec.Command("docker", "ps", "--filter", fmt.Sprintf("name=%s", s.containerName), "--format", "{{.Names}}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("error verificando contenedor %s: %w", s.containerName, err)
+	}
+
+	containerStatus := string(output)
+	if containerStatus == "" {
+		return fmt.Errorf("el contenedor %s no está corriendo. Verifica con 'docker ps'", s.containerName)
+	}
+
+	log.Info().
+		Str("container", s.containerName).
+		Msg("contenedor Docker verificado correctamente")
+
+	// Verificar que podemos ejecutar comandos dentro del contenedor
+	// Intentamos ejecutar un comando simple para verificar permisos
+	cmd = exec.Command("docker", "exec", s.containerName, "echo", "test")
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("no se pueden ejecutar comandos en el contenedor %s (verifica permisos de Docker): %w", s.containerName, err)
+	}
+
+	log.Info().
+		Str("container", s.containerName).
+		Msg("permisos de Docker verificados correctamente")
+
+	return nil
 }
 
 // Start inicia el servicio de backup y configura el cron
 func (s *Service) Start(shouldRunFirstTime bool) error {
+	// Verificar acceso a Docker antes de continuar
+	if err := s.VerifyDockerAccess(); err != nil {
+		log.Error().Err(err).Msg("verificación de Docker falló")
+		return fmt.Errorf("verificación de Docker falló: %w", err)
+	}
+
 	// Crear el directorio de backup si no existe
 	if err := os.MkdirAll(s.backupDir, 0755); err != nil {
 		return fmt.Errorf("error creando directorio de backup: %w", err)
@@ -68,34 +126,47 @@ func (s *Service) performBackup() error {
 	filename := fmt.Sprintf("backup_%s.sql", timestamp)
 	filepath := filepath.Join(s.backupDir, filename)
 
-	log.Info().Str("file", filepath).Msg("iniciando backup de base de datos")
+	log.Info().
+		Str("file", filepath).
+		Str("container", s.containerName).
+		Msg("iniciando backup de base de datos desde contenedor Docker")
 
-	// Configurar variables de entorno para pg_dump
-	env := os.Environ()
-	env = append(env, fmt.Sprintf("PGPASSWORD=%s", s.dbPassword))
+	// Crear el archivo de salida
+	outFile, err := os.Create(filepath)
+	if err != nil {
+		return fmt.Errorf("error creando archivo de backup: %w", err)
+	}
 
-	// Construir comando pg_dump
-	cmd := exec.Command("pg_dump",
-		"-h", s.dbHost,
-		"-p", s.dbPort,
+	// Construir comando docker exec con pg_dump dentro del contenedor
+	// Usamos PGPASSWORD como variable de entorno dentro del contenedor
+	cmd := exec.Command("docker", "exec",
+		"-e", fmt.Sprintf("PGPASSWORD=%s", s.dbPassword),
+		s.containerName,
+		"pg_dump",
 		"-U", s.dbUser,
 		"-d", s.dbName,
-		"-f", filepath,
 		"--no-owner",
 		"--no-acl",
 	)
 
-	cmd.Env = env
+	// Redirigir stdout al archivo y stderr para ver errores
+	cmd.Stdout = outFile
+	cmd.Stderr = os.Stderr
 
 	// Ejecutar el comando
-	// pg_dump escribe directamente al archivo cuando se usa -f, así que solo capturamos stderr
-	cmd.Stdout = os.Stderr // Redirigir stdout a stderr para ver progreso si hay
-	err := cmd.Run()
+	err = cmd.Run()
+
+	// Cerrar el archivo siempre
+	outFile.Close()
+
 	if err != nil {
+		// Eliminar el archivo si hay error
+		os.Remove(filepath)
 		log.Error().
 			Err(err).
-			Msg("error ejecutando pg_dump")
-		return fmt.Errorf("error ejecutando pg_dump: %w", err)
+			Str("container", s.containerName).
+			Msg("error ejecutando pg_dump en contenedor Docker")
+		return fmt.Errorf("error ejecutando pg_dump en contenedor %s: %w", s.containerName, err)
 	}
 
 	// Obtener información del archivo creado
@@ -106,9 +177,9 @@ func (s *Service) performBackup() error {
 		log.Info().
 			Str("file", filepath).
 			Int64("size_bytes", fileInfo.Size()).
+			Str("container", s.containerName).
 			Msg("backup completado exitosamente")
 	}
 
 	return nil
 }
-
