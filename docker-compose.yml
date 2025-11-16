@@ -74,7 +74,7 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
-    user: "1000:1000"
+    # user: "1000:1000"  # Temporalmente deshabilitado para permitir escritura en backups
     security_opt:
       - no-new-privileges:true
     cap_drop:
