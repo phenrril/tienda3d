@@ -81,8 +81,12 @@ func main() {
 
 	// Iniciar scheduler de backup
 	go func() {
+		// Pequeño delay para asegurar que los logs se muestren
+		time.Sleep(100 * time.Millisecond)
 		if err := backupScheduler.Start(backupCtx); err != nil {
-			zlog.Error().Err(err).Msg("error iniciando scheduler de backup")
+			zlog.Error().Err(err).Msg("error iniciando scheduler de backup - el backup no funcionará hasta que se resuelva este error")
+		} else {
+			zlog.Info().Msg("scheduler de backup iniciado correctamente")
 		}
 	}()
 
