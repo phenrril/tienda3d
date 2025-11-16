@@ -70,7 +70,8 @@ func main() {
 	// Configurar servicio de backup
 	backupDir := os.Getenv("BACKUP_DIR")
 	if backupDir == "" {
-		backupDir = `C:\Users\server\Desktop\backup-db`
+		// Por defecto usar /app/backups dentro del contenedor (montado desde ./backups en el host)
+		backupDir = "/app/backups"
 	}
 	backupService := backup.NewService(backupDir, host, dbPort, user, password, dbname)
 	backupScheduler := backup.NewScheduler(backupService)

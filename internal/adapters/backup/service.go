@@ -39,12 +39,20 @@ func NewService(backupDir, dbHost, dbPort, dbUser, dbPassword, dbName string) *S
 	}
 }
 
-// VerifyDockerAccess verifica que Docker esté disponible y que se pueda acceder al contenedor
+// VerifyDockerAccess verifica que se pueda acceder a la base de datos para hacer backup
 func (s *Service) VerifyDockerAccess() error {
-	// Verificar que docker está disponible
-	if _, err := exec.LookPath("docker"); err != nil {
-		return fmt.Errorf("docker no está disponible en el PATH: %w", err)
+	// Primero verificar si pg_dump está disponible directamente
+	if _, err := exec.LookPath("pg_dump"); err == nil {
+		log.Info().Msg("pg_dump disponible directamente, no se requiere Docker")
+		return nil
 	}
+
+	// Si pg_dump no está disponible, verificar que docker esté disponible
+	if _, err := exec.LookPath("docker"); err != nil {
+		return fmt.Errorf("ni pg_dump ni docker están disponibles en el PATH. Instala postgresql-client o docker")
+	}
+
+	log.Info().Msg("pg_dump no disponible, verificando acceso a Docker")
 
 	// Verificar que docker está corriendo
 	cmd := exec.Command("docker", "ps")
@@ -133,8 +141,8 @@ func (s *Service) performBackup() error {
 
 	log.Info().
 		Str("file", filepath).
-		Str("container", s.containerName).
-		Msg("iniciando backup de base de datos desde contenedor Docker")
+		Str("db_host", s.dbHost).
+		Msg("iniciando backup de base de datos")
 
 	// Crear el archivo de salida
 	outFile, err := os.Create(filepath)
@@ -142,17 +150,41 @@ func (s *Service) performBackup() error {
 		return fmt.Errorf("error creando archivo de backup: %w", err)
 	}
 
-	// Construir comando docker exec con pg_dump dentro del contenedor
-	// Usamos PGPASSWORD como variable de entorno dentro del contenedor
-	cmd := exec.Command("docker", "exec",
-		"-e", fmt.Sprintf("PGPASSWORD=%s", s.dbPassword),
-		s.containerName,
-		"pg_dump",
-		"-U", s.dbUser,
-		"-d", s.dbName,
-		"--no-owner",
-		"--no-acl",
-	)
+	var cmd *exec.Cmd
+
+	// Intentar primero usar pg_dump directamente (si está disponible)
+	if _, err := exec.LookPath("pg_dump"); err == nil {
+		log.Info().Msg("usando pg_dump directamente")
+		// Configurar variables de entorno para pg_dump
+		env := os.Environ()
+		env = append(env, fmt.Sprintf("PGPASSWORD=%s", s.dbPassword))
+
+		cmd = exec.Command("pg_dump",
+			"-h", s.dbHost,
+			"-p", s.dbPort,
+			"-U", s.dbUser,
+			"-d", s.dbName,
+			"--no-owner",
+			"--no-acl",
+		)
+		cmd.Env = env
+	} else {
+		// Si pg_dump no está disponible, intentar usar docker exec
+		log.Info().Str("container", s.containerName).Msg("pg_dump no disponible, usando docker exec")
+		if _, err := exec.LookPath("docker"); err != nil {
+			return fmt.Errorf("ni pg_dump ni docker están disponibles en el PATH")
+		}
+
+		cmd = exec.Command("docker", "exec",
+			"-e", fmt.Sprintf("PGPASSWORD=%s", s.dbPassword),
+			s.containerName,
+			"pg_dump",
+			"-U", s.dbUser,
+			"-d", s.dbName,
+			"--no-owner",
+			"--no-acl",
+		)
+	}
 
 	// Redirigir stdout al archivo y stderr para ver errores
 	cmd.Stdout = outFile
@@ -169,9 +201,9 @@ func (s *Service) performBackup() error {
 		os.Remove(filepath)
 		log.Error().
 			Err(err).
-			Str("container", s.containerName).
-			Msg("error ejecutando pg_dump en contenedor Docker")
-		return fmt.Errorf("error ejecutando pg_dump en contenedor %s: %w", s.containerName, err)
+			Str("db_host", s.dbHost).
+			Msg("error ejecutando pg_dump")
+		return fmt.Errorf("error ejecutando pg_dump: %w", err)
 	}
 
 	// Obtener información del archivo creado
@@ -182,7 +214,6 @@ func (s *Service) performBackup() error {
 		log.Info().
 			Str("file", filepath).
 			Int64("size_bytes", fileInfo.Size()).
-			Str("container", s.containerName).
 			Msg("backup completado exitosamente")
 	}
 

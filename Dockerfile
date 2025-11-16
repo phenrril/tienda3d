@@ -9,8 +9,8 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /out/tien
 
 # ------ runtime ------
 FROM alpine:3.20
-# certificados TLS y herramientas mínimas para healthcheck
-RUN apk add --no-cache ca-certificates tzdata wget
+# certificados TLS, herramientas mínimas para healthcheck y postgresql-client para backups
+RUN apk add --no-cache ca-certificates tzdata wget postgresql-client
 WORKDIR /app
 # usuario no-root
 RUN adduser -D -H -s /sbin/nologin appuser
