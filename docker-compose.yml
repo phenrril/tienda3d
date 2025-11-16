@@ -63,6 +63,7 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./public:/app/public
+      - ./backups:/app/backups
     networks:
       - internal_net
       - edge_net
@@ -131,6 +132,7 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./public:/app/public
+      - ./backups:/app/backups
     networks:
       - internal_net
       - edge_net
