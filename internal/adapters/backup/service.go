@@ -98,7 +98,10 @@ func (s *Service) Start(shouldRunFirstTime bool) error {
 		return fmt.Errorf("error creando directorio de backup: %w", err)
 	}
 
-	log.Info().Str("backup_dir", s.backupDir).Msg("servicio de backup iniciado")
+	log.Info().
+		Str("backup_dir", s.backupDir).
+		Bool("should_run_first_time", shouldRunFirstTime).
+		Msg("servicio de backup iniciado")
 
 	// Ejecutar la primera vez si está configurado
 	if shouldRunFirstTime {
@@ -108,7 +111,9 @@ func (s *Service) Start(shouldRunFirstTime bool) error {
 			return err
 		}
 		s.firstRunDone = true
-		log.Info().Msg("backup inicial completado")
+		log.Info().Msg("backup inicial completado exitosamente")
+	} else {
+		log.Info().Msg("backup inicial omitido (variable Backup no configurada)")
 	}
 
 	return nil

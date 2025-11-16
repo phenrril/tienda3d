@@ -23,10 +23,25 @@ func NewScheduler(service *Service) *Scheduler {
 // Start inicia el scheduler con el cron job
 func (s *Scheduler) Start(ctx context.Context) error {
 	// Verificar si debe ejecutarse la primera vez
-	shouldRunFirstTime := os.Getenv("Backup") != ""
+	// Buscar la variable en diferentes formatos (case-insensitive)
+	backupEnv := os.Getenv("Backup")
+	if backupEnv == "" {
+		backupEnv = os.Getenv("BACKUP")
+	}
+	if backupEnv == "" {
+		backupEnv = os.Getenv("backup")
+	}
+	
+	shouldRunFirstTime := backupEnv != ""
+	
+	log.Info().
+		Str("Backup_env_value", backupEnv).
+		Bool("should_run_first_time", shouldRunFirstTime).
+		Msg("verificando configuración de backup inicial")
 
 	// Iniciar el servicio de backup
 	if err := s.service.Start(shouldRunFirstTime); err != nil {
+		log.Error().Err(err).Msg("error iniciando servicio de backup")
 		return err
 	}
 
