@@ -79,7 +79,7 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    read_only: true
+    # read_only: true  # Temporalmente deshabilitado para permitir escritura en backups
     tmpfs:
       - /tmp
 

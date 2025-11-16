@@ -102,9 +102,17 @@ func (s *Service) Start(shouldRunFirstTime bool) error {
 	}
 
 	// Crear el directorio de backup si no existe
-	if err := os.MkdirAll(s.backupDir, 0755); err != nil {
-		return fmt.Errorf("error creando directorio de backup: %w", err)
+	if err := os.MkdirAll(s.backupDir, 0777); err != nil {
+		log.Warn().Err(err).Str("backup_dir", s.backupDir).Msg("no se pudo crear directorio de backup, intentando continuar")
+		// No retornar error aquí, intentar crear el archivo directamente
 	}
+	
+	// Verificar permisos de escritura
+	testFile := filepath.Join(s.backupDir, ".test_write")
+	if err := os.WriteFile(testFile, []byte("test"), 0666); err != nil {
+		return fmt.Errorf("no se tienen permisos de escritura en %s (error: %w). Asegúrate de que el directorio existe y tiene permisos de escritura", s.backupDir, err)
+	}
+	os.Remove(testFile) // Limpiar archivo de prueba
 
 	log.Info().
 		Str("backup_dir", s.backupDir).

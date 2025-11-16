@@ -14,6 +14,8 @@ RUN apk add --no-cache ca-certificates tzdata wget postgresql-client
 WORKDIR /app
 # usuario no-root
 RUN adduser -D -H -s /sbin/nologin appuser
+# Crear directorio de backups con permisos adecuados
+RUN mkdir -p /app/backups && chmod 777 /app/backups
 COPY --from=build /out/tienda3d /app/tienda3d
 COPY --from=build /src/internal/views /app/internal/views
 COPY --from=build /src/public /app/public
