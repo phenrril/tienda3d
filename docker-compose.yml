@@ -14,6 +14,7 @@ volumes:
     name: tienda3d-backend_pgdata
   caddy_data: {}
   caddy_config: {}
+  backups_data: {}
 
 services:
   db:
@@ -64,7 +65,7 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./public:/app/public
-      - ./backups:/app/backups
+      - backups_data:/app/backups
     networks:
       - internal_net
       - edge_net
@@ -133,7 +134,7 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./public:/app/public
-      - ./backups:/app/backups
+      - backups_data:/app/backups
     networks:
       - internal_net
       - edge_net
