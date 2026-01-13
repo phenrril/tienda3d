@@ -109,63 +109,12 @@ services:
     tmpfs:
       - /tmp
 
-  # ----- DEV -----
-  app_dev:
-    profiles: ["dev"]
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: tienda3d_app_dev
-    env_file:
-      - .env
-    environment:
-      APP_ENV: development
-      DB_HOST: db
-      DB_PORT: ${DB_PORT:-5432}
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_NAME: ${POSTGRES_DB}
-      DB_DSN: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DB_PORT:-5432}/${POSTGRES_DB}?sslmode=disable
-    depends_on:
-      db:
-        condition: service_healthy
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./uploads:/app/uploads
-      - ./public:/app/public
-      - backups_data:/app/backups
-    networks:
-      - internal_net
-      - edge_net
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080 || exit 1"]
-    restart: unless-stopped
-    tmpfs:
-      - /tmp
-
-  caddy_dev:
-    profiles: ["dev"]
-    image: caddy:2.7
-    container_name: tienda3d_caddy_dev
-    depends_on:
-      app_dev:
-        condition: service_started
-    ports:
-      - "127.0.0.1:80:80"
-      - "127.0.0.1:443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - edge_net
-    restart: unless-stopped
-    user: "1000:1000"
-    tmpfs:
-      - /tmp
-
   cloudflared:
     image: cloudflare/cloudflared:latest
+    container_name: tienda3d_cloudflared
     restart: unless-stopped
     command: tunnel run --token ${TOKEN_CLOUDFLARE}
+    networks:
+      - edge_net
+    depends_on:
+      - caddy
