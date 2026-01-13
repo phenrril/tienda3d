@@ -164,3 +164,8 @@ services:
     user: "1000:1000"
     tmpfs:
       - /tmp
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run --token ${TOKEN_CLOUDFLARE}
