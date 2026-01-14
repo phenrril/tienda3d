@@ -1,50 +1,19 @@
+version: "3.8"
+
 networks:
   internal_net:
     internal: true
   edge_net:
-    driver: bridge
-    name: tienda3d_edge_net  
+    external: true
+    name: tienda3d_edge_net
 
 volumes:
-  app_db_data:
-    external: true
-    name: app_db_data
-  prod_db_data:
-    external: true
-    name: tienda3d-backend_pgdata
   caddy_data: {}
   caddy_config: {}
   backups_data: {}
 
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: tienda3d_db
-    env_file:
-      - .env
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - app_db_data:/var/lib/postgresql/data
-    networks:
-      - internal_net
-    ports:
-      - "${DB_PORT:-5432}:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-    tmpfs:
-      - /tmp
-      - /var/run/postgresql
-
-  # ----- PROD -----
   app:
-    profiles: ["prod"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -53,15 +22,12 @@ services:
       - .env
     environment:
       APP_ENV: production
-      DB_HOST: db
-      DB_PORT: ${DB_PORT:-5432}
+      DB_HOST: tienda3d_db
+      DB_PORT: "5432"
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
-      DB_DSN: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${DB_PORT:-5432}/${POSTGRES_DB}?sslmode=disable
-    depends_on:
-      db:
-        condition: service_healthy
+      DB_DSN: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@tienda3d_db:5432/${POSTGRES_DB}?sslmode=disable
     volumes:
       - ./uploads:/app/uploads
       - ./public:/app/public
@@ -69,45 +35,31 @@ services:
     networks:
       - internal_net
       - edge_net
+    expose:
+      - "8080"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8080 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
     restart: unless-stopped
-    # user: "1000:1000"  # Temporalmente deshabilitado para permitir escritura en backups
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    # read_only: true  # Temporalmente deshabilitado para permitir escritura en backups
-    tmpfs:
-      - /tmp
 
   caddy:
-    profiles: ["prod"]
     image: caddy:2.7
     container_name: tienda3d_caddy
     depends_on:
       app:
         condition: service_started
-    ports:
-      - "80:80"
-      - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    ports:
+      - "80:80"
+      - "443:443"
     networks:
       - edge_net
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:2019/metrics || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
     restart: unless-stopped
-    tmpfs:
-      - /tmp
 
   cloudflared:
     image: cloudflare/cloudflared:latest
