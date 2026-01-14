@@ -1,18 +1,41 @@
 version: "3.8"
 
 networks:
-  internal_net:
+  chroma_internal:
     internal: true
   edge_net:
     external: true
     name: tienda3d_edge_net
 
 volumes:
-  caddy_data: {}
-  caddy_config: {}
+  # Reusamos el volumen REAL existente del Postgres
+  app_db_data:
+    external: true
+    name: app_db_data
+
   backups_data: {}
 
 services:
+  db:
+    image: postgres:15-alpine
+    container_name: tienda3d_db
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Matute00!
+      POSTGRES_DB: tienda3d
+    volumes:
+      - app_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tienda3d"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - chroma_internal
+
   app:
     build:
       context: .
@@ -24,49 +47,25 @@ services:
       APP_ENV: production
       DB_HOST: tienda3d_db
       DB_PORT: "5432"
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_NAME: ${POSTGRES_DB}
-      DB_DSN: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@tienda3d_db:5432/${POSTGRES_DB}?sslmode=disable
+      DB_USER: postgres
+      DB_PASSWORD: Matute00!
+      DB_NAME: tienda3d
+      DB_DSN: postgres://postgres:Matute00!@tienda3d_db:5432/tienda3d?sslmode=disable
     volumes:
       - ./uploads:/app/uploads
       - ./public:/app/public
       - backups_data:/app/backups
-    networks:
-      - internal_net
-      - edge_net
     expose:
       - "8080"
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8080 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
     restart: unless-stopped
-
-  caddy:
-    image: caddy:2.7
-    container_name: tienda3d_caddy
-    depends_on:
-      app:
-        condition: service_started
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    ports:
-      - "80:80"
-      - "443:443"
     networks:
+      - chroma_internal
       - edge_net
-    restart: unless-stopped
-
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: tienda3d_cloudflared
-    restart: unless-stopped
-    command: tunnel run --token ${TOKEN_CLOUDFLARE}
-    networks:
-      - edge_net
-    depends_on:
-      - caddy
