@@ -38,6 +38,7 @@ type OrderRepo interface {
 	UpdateStatus(ctx context.Context, id uuid.UUID, st OrderStatus) error
 	List(ctx context.Context, status *OrderStatus, mpStatus *string, page, pageSize int) ([]Order, int64, error)
 	ListInRange(ctx context.Context, from, to time.Time) ([]Order, error)
+	FindPendingByEmailAndCoupon(ctx context.Context, email, couponCode string) ([]Order, error)
 }
 
 type QuoteRepo interface {
@@ -61,6 +62,20 @@ type FeaturedProductRepo interface {
 	FindAll(ctx context.Context) ([]FeaturedProduct, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	Count(ctx context.Context) (int64, error)
+}
+
+type CouponRepo interface {
+	Save(ctx context.Context, c *Coupon) error
+	FindByCode(ctx context.Context, code string) (*Coupon, error)
+	FindByID(ctx context.Context, id uuid.UUID) (*Coupon, error)
+	List(ctx context.Context, activeOnly bool, page, pageSize int) ([]Coupon, int64, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+	IncrementUses(ctx context.Context, id uuid.UUID) error
+
+	// Tracking de uso
+	SaveUsage(ctx context.Context, usage *CouponUsage) error
+	FindUsagesByEmail(ctx context.Context, email string, couponID uuid.UUID) ([]CouponUsage, error)
+	GetUsageStats(ctx context.Context, couponID uuid.UUID) (totalUses int64, totalDiscount float64, err error)
 }
 
 type QuoteService interface {

@@ -222,14 +222,13 @@
           <div class="checkout-radio-check">✓</div>
         </label>
         
-        <label class="checkout-radio-option checkout-radio-discount">
-          <div class="checkout-discount-badge">-10%</div>
+        <label class="checkout-radio-option">
           <input type="radio" name="payment_method" value="transferencia" />
           <div class="checkout-radio-content">
             <div class="checkout-radio-icon">🏦</div>
             <div class="checkout-radio-info">
               <div class="checkout-radio-title">Transferencia</div>
-              <div class="checkout-radio-subtitle">¡Ahorrá 10% en tu compra!</div>
+              <div class="checkout-radio-subtitle">Bancaria o CBU</div>
             </div>
           </div>
           <div class="checkout-radio-check">✓</div>
@@ -246,6 +245,32 @@
           </div>
           <div class="checkout-radio-check">✓</div>
         </label>
+      </div>
+    </div>
+
+    <!-- Sección 4: Cupón de Descuento -->
+    <div class="checkout-section" data-section="coupon">
+      <button type="button" class="checkout-section-header" data-toggle="coupon">
+        <div class="checkout-section-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 14l2 2 4-4m0-7v1a3 3 0 01-3 3h-1m0-4H8a3 3 0 00-3 3v1m0 0v10a3 3 0 003 3h8a3 3 0 003-3v-1m0-9a3 3 0 01-3 3m-3 0h1a3 3 0 003-3V5a3 3 0 00-3-3h-1m-1 13a3 3 0 01-3 3"/>
+          </svg>
+        </div>
+        <div class="checkout-section-title">
+          <span class="checkout-section-number">4</span>
+          <span>Cupón de descuento (opcional)</span>
+        </div>
+        <svg class="checkout-section-arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+      
+      <div class="checkout-section-content">
+        <div class="coupon-input-wrapper">
+          <input type="text" name="coupon_code" id="coupon_code" placeholder="Ingresá tu código" class="checkout-input" autocomplete="off" />
+          <button type="button" id="validate-coupon-btn" class="coupon-validate-btn">Validar</button>
+        </div>
+        <div id="coupon-message" class="coupon-message" style="display:none"></div>
       </div>
     </div>
 
@@ -266,7 +291,7 @@
       <span id="shipCost" class="summary-value">$0.00</span>
     </div>
     <div class="cart-summary-row cart-summary-discount" id="discountRow" style="display:none">
-      <span>Descuento (10%)</span>
+      <span id="discountLabel">Descuento</span>
       <span id="discount" class="summary-value">-$0.00</span>
     </div>
     <div class="cart-summary-total">

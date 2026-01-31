@@ -1,7 +1,7 @@
 {{define "admin_orders.html"}}
 {{template "layout_start" .}}
 <h1>Órdenes</h1>
-<nav class="admin-nav"><a href="/admin/products">Productos</a> | <a href="/admin/orders" class="active">Órdenes</a> | <a href="/admin/sales">Ventas</a> | <a href="/admin/destacada">Destacada</a> | <a href="/admin/costs">Calculadora</a> | <a href="/admin/logout">Salir</a></nav>
+<nav class="admin-nav"><a href="/admin/products">Productos</a> | <a href="/admin/orders" class="active">Órdenes</a> | <a href="/admin/sales">Ventas</a> | <a href="/admin/destacada">Destacada</a> | <a href="/admin/costs">Calculadora</a> | <a href="/admin/cupones">Cupones</a> | <a href="/admin/logout">Salir</a></nav>
 <form method="GET" class="filter-bar" style="margin:12px 0 4px;display:flex;align-items:center;gap:16px">
   <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)">
     <input type="checkbox" name="approved" value="1" {{if .FilterApproved}}checked{{end}} /> Solo aprobadas MP
@@ -10,20 +10,80 @@
   {{if .FilterApproved}}<a class="btn-secondary small" href="/admin/orders" style="padding:6px 10px">Limpiar</a>{{end}}
 </form>
 <table class="table" style="width:100%;font-size:0.9rem;margin-top:4px">
-  <thead><tr><th>ID</th><th>Email</th><th>Estado</th><th>Total</th><th>MP</th><th>Creada</th></tr></thead>
+  <thead><tr><th>ID</th><th>Email</th><th>Estado</th><th>Total</th><th>Cupón</th><th>MP</th><th>Creada</th><th>Acciones</th></tr></thead>
   <tbody>
     {{range .Orders}}
     <tr>
-      <td style="font-family:monospace">{{.ID}}</td>
+      <td style="font-family:monospace;font-size:11px">{{.ID}}</td>
       <td>{{.Email}}</td>
       <td>{{.Status}}</td>
       <td>${{formatPrice .Total}}</td>
-      <td>{{.MPStatus}}</td>
-      <td>{{.CreatedAt}}</td>
+      <td>
+        {{if .CouponCode}}
+          <span style="color:#10b981;font-weight:600">{{.CouponCode}}</span>
+          <br/>
+          <small style="color:var(--muted)">-${{formatPrice .DiscountAmount}}</small>
+        {{else}}
+          -
+        {{end}}
+      </td>
+      <td>
+        {{if eq .MPStatus "efectivo_pending"}}
+          <span style="color:#f59e0b">⏳ Efectivo</span>
+        {{else if eq .MPStatus "transferencia_pending"}}
+          <span style="color:#f59e0b">⏳ Transferencia</span>
+        {{else if eq .MPStatus "approved"}}
+          <span style="color:#10b981">✓ Aprobado</span>
+        {{else}}
+          {{.MPStatus}}
+        {{end}}
+      </td>
+      <td style="font-size:11px">{{.CreatedAt.Format "02/01 15:04"}}</td>
+      <td>
+        {{if or (eq .MPStatus "efectivo_pending") (eq .MPStatus "transferencia_pending")}}
+          <button 
+            onclick="confirmarPago('{{.ID}}')" 
+            class="btn-primary small"
+            style="padding:4px 8px;font-size:12px">
+            ✓ Confirmar
+          </button>
+        {{else if eq .Status "finished"}}
+          <span style="color:#10b981;font-size:11px">✓ Confirmada</span>
+        {{else}}
+          -
+        {{end}}
+      </td>
     </tr>
     {{end}}
   </tbody>
 </table>
 <div class="pager">Página {{.Page}} / {{.Pages}}</div>
+
+<script>
+function confirmarPago(orderID) {
+  if(!confirm('¿Confirmar que se recibió el pago?\n\nEsto marcará la orden como finalizada y registrará el uso del cupón (si aplica).')) {
+    return;
+  }
+  
+  fetch(`/admin/orders/confirm-payment?id=${orderID}`, {
+    method: 'POST'
+  })
+  .then(res => {
+    if(res.ok) {
+      alert('✓ Pago confirmado exitosamente');
+      location.reload();
+    } else {
+      return res.text().then(text => {
+        alert('Error al confirmar pago: ' + text);
+      });
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    alert('Error: ' + err);
+  });
+}
+</script>
+
 {{template "layout_end" .}}
 {{end}}

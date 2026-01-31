@@ -36,3 +36,6 @@ Caddyfile
 # .vscode/
 
 /uploads
+
+# Docker compose de producción (no versionar)
+docker-compose.yml

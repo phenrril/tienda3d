@@ -1491,13 +1491,12 @@ if ('serviceWorker' in navigator) {
       }
     }
     
-    // Calcular descuento (10% en transferencia)
-    let discount = 0;
+    // Obtener descuento del cupón (si está validado)
+    let discount = window.appliedCouponDiscount || 0;
     const discountRow = document.getElementById('discountRow');
     const stickyDiscountRow = document.getElementById('stickyDiscountRow');
     
-    if(paymentMethod && paymentMethod.value === 'transferencia') {
-      discount = subtotal * 0.1;
+    if(discount > 0) {
       if(discountRow) discountRow.style.display = 'flex';
       if(stickyDiscountRow) stickyDiscountRow.style.display = 'flex';
     } else {
@@ -1538,6 +1537,127 @@ if ('serviceWorker' in navigator) {
   
   // Calcular totales al cargar
   updateTotals();
+  
+  // ============ VALIDACIÓN DE CUPONES ============
+  const validateCouponBtn = document.getElementById('validate-coupon-btn');
+  const couponCodeInput = document.getElementById('coupon_code');
+  const couponMessage = document.getElementById('coupon-message');
+  
+  // Variable global para almacenar el descuento del cupón
+  window.appliedCouponDiscount = 0;
+  
+  if(validateCouponBtn && couponCodeInput && couponMessage) {
+    validateCouponBtn.addEventListener('click', function() {
+      const code = couponCodeInput.value.trim();
+      
+      if(!code) {
+        couponMessage.textContent = 'Ingresá un código de cupón';
+        couponMessage.className = 'coupon-message coupon-error';
+        couponMessage.style.display = 'block';
+        return;
+      }
+      
+      // Obtener email del usuario
+      const emailInput = document.querySelector('input[name="email"]');
+      const email = emailInput ? emailInput.value.trim() : '';
+      
+      if(!email) {
+        couponMessage.textContent = 'Ingresá tu email primero';
+        couponMessage.className = 'coupon-message coupon-error';
+        couponMessage.style.display = 'block';
+        return;
+      }
+      
+      // Calcular subtotal con envío
+      let subtotal = 0;
+      const subtotalEl = document.getElementById('subtotalVal');
+      if(subtotalEl) {
+        const text = subtotalEl.textContent.replace(/[$.,]/g, '');
+        subtotal = parseFloat(text) || 0;
+      }
+      
+      // Calcular costo de envío
+      const shippingMethod = document.querySelector('input[name="shipping"]:checked');
+      let shipCost = 0;
+      if(shippingMethod) {
+        if(shippingMethod.value === 'cadete') {
+          shipCost = 5000;
+        } else if(shippingMethod.value === 'envio') {
+          const provinceSelect = document.getElementById('provinceSelect');
+          const pcData = document.getElementById('pcData');
+          if(provinceSelect && pcData) {
+            const province = provinceSelect.value;
+            const provinceCostEl = pcData.querySelector(`[data-prov="${province}"]`);
+            if(provinceCostEl) {
+              shipCost = parseFloat(provinceCostEl.getAttribute('data-cost')) || 0;
+            }
+          }
+        }
+      }
+      
+      const totalWithShip = subtotal + shipCost;
+      
+      // Deshabilitar botón mientras valida
+      validateCouponBtn.disabled = true;
+      validateCouponBtn.textContent = 'Validando...';
+      
+      // Llamar a la API
+      fetch(`/api/validate-coupon?code=${encodeURIComponent(code)}&email=${encodeURIComponent(email)}&subtotal=${totalWithShip}`)
+        .then(res => res.json())
+        .then(data => {
+          if(data.valid) {
+            // Cupón válido
+            window.appliedCouponDiscount = data.discount;
+            couponMessage.textContent = data.message;
+            couponMessage.className = 'coupon-message coupon-success';
+            couponMessage.style.display = 'block';
+            
+            // Actualizar label del descuento
+            const discountLabel = document.getElementById('discountLabel');
+            if(discountLabel) {
+              discountLabel.textContent = `Descuento (${code})`;
+            }
+            
+            // Actualizar totales
+            updateTotals();
+            
+            // Cambiar botón a "Aplicado"
+            validateCouponBtn.textContent = '✓ Aplicado';
+            validateCouponBtn.disabled = true;
+            couponCodeInput.readOnly = true;
+            
+            showToast('Cupón aplicado correctamente', 'success');
+          } else {
+            // Cupón inválido
+            window.appliedCouponDiscount = 0;
+            couponMessage.textContent = data.message;
+            couponMessage.className = 'coupon-message coupon-error';
+            couponMessage.style.display = 'block';
+            updateTotals();
+            
+            validateCouponBtn.disabled = false;
+            validateCouponBtn.textContent = 'Validar';
+          }
+        })
+        .catch(err => {
+          console.error('Error validating coupon:', err);
+          couponMessage.textContent = 'Error al validar el cupón';
+          couponMessage.className = 'coupon-message coupon-error';
+          couponMessage.style.display = 'block';
+          
+          validateCouponBtn.disabled = false;
+          validateCouponBtn.textContent = 'Validar';
+        });
+    });
+    
+    // Permitir validar con Enter
+    couponCodeInput.addEventListener('keypress', function(e) {
+      if(e.key === 'Enter') {
+        e.preventDefault();
+        validateCouponBtn.click();
+      }
+    });
+  }
   
   // ============ MICRO-INTERACCIONES ============
   

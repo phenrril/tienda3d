@@ -75,6 +75,9 @@
       <div><strong>Dirección:</strong> {{.Order.Address}} {{if .Order.PostalCode}}({{.Order.PostalCode}} – {{.Order.Province}}){{end}}</div>
       <div><strong>Costo envío:</strong> ${{formatPrice .Order.ShippingCost}}</div>
     {{end}}
+    {{if and .Order.CouponCode (gt .Order.DiscountAmount 0)}}
+      <div style="color:#10b981"><strong>Cupón aplicado ({{.Order.CouponCode}}):</strong> -${{formatPrice .Order.DiscountAmount}}</div>
+    {{end}}
     <div><strong>Total:</strong> ${{formatPrice .Order.Total}}</div>
     <div style="margin-top:6px"><strong>Items:</strong></div>
     <ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px">

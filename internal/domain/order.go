@@ -36,6 +36,8 @@ type Order struct {
 	ShippingCost   float64 `gorm:"type:decimal(12,2)"`
 	PaymentMethod  string  `gorm:"size:30;index"`
 	DiscountAmount float64 `gorm:"type:decimal(12,2)"`
+	CouponCode     string  `gorm:"size:50;index"`
+	CouponID       *uuid.UUID `gorm:"type:uuid;index"`
 	Notified       bool    `gorm:"not null;default:false"`
 
 	CreatedAt time.Time

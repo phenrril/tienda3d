@@ -1,0 +1,115 @@
+{{define "admin_coupons_stats.html"}}
+{{template "layout_start" .}}
+<h1>Estadísticas: {{.Coupon.Code}}</h1>
+<nav class="admin-nav">
+  <a href="/admin/products">Productos</a> | 
+  <a href="/admin/orders">Órdenes</a> | 
+  <a href="/admin/sales">Ventas</a> | 
+  <a href="/admin/destacada">Destacada</a> | 
+  <a href="/admin/costs">Calculadora</a> | 
+  <a href="/admin/cupones" class="active">Cupones</a> | 
+  <a href="/admin/logout">Salir</a>
+</nav>
+
+<div style="margin-top:20px">
+  <a href="/admin/cupones" class="btn-secondary">← Volver a la lista</a>
+  <a href="/admin/cupones/editar?id={{.Coupon.ID}}" class="btn-secondary" style="margin-left:8px">Editar cupón</a>
+</div>
+
+<div style="margin-top:30px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;max-width:800px">
+  <div style="background:var(--surface);padding:20px;border-radius:8px;border:1px solid var(--border)">
+    <div style="font-size:14px;color:var(--muted);margin-bottom:8px">Código</div>
+    <div style="font-size:24px;font-weight:700;font-family:monospace">{{.Coupon.Code}}</div>
+  </div>
+
+  <div style="background:var(--surface);padding:20px;border-radius:8px;border:1px solid var(--border)">
+    <div style="font-size:14px;color:var(--muted);margin-bottom:8px">Tipo</div>
+    <div style="font-size:20px;font-weight:600">
+      {{if eq .Coupon.DiscountType "percentage"}}Porcentaje{{else}}Monto fijo{{end}}
+    </div>
+  </div>
+
+  <div style="background:var(--surface);padding:20px;border-radius:8px;border:1px solid var(--border)">
+    <div style="font-size:14px;color:var(--muted);margin-bottom:8px">Descuento</div>
+    <div style="font-size:24px;font-weight:700;color:#6366f1">
+      {{if eq .Coupon.DiscountType "percentage"}}{{.Coupon.DiscountValue}}%{{else}}${{formatPrice .Coupon.DiscountValue}}{{end}}
+    </div>
+  </div>
+
+  <div style="background:var(--surface);padding:20px;border-radius:8px;border:1px solid var(--border)">
+    <div style="font-size:14px;color:var(--muted);margin-bottom:8px">Estado</div>
+    <div style="font-size:20px;font-weight:600">
+      {{if .Coupon.Active}}
+        <span style="color:#10b981">✓ Activo</span>
+      {{else}}
+        <span style="color:#ef4444">✕ Inactivo</span>
+      {{end}}
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:30px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;max-width:800px">
+  <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px;border-radius:12px;color:white">
+    <div style="font-size:14px;opacity:0.9;margin-bottom:8px">Total de usos</div>
+    <div style="font-size:36px;font-weight:700">{{.TotalUses}}</div>
+    <div style="font-size:13px;opacity:0.8;margin-top:4px">
+      {{if .Coupon.MaxUses}}
+        Límite: {{.Coupon.MaxUses}}
+      {{else}}
+        Sin límite
+      {{end}}
+    </div>
+  </div>
+
+  <div style="background:linear-gradient(135deg,#10b981,#059669);padding:24px;border-radius:12px;color:white">
+    <div style="font-size:14px;opacity:0.9;margin-bottom:8px">Descuento total</div>
+    <div style="font-size:36px;font-weight:700">${{formatPrice .TotalDiscount}}</div>
+    <div style="font-size:13px;opacity:0.8;margin-top:4px">Ahorro generado</div>
+  </div>
+
+  <div style="background:var(--surface);padding:20px;border-radius:8px;border:1px solid var(--border)">
+    <div style="font-size:14px;color:var(--muted);margin-bottom:8px">Mín. Compra</div>
+    <div style="font-size:20px;font-weight:600">
+      {{if gt .Coupon.MinPurchaseAmount 0.0}}${{formatPrice .Coupon.MinPurchaseAmount}}{{else}}-{{end}}
+    </div>
+  </div>
+
+  <div style="background:var(--surface);padding:20px;border-radius:8px;border:1px solid var(--border)">
+    <div style="font-size:14px;color:var(--muted);margin-bottom:8px">Expira</div>
+    <div style="font-size:18px;font-weight:600">
+      {{if .Coupon.ExpiresAt}}{{.Coupon.ExpiresAt.Format "02/01/2006"}}{{else}}Nunca{{end}}
+    </div>
+  </div>
+</div>
+
+{{if .Coupon.Description}}
+<div style="margin-top:30px;max-width:800px">
+  <div style="background:var(--surface);padding:20px;border-radius:8px;border:1px solid var(--border)">
+    <div style="font-size:14px;color:var(--muted);margin-bottom:8px;font-weight:600">Descripción</div>
+    <div style="font-size:15px;line-height:1.5">{{.Coupon.Description}}</div>
+  </div>
+</div>
+{{end}}
+
+<div style="margin-top:30px;max-width:800px">
+  <div style="background:var(--surface);padding:20px;border-radius:8px;border:1px solid var(--border)">
+    <div style="font-size:14px;color:var(--muted);margin-bottom:12px;font-weight:600">Información del cupón</div>
+    <div style="display:grid;gap:8px;font-size:14px">
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--muted)">Creado:</span>
+        <span>{{.Coupon.CreatedAt.Format "02/01/2006 15:04"}}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--muted)">Última actualización:</span>
+        <span>{{.Coupon.UpdatedAt.Format "02/01/2006 15:04"}}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--muted)">ID:</span>
+        <span style="font-family:monospace;font-size:12px">{{.Coupon.ID}}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{template "layout_end" .}}
+{{end}}

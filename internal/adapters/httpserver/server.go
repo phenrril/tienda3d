@@ -41,6 +41,7 @@ type Server struct {
 	orders           *usecase.OrderUC
 	payments         *usecase.PaymentUC
 	whatsapp         *usecase.WhatsAppUC
+	coupons          *usecase.CouponUseCase
 	models           domain.UploadedModelRepo
 	featuredProducts domain.FeaturedProductRepo
 	storage          domain.FileStorage
@@ -54,8 +55,8 @@ type Server struct {
 
 var emailRe = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
 
-func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config, fp domain.FeaturedProductRepo, emailSvc domain.EmailService) http.Handler {
-	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, models: m, featuredProducts: fp, storage: fs, customers: customers, oauthCfg: oauthCfg, emailService: emailSvc, mux: http.NewServeMux()}
+func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, c *usecase.CouponUseCase, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config, fp domain.FeaturedProductRepo, emailSvc domain.EmailService) http.Handler {
+	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, coupons: c, models: m, featuredProducts: fp, storage: fs, customers: customers, oauthCfg: oauthCfg, emailService: emailSvc, mux: http.NewServeMux()}
 
 	allowed := map[string]struct{}{}
 	if raw := os.Getenv("ADMIN_ALLOWED_EMAILS"); raw != "" {
@@ -123,6 +124,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/product_images/", s.apiProductImageByID)
 	s.mux.HandleFunc("/api/quote", s.apiQuote)
 	s.mux.HandleFunc("/api/checkout", s.apiCheckout)
+	s.mux.HandleFunc("/api/validate-coupon", s.handleValidateCouponAPI)
 	s.mux.HandleFunc("/webhooks/mp", s.webhookMP)
 	s.mux.HandleFunc("/api/products/delete", s.apiProductsBulkDelete)
 
@@ -143,6 +145,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/admin/logout", s.handleAdminLogout)
 
 	s.mux.HandleFunc("/admin/orders", s.handleAdminOrders)
+	s.mux.HandleFunc("/admin/orders/confirm-payment", s.handleAdminConfirmPayment)
 	s.mux.HandleFunc("/admin/products", s.handleAdminProducts)
 
 	s.mux.HandleFunc("/admin/sales", s.handleAdminSales)
@@ -158,6 +161,15 @@ func (s *Server) routes() {
 	// Admin: Calculadora de costos
 	s.mux.HandleFunc("/admin/costs", s.handleAdminCosts)
 	s.mux.HandleFunc("/admin/costs/calculate", s.handleAdminCostsCalculate)
+
+	// Admin: Cupones de descuento
+	s.mux.HandleFunc("/admin/cupones", s.handleAdminCouponsList)
+	s.mux.HandleFunc("/admin/cupones/nuevo", s.handleAdminCouponsNew)
+	s.mux.HandleFunc("/admin/cupones/crear", s.handleAdminCouponsCreate)
+	s.mux.HandleFunc("/admin/cupones/editar", s.handleAdminCouponsEdit)
+	s.mux.HandleFunc("/admin/cupones/actualizar", s.handleAdminCouponsUpdate)
+	s.mux.HandleFunc("/admin/cupones/toggle", s.handleAdminCouponsToggle)
+	s.mux.HandleFunc("/admin/cupones/estadisticas", s.handleAdminCouponsStats)
 
 	// WhatsApp Business API endpoints
 	s.mux.HandleFunc("/api/whatsapp/webhook", s.handleWhatsAppWebhook)
@@ -977,6 +989,22 @@ func (s *Server) webhookMP(w http.ResponseWriter, r *http.Request) {
 	if approved && !o.Notified {
 		o.Notified = true
 		notify = true
+		
+		// Registrar uso del cupón cuando el pago es aprobado
+		if o.CouponID != nil && o.CouponCode != "" {
+			if err := s.coupons.ApplyCoupon(r.Context(), *o.CouponID, o.ID, o.Email, o.DiscountAmount, o.Total+o.DiscountAmount); err != nil {
+				log.Error().Err(err).
+					Str("coupon_code", o.CouponCode).
+					Str("order_id", o.ID.String()).
+					Msg("error al registrar uso de cupón en webhook")
+			} else {
+				log.Info().
+					Str("coupon_code", o.CouponCode).
+					Str("order_id", o.ID.String()).
+					Float64("discount", o.DiscountAmount).
+					Msg("cupón registrado exitosamente tras confirmación de pago")
+			}
+		}
 	}
 	if err := s.orders.Orders.Save(r.Context(), o); err != nil {
 		log.Error().Err(err).Msg("guardar orden webhook")
@@ -1321,6 +1349,8 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 		paymentMethod = "efectivo"
 	}
 
+	couponCode := strings.TrimSpace(r.FormValue("coupon_code"))
+
 	addrEnvio := r.FormValue("address_envio")
 	addrCadete := r.FormValue("address_cadete")
 	legacyAddr := r.FormValue("address")
@@ -1402,18 +1432,35 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 	o.ShippingCost = shippingCost
 	subtotal := itemsTotal + shippingCost
 
-	// Aplicar descuento para transferencia (10%)
+	// Validar y aplicar cupón de descuento
 	discountAmount := 0.0
-	if paymentMethod == "transferencia" {
-		discountAmount = subtotal * 0.1
+	var appliedCoupon *domain.Coupon = nil
+
+	if couponCode != "" {
+		coupon, err := s.coupons.ValidateCoupon(r.Context(), couponCode, email, subtotal)
+		if err != nil {
+			// Redirigir con error específico
+			http.Redirect(w, r, "/cart?err=cupon_invalido&msg="+url.QueryEscape(err.Error()), 302)
+			return
+		}
+		discountAmount = s.coupons.CalculateDiscount(coupon, subtotal)
+		appliedCoupon = coupon
 	}
+
 	o.DiscountAmount = discountAmount
 	o.Total = subtotal - discountAmount
+	if appliedCoupon != nil {
+		o.CouponCode = appliedCoupon.Code
+		o.CouponID = &appliedCoupon.ID
+	}
 
 	if err := s.orders.Orders.Save(r.Context(), o); err != nil {
 		http.Redirect(w, r, "/cart?err=orden", 302)
 		return
 	}
+
+	// NOTA: El uso del cupón se registra cuando el pago es confirmado (en el webhook)
+	// NO lo registramos aquí para evitar que se marque como usado en pagos pendientes
 
 	// Manejar según método de pago
 	switch paymentMethod {
@@ -1947,6 +1994,104 @@ func (s *Server) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
 	pages := (int(total) + 19) / 20
 	data := map[string]any{"Orders": list, "Page": page, "Pages": pages, "AdminToken": s.readAdminToken(r), "FilterApproved": filterApproved}
 	s.render(w, "admin_orders.html", data)
+}
+
+// handleAdminConfirmPayment confirma manualmente un pago en efectivo/transferencia
+func (s *Server) handleAdminConfirmPayment(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	orderIDStr := r.URL.Query().Get("id")
+	if orderIDStr == "" {
+		http.Error(w, "id requerido", http.StatusBadRequest)
+		return
+	}
+
+	orderID, err := uuid.Parse(orderIDStr)
+	if err != nil {
+		http.Error(w, "id inválido", http.StatusBadRequest)
+		return
+	}
+
+	// Obtener la orden
+	order, err := s.orders.Orders.FindByID(r.Context(), orderID)
+	if err != nil || order == nil {
+		log.Error().Err(err).Str("order_id", orderIDStr).Msg("orden no encontrada")
+		http.Error(w, "orden no encontrada", http.StatusNotFound)
+		return
+	}
+
+	// Verificar que sea un pago pendiente de efectivo/transferencia
+	if order.MPStatus != "efectivo_pending" && order.MPStatus != "transferencia_pending" {
+		http.Error(w, "esta orden no requiere confirmación manual (estado: "+order.MPStatus+")", http.StatusBadRequest)
+		return
+	}
+
+	// Verificar que no esté ya confirmada
+	if order.Status == domain.OrderStatusFinished {
+		http.Error(w, "esta orden ya fue confirmada", http.StatusBadRequest)
+		return
+	}
+
+	// Actualizar el estado de la orden
+	oldStatus := order.Status
+	order.Status = domain.OrderStatusFinished
+	
+	// Actualizar MPStatus para reflejar la confirmación manual
+	if order.MPStatus == "efectivo_pending" {
+		order.MPStatus = "efectivo_confirmed"
+	} else if order.MPStatus == "transferencia_pending" {
+		order.MPStatus = "transferencia_confirmed"
+	}
+
+	// Registrar uso del cupón si aplica
+	if order.CouponID != nil && order.CouponCode != "" {
+		if err := s.coupons.ApplyCoupon(r.Context(), *order.CouponID, order.ID, order.Email, order.DiscountAmount, order.Total+order.DiscountAmount); err != nil {
+			log.Error().Err(err).
+				Str("coupon_code", order.CouponCode).
+				Str("order_id", order.ID.String()).
+				Msg("error al registrar uso de cupón en confirmación manual")
+			http.Error(w, "error al registrar cupón: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		log.Info().
+			Str("coupon_code", order.CouponCode).
+			Str("order_id", order.ID.String()).
+			Float64("discount", order.DiscountAmount).
+			Msg("cupón registrado exitosamente tras confirmación manual")
+	}
+
+	// Marcar como notificada y enviar notificación si no se había enviado
+	if !order.Notified {
+		order.Notified = true
+		go s.sendOrderNotify(order, true)
+	}
+
+	// Guardar la orden actualizada
+	if err := s.orders.Orders.Save(r.Context(), order); err != nil {
+		log.Error().Err(err).Msg("error al guardar orden confirmada")
+		http.Error(w, "error al guardar cambios", http.StatusInternalServerError)
+		return
+	}
+
+	log.Info().
+		Str("order_id", order.ID.String()).
+		Str("email", order.Email).
+		Str("old_status", string(oldStatus)).
+		Str("new_status", string(order.Status)).
+		Str("payment_method", order.PaymentMethod).
+		Float64("total", order.Total).
+		Msg("pago confirmado manualmente por admin")
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Pago confirmado exitosamente"))
 }
 
 func (s *Server) handleAdminSales(w http.ResponseWriter, r *http.Request) {
@@ -3165,4 +3310,378 @@ func (s *Server) apiCarouselUpdate(w http.ResponseWriter, r *http.Request) {
 		"status": "success",
 		"items":  req.Items,
 	})
+}
+
+// handleValidateCouponAPI valida un cupón de descuento vía AJAX
+func (s *Server) handleValidateCouponAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	code := strings.TrimSpace(r.URL.Query().Get("code"))
+	email := strings.TrimSpace(r.URL.Query().Get("email"))
+	subtotalStr := strings.TrimSpace(r.URL.Query().Get("subtotal"))
+
+	if code == "" {
+		writeJSON(w, 400, map[string]interface{}{
+			"valid":   false,
+			"message": "Código de cupón requerido",
+		})
+		return
+	}
+
+	if email == "" {
+		writeJSON(w, 400, map[string]interface{}{
+			"valid":   false,
+			"message": "Email requerido",
+		})
+		return
+	}
+
+	subtotal := 0.0
+	if subtotalStr != "" {
+		var err error
+		subtotal, err = strconv.ParseFloat(subtotalStr, 64)
+		if err != nil {
+			writeJSON(w, 400, map[string]interface{}{
+				"valid":   false,
+				"message": "Subtotal inválido",
+			})
+			return
+		}
+	}
+
+	// Validar cupón
+	coupon, err := s.coupons.ValidateCoupon(r.Context(), code, email, subtotal)
+	if err != nil {
+		writeJSON(w, 200, map[string]interface{}{
+			"valid":   false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Calcular descuento
+	discount := s.coupons.CalculateDiscount(coupon, subtotal)
+
+	// Preparar mensaje descriptivo
+	message := ""
+	if coupon.DiscountType == domain.DiscountTypePercentage {
+		message = fmt.Sprintf("Cupón aplicado: %.0f%% de descuento", coupon.DiscountValue)
+	} else {
+		message = fmt.Sprintf("Cupón aplicado: $%.2f de descuento", coupon.DiscountValue)
+	}
+
+	writeJSON(w, 200, map[string]interface{}{
+		"valid":    true,
+		"discount": discount,
+		"message":  message,
+		"code":     coupon.Code,
+	})
+}
+
+// ============================================
+// ADMIN: CUPONES DE DESCUENTO
+// ============================================
+
+func (s *Server) handleAdminCouponsList(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", http.StatusFound)
+		return
+	}
+
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		if parsed, err := strconv.Atoi(p); err == nil && parsed > 0 {
+			page = parsed
+		}
+	}
+
+	coupons, total, err := s.coupons.ListCoupons(r.Context(), false, page, 20)
+	if err != nil {
+		http.Error(w, "error al listar cupones", http.StatusInternalServerError)
+		log.Error().Err(err).Msg("error listing coupons")
+		return
+	}
+
+	data := map[string]interface{}{
+		"Coupons":     coupons,
+		"Total":       total,
+		"Page":        page,
+		"TotalPages":  (total + 19) / 20,
+		"AdminActive": "cupones",
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := s.tmpl.ExecuteTemplate(w, "admin_coupons_list.html", data); err != nil {
+		log.Error().Err(err).Msg("error rendering admin_coupons_list")
+		http.Error(w, "error rendering template", http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleAdminCouponsNew(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", http.StatusFound)
+		return
+	}
+
+	data := map[string]interface{}{
+		"AdminActive": "cupones",
+		"IsEdit":      false,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := s.tmpl.ExecuteTemplate(w, "admin_coupons_form.html", data); err != nil {
+		log.Error().Err(err).Msg("error rendering admin_coupons_form")
+		http.Error(w, "error rendering template", http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleAdminCouponsCreate(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "error parsing form", http.StatusBadRequest)
+		return
+	}
+
+	// Parsear campos
+	code := strings.TrimSpace(r.FormValue("code"))
+	discountType := domain.DiscountType(r.FormValue("discount_type"))
+	discountValueStr := r.FormValue("discount_value")
+	minPurchaseStr := r.FormValue("min_purchase_amount")
+	maxUsesStr := r.FormValue("max_uses")
+	expiresAtStr := r.FormValue("expires_at")
+	description := strings.TrimSpace(r.FormValue("description"))
+
+	discountValue, _ := strconv.ParseFloat(discountValueStr, 64)
+	minPurchase, _ := strconv.ParseFloat(minPurchaseStr, 64)
+
+	var maxUses *int
+	if maxUsesStr != "" {
+		if parsed, err := strconv.Atoi(maxUsesStr); err == nil && parsed > 0 {
+			maxUses = &parsed
+		}
+	}
+
+	var expiresAt *time.Time
+	if expiresAtStr != "" {
+		if parsed, err := time.Parse("2006-01-02", expiresAtStr); err == nil {
+			expiresAt = &parsed
+		}
+	}
+
+	coupon := &domain.Coupon{
+		ID:                uuid.New(),
+		Code:              code,
+		DiscountType:      discountType,
+		DiscountValue:     discountValue,
+		MinPurchaseAmount: minPurchase,
+		MaxUses:           maxUses,
+		ExpiresAt:         expiresAt,
+		Active:            true,
+		Description:       description,
+	}
+
+	if err := s.coupons.CreateCoupon(r.Context(), coupon); err != nil {
+		log.Error().Err(err).Msg("error creating coupon")
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/cupones", http.StatusSeeOther)
+}
+
+func (s *Server) handleAdminCouponsEdit(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", http.StatusFound)
+		return
+	}
+
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		http.Error(w, "id requerido", http.StatusBadRequest)
+		return
+	}
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "id inválido", http.StatusBadRequest)
+		return
+	}
+
+	coupon, err := s.coupons.GetCoupon(r.Context(), id)
+	if err != nil {
+		http.Error(w, "cupón no encontrado", http.StatusNotFound)
+		return
+	}
+
+	data := map[string]interface{}{
+		"AdminActive": "cupones",
+		"IsEdit":      true,
+		"Coupon":      coupon,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := s.tmpl.ExecuteTemplate(w, "admin_coupons_form.html", data); err != nil {
+		log.Error().Err(err).Msg("error rendering admin_coupons_form")
+		http.Error(w, "error rendering template", http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleAdminCouponsUpdate(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "error parsing form", http.StatusBadRequest)
+		return
+	}
+
+	idStr := r.FormValue("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "id inválido", http.StatusBadRequest)
+		return
+	}
+
+	// Parsear campos
+	code := strings.TrimSpace(r.FormValue("code"))
+	discountType := domain.DiscountType(r.FormValue("discount_type"))
+	discountValueStr := r.FormValue("discount_value")
+	minPurchaseStr := r.FormValue("min_purchase_amount")
+	maxUsesStr := r.FormValue("max_uses")
+	expiresAtStr := r.FormValue("expires_at")
+	description := strings.TrimSpace(r.FormValue("description"))
+	activeStr := r.FormValue("active")
+
+	discountValue, _ := strconv.ParseFloat(discountValueStr, 64)
+	minPurchase, _ := strconv.ParseFloat(minPurchaseStr, 64)
+
+	var maxUses *int
+	if maxUsesStr != "" {
+		if parsed, err := strconv.Atoi(maxUsesStr); err == nil && parsed > 0 {
+			maxUses = &parsed
+		}
+	}
+
+	var expiresAt *time.Time
+	if expiresAtStr != "" {
+		if parsed, err := time.Parse("2006-01-02", expiresAtStr); err == nil {
+			expiresAt = &parsed
+		}
+	}
+
+	coupon := &domain.Coupon{
+		ID:                id,
+		Code:              code,
+		DiscountType:      discountType,
+		DiscountValue:     discountValue,
+		MinPurchaseAmount: minPurchase,
+		MaxUses:           maxUses,
+		ExpiresAt:         expiresAt,
+		Active:            activeStr == "on",
+		Description:       description,
+	}
+
+	if err := s.coupons.UpdateCoupon(r.Context(), coupon); err != nil {
+		log.Error().Err(err).Msg("error updating coupon")
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/cupones", http.StatusSeeOther)
+}
+
+func (s *Server) handleAdminCouponsToggle(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		http.Error(w, "id requerido", http.StatusBadRequest)
+		return
+	}
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "id inválido", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.coupons.ToggleCoupon(r.Context(), id); err != nil {
+		log.Error().Err(err).Msg("error toggling coupon")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, 200, map[string]interface{}{"status": "success"})
+}
+
+func (s *Server) handleAdminCouponsStats(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", http.StatusFound)
+		return
+	}
+
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		http.Error(w, "id requerido", http.StatusBadRequest)
+		return
+	}
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "id inválido", http.StatusBadRequest)
+		return
+	}
+
+	coupon, err := s.coupons.GetCoupon(r.Context(), id)
+	if err != nil {
+		http.Error(w, "cupón no encontrado", http.StatusNotFound)
+		return
+	}
+
+	totalUses, totalDiscount, err := s.coupons.GetCouponStats(r.Context(), id)
+	if err != nil {
+		log.Error().Err(err).Msg("error getting coupon stats")
+		http.Error(w, "error al obtener estadísticas", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]interface{}{
+		"AdminActive":   "cupones",
+		"Coupon":        coupon,
+		"TotalUses":     totalUses,
+		"TotalDiscount": totalDiscount,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := s.tmpl.ExecuteTemplate(w, "admin_coupons_stats.html", data); err != nil {
+		log.Error().Err(err).Msg("error rendering admin_coupons_stats")
+		http.Error(w, "error rendering template", http.StatusInternalServerError)
+	}
 }
