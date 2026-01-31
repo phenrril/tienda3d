@@ -1,0 +1,119 @@
+{{define "admin_coupons_list.html"}}
+{{template "layout_start" .}}
+<h1>Cupones de Descuento</h1>
+<nav class="admin-nav">
+  <a href="/admin/products">Productos</a> | 
+  <a href="/admin/orders">Órdenes</a> | 
+  <a href="/admin/sales">Ventas</a> | 
+  <a href="/admin/destacada">Destacada</a> | 
+  <a href="/admin/costs">Calculadora</a> | 
+  <a href="/admin/cupones" class="active">Cupones</a> | 
+  <a href="/admin/logout">Salir</a>
+</nav>
+
+<div style="margin:20px 0;display:flex;justify-content:space-between;align-items:center">
+  <div>
+    <p style="color:var(--muted);font-size:14px">Total: {{.Total}} cupones</p>
+  </div>
+  <a href="/admin/cupones/nuevo" class="btn-primary">+ Crear cupón</a>
+</div>
+
+{{if not .Coupons}}
+<div style="text-align:center;padding:60px 20px;color:var(--muted)">
+  <p>No hay cupones creados aún.</p>
+  <a href="/admin/cupones/nuevo" class="btn-primary" style="margin-top:16px">Crear primer cupón</a>
+</div>
+{{else}}
+<table class="table" style="width:100%;font-size:0.9rem">
+  <thead>
+    <tr>
+      <th>Código</th>
+      <th>Tipo</th>
+      <th>Descuento</th>
+      <th>Mín. Compra</th>
+      <th>Usos</th>
+      <th>Expira</th>
+      <th>Estado</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Coupons}}
+    <tr>
+      <td style="font-family:monospace;font-weight:600">{{.Code}}</td>
+      <td>
+        {{if eq .DiscountType "percentage"}}Porcentaje{{else}}Monto fijo{{end}}
+      </td>
+      <td>
+        {{if eq .DiscountType "percentage"}}{{.DiscountValue}}%{{else}}${{formatPrice .DiscountValue}}{{end}}
+      </td>
+      <td>
+        {{if gt .MinPurchaseAmount 0.0}}${{formatPrice .MinPurchaseAmount}}{{else}}-{{end}}
+      </td>
+      <td>
+        {{.CurrentUses}}{{if .MaxUses}} / {{.MaxUses}}{{else}} / ∞{{end}}
+      </td>
+      <td>
+        {{if .ExpiresAt}}{{.ExpiresAt.Format "02/01/2006"}}{{else}}-{{end}}
+      </td>
+      <td>
+        {{if .Active}}
+          <span style="color:#10b981;font-weight:600">✓ Activo</span>
+        {{else}}
+          <span style="color:#ef4444;font-weight:600">✕ Inactivo</span>
+        {{end}}
+      </td>
+      <td>
+        <div style="display:flex;gap:8px">
+          <a href="/admin/cupones/editar?id={{.ID}}" class="btn-secondary small">Editar</a>
+          <a href="/admin/cupones/estadisticas?id={{.ID}}" class="btn-secondary small">Stats</a>
+          <button 
+            onclick="toggleCoupon('{{.ID}}', {{.Active}})" 
+            class="btn-secondary small"
+            style="min-width:70px">
+            {{if .Active}}Desactivar{{else}}Activar{{end}}
+          </button>
+        </div>
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+
+{{if gt .TotalPages 1}}
+<div class="pager" style="margin-top:20px">
+  Página {{.Page}} / {{.TotalPages}}
+  {{if gt .Page 1}}
+    <a href="/admin/cupones?page={{add .Page -1}}">← Anterior</a>
+  {{end}}
+  {{if lt .Page .TotalPages}}
+    <a href="/admin/cupones?page={{add .Page 1}}">Siguiente →</a>
+  {{end}}
+</div>
+{{end}}
+{{end}}
+
+<script>
+function toggleCoupon(id, isActive) {
+  const action = isActive ? 'desactivar' : 'activar';
+  if(!confirm(`¿Seguro que querés ${action} este cupón?`)) return;
+  
+  fetch(`/admin/cupones/toggle?id=${id}`, {
+    method: 'POST'
+  })
+  .then(res => {
+    if(res.ok) {
+      location.reload();
+    } else {
+      alert('Error al cambiar estado del cupón');
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    alert('Error: ' + err);
+  });
+}
+</script>
+
+{{template "layout_end" .}}
+{{end}}

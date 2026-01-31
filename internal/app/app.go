@@ -32,6 +32,7 @@ type App struct {
 	OrderUC             *usecase.OrderUC
 	PaymentUC           *usecase.PaymentUC
 	WhatsAppUC          *usecase.WhatsAppUC
+	CouponUC            *usecase.CouponUseCase
 	ModelRepo           domain.UploadedModelRepo
 	FeaturedProductRepo domain.FeaturedProductRepo
 	ShippingMethod      string  `gorm:"size:30"`
@@ -49,6 +50,7 @@ func NewApp(db *gorm.DB) (*App, error) {
 	modelRepo := postgres.NewUploadedModelRepo(db)
 	custRepo := postgres.NewCustomerRepo(db)
 	featuredRepo := postgres.NewFeaturedProductRepo(db)
+	couponRepo := postgres.NewCouponRepo(db)
 	storageDir := os.Getenv("STORAGE_DIR")
 	if storageDir == "" {
 		storageDir = "uploads"
@@ -112,6 +114,7 @@ func NewApp(db *gorm.DB) (*App, error) {
 		Orders:       orderRepo,
 		Payments:     &usecase.PaymentUC{Orders: orderRepo, Gateway: payment},
 	}
+	app.CouponUC = usecase.NewCouponUseCase(couponRepo, orderRepo)
 	app.DB = db
 	app.ModelRepo = modelRepo
 	app.FeaturedProductRepo = featuredRepo
@@ -177,16 +180,35 @@ func NewApp(db *gorm.DB) (*App, error) {
 			base = strings.ReplaceAll(base, " ", "%20")
 			return fmt.Sprintf("%s?w=%d", base, w)
 		},
-		// formatPrice: formatea un número con puntos de miles (ej: 1000 -> "1.000", 1234.56 -> "1.234.56")
+		// formatPrice: formatea un número con puntos de miles (ej: 1000 -> "1.000", 1234.56 -> "1.234,56")
 		"formatPrice": func(n float64) string {
+			defer func() {
+				if r := recover(); r != nil {
+					// En caso de pánico, retornar un valor por defecto
+					fmt.Printf("PANIC en formatPrice: %v\n", r)
+				}
+			}()
+			
 			// Formatear con 2 decimales
 			str := strconv.FormatFloat(n, 'f', 2, 64)
 			parts := strings.Split(str, ".")
+			if len(parts) == 0 {
+				return "0"
+			}
 			intStr := parts[0]
-			decStr := parts[1]
+			decStr := "00"
+			if len(parts) > 1 {
+				decStr = parts[1]
+			}
 			
 			// Agregar puntos de miles a la parte entera
 			var result strings.Builder
+			// Manejar números negativos
+			if strings.HasPrefix(intStr, "-") {
+				result.WriteString("-")
+				intStr = intStr[1:]
+			}
+			
 			for i, r := range intStr {
 				if i > 0 && (len(intStr)-i)%3 == 0 {
 					result.WriteString(".")
@@ -198,7 +220,7 @@ func NewApp(db *gorm.DB) (*App, error) {
 			if decStr == "00" {
 				return result.String()
 			}
-			return result.String() + "." + decStr
+			return result.String() + "," + decStr
 		},
 	}
 	tmpl, err := template.New("layout").Funcs(funcMap).ParseFS(views.FS, "*.html", "admin/*.html")
@@ -211,12 +233,12 @@ func NewApp(db *gorm.DB) (*App, error) {
 }
 
 func (a *App) HTTPHandler() http.Handler {
-	return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.WhatsAppUC, a.ModelRepo, a.Storage, a.Customers, a.OAuthConfig, a.FeaturedProductRepo, a.EmailService)
+	return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.WhatsAppUC, a.CouponUC, a.ModelRepo, a.Storage, a.Customers, a.OAuthConfig, a.FeaturedProductRepo, a.EmailService)
 }
 
 func (a *App) MigrateAndSeed() error {
 	if err := a.DB.AutoMigrate(
-		&domain.Product{}, &domain.Variant{}, &domain.Image{}, &domain.Order{}, &domain.OrderItem{}, &domain.UploadedModel{}, &domain.Quote{}, &domain.Page{}, &domain.Customer{}, &domain.WhatsAppOrder{}, &domain.WhatsAppProductSync{}, &domain.FeaturedProduct{},
+		&domain.Product{}, &domain.Variant{}, &domain.Image{}, &domain.Order{}, &domain.OrderItem{}, &domain.UploadedModel{}, &domain.Quote{}, &domain.Page{}, &domain.Customer{}, &domain.WhatsAppOrder{}, &domain.WhatsAppProductSync{}, &domain.FeaturedProduct{}, &domain.Coupon{}, &domain.CouponUsage{},
 	); err != nil {
 		return err
 	}

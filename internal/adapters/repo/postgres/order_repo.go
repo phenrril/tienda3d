@@ -27,7 +27,7 @@ func (r *OrderRepo) Save(ctx context.Context, o *domain.Order) error {
 	}
 	if count == 0 {
 
-		core := domain.Order{ID: o.ID, Status: o.Status, Email: o.Email, Name: o.Name, Phone: o.Phone, DNI: o.DNI, Address: o.Address, PostalCode: o.PostalCode, Province: o.Province, MPPreferenceID: o.MPPreferenceID, MPStatus: o.MPStatus, Total: o.Total, ShippingMethod: o.ShippingMethod, ShippingCost: o.ShippingCost, Notified: o.Notified}
+		core := domain.Order{ID: o.ID, Status: o.Status, Email: o.Email, Name: o.Name, Phone: o.Phone, DNI: o.DNI, Address: o.Address, PostalCode: o.PostalCode, Province: o.Province, MPPreferenceID: o.MPPreferenceID, MPStatus: o.MPStatus, Total: o.Total, ShippingMethod: o.ShippingMethod, ShippingCost: o.ShippingCost, PaymentMethod: o.PaymentMethod, DiscountAmount: o.DiscountAmount, CouponCode: o.CouponCode, CouponID: o.CouponID, Notified: o.Notified}
 		if err := r.db.WithContext(ctx).Create(&core).Error; err != nil {
 			return err
 		}
@@ -60,6 +60,10 @@ func (r *OrderRepo) Save(ctx context.Context, o *domain.Order) error {
 		"total":            o.Total,
 		"shipping_method":  o.ShippingMethod,
 		"shipping_cost":    o.ShippingCost,
+		"payment_method":   o.PaymentMethod,
+		"discount_amount":  o.DiscountAmount,
+		"coupon_code":      o.CouponCode,
+		"coupon_id":        o.CouponID,
 		"notified":         o.Notified,
 	}).Error
 }
@@ -125,6 +129,24 @@ func (r *OrderRepo) ListInRange(ctx context.Context, from, to time.Time) ([]doma
 	to = time.Date(to.Year(), to.Month(), to.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), to.Location())
 	var list []domain.Order
 	if err := r.db.WithContext(ctx).Where("created_at BETWEEN ? AND ?", from, to).Order("created_at asc").Preload("Items").Find(&list).Error; err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+// FindPendingByEmailAndCoupon busca órdenes pendientes de un usuario con un cupón específico
+func (r *OrderRepo) FindPendingByEmailAndCoupon(ctx context.Context, email, couponCode string) ([]domain.Order, error) {
+	var list []domain.Order
+	// Buscar órdenes que:
+	// 1. Tengan el email del usuario
+	// 2. Tengan el código de cupón (case-insensitive)
+	// 3. NO estén finalizadas ni canceladas (solo pendientes de pago)
+	if err := r.db.WithContext(ctx).
+		Where("LOWER(email) = LOWER(?) AND UPPER(coupon_code) = UPPER(?) AND status IN (?)", 
+			email, 
+			couponCode, 
+			[]domain.OrderStatus{domain.OrderStatusAwaitingPay}).
+		Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return list, nil
