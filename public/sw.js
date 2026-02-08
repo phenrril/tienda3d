@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chroma3d-v2';
+const CACHE_NAME = 'chroma3d-v3';
 const urlsToCache = [
   '/',
   '/public/assets/styles.css',
