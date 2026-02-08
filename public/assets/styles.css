@@ -1219,8 +1219,8 @@ body.drawer-open .fab-whatsapp{display:none}
 .checkout-section-header.completed{animation:successPulse 0.5s ease}
 
 /* Cupón Colapsable */
-.coupon-collapse-wrapper{padding:0 16px 16px;margin-top:8px}
-.coupon-toggle-link{display:inline-flex;align-items:center;gap:8px;background:transparent;border:none;color:var(--primary);font-size:14px;font-weight:600;cursor:pointer;padding:12px 16px;border-radius:10px;transition:all 0.2s;text-decoration:none}
+.coupon-collapse-wrapper{padding:16px 20px 16px 20px;margin-top:8px;overflow:visible;min-width:0}
+.coupon-toggle-link{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:none;color:var(--primary);font-size:14px;font-weight:600;cursor:pointer;padding:12px 16px;border-radius:10px;transition:all 0.2s;text-decoration:none;overflow:visible;box-sizing:border-box}
 .coupon-toggle-link:hover{background:rgba(99,102,241,0.1);transform:translateX(2px)}
 .coupon-toggle-link svg{flex-shrink:0;transition:transform 0.3s}
 .coupon-toggle-link.active svg{transform:rotate(180deg)}
@@ -1266,7 +1266,7 @@ body.drawer-open .fab-whatsapp{display:none}
 
 /* Desktop Enhancements */
 @media (min-width:1024px){
-  .coupon-collapse-wrapper{padding:0 0 16px}
+  .coupon-collapse-wrapper{padding:16px 20px 16px 20px}
   .coupon-input-group{max-width:500px}
 }
 
