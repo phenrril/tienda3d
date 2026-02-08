@@ -1184,3 +1184,199 @@ body.drawer-open .fab-whatsapp{display:none}
 /* Buttons Row */
 .inline-btns{display:flex;gap:8px;flex-wrap:wrap}
 .inline-btns button{flex:1;min-width:80px}
+
+/* ============================================
+   CHECKOUT UX IMPROVEMENTS
+   ============================================ */
+
+/* Progress Bar Dinámica */
+.cart-progress-bar{position:relative;height:6px;background:var(--border);border-radius:3px;margin:16px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);transition:width 0.4s cubic-bezier(0.4,0,0.2,1);border-radius:3px;box-shadow:0 0 10px rgba(99,102,241,0.4)}
+.progress-bar-label{display:flex;justify-content:space-between;align-items:center;padding:8px 16px 0;font-size:12px;color:var(--muted);font-weight:500}
+.progress-text{font-weight:600;color:var(--text)}
+.progress-percent{color:var(--primary);font-weight:700}
+@media (max-width:480px){
+  .progress-bar-label{font-size:11px;padding:6px 16px 0}
+}
+
+/* Section Checkmarks */
+.section-main-icon{display:block;transition:opacity 0.3s}
+.section-check-icon{display:none;transition:opacity 0.3s}
+.checkout-section-header.completed .section-main-icon{display:none}
+.checkout-section-header.completed .section-check-icon{display:block;color:#10b981}
+.checkout-section-header.completed .checkout-section-icon{background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 4px 12px rgba(16,185,129,0.3)}
+
+/* Section Disabled State */
+.checkout-section-header.disabled{opacity:0.5;cursor:not-allowed;pointer-events:none}
+.checkout-section-header.disabled .checkout-section-icon{background:var(--border)}
+
+/* Animación Success Pulse */
+@keyframes successPulse{
+  0%{transform:scale(1)}
+  50%{transform:scale(1.05);box-shadow:0 0 20px rgba(16,185,129,0.4)}
+  100%{transform:scale(1)}
+}
+.checkout-section-header.completed{animation:successPulse 0.5s ease}
+
+/* Cupón Colapsable */
+.coupon-collapse-wrapper{padding:0 16px 16px;margin-top:8px}
+.coupon-toggle-link{display:inline-flex;align-items:center;gap:8px;background:transparent;border:none;color:var(--primary);font-size:14px;font-weight:600;cursor:pointer;padding:12px 16px;border-radius:10px;transition:all 0.2s;text-decoration:none}
+.coupon-toggle-link:hover{background:rgba(99,102,241,0.1);transform:translateX(2px)}
+.coupon-toggle-link svg{flex-shrink:0;transition:transform 0.3s}
+.coupon-toggle-link.active svg{transform:rotate(180deg)}
+.coupon-field-wrapper{margin-top:12px;padding:16px;background:var(--panel);border:1px solid var(--border);border-radius:12px;animation:slideDown 0.3s ease}
+.coupon-input-group{display:flex;gap:8px}
+.coupon-input-group input{flex:1}
+.coupon-validate-btn{padding:12px 20px;background:var(--primary);color:white;border:none;border-radius:10px;font-weight:600;cursor:pointer;transition:all 0.2s;white-space:nowrap}
+.coupon-validate-btn:hover{filter:brightness(0.95);transform:translateY(-1px)}
+.coupon-validate-btn:active{transform:translateY(0)}
+.coupon-message{margin-top:8px;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:500}
+.coupon-message.coupon-success{background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.3)}
+.coupon-message.coupon-error{background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.3)}
+@keyframes slideDown{
+  from{opacity:0;transform:translateY(-10px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+/* Field Validation States */
+.checkout-input.field-valid{border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,0.1)}
+.checkout-input.field-invalid{border-color:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,0.1);animation:shake 0.3s ease}
+.field-error{margin-top:6px;padding:8px 12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#ef4444;font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px;animation:slideDown 0.3s ease}
+.field-error::before{content:'⚠';font-size:14px}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-5px)}
+  75%{transform:translateX(5px)}
+}
+
+/* Input Focus Enhanced */
+.checkout-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,0.15);transform:scale(1.01);transition:all 0.2s}
+
+/* Conditional Fields Animation */
+.checkout-conditional-fields{animation:slideDown 0.3s ease;overflow:hidden}
+
+/* Mobile Touch Improvements */
+@media (max-width:768px){
+  .checkout-section-header{min-height:64px;padding:16px}
+  .checkout-input{min-height:50px;padding:14px;font-size:16px}
+  .checkout-radio-option{min-height:60px;padding:16px}
+  .coupon-toggle-link{min-height:48px}
+  .coupon-validate-btn{min-height:50px;padding:14px 24px}
+}
+
+/* Desktop Enhancements */
+@media (min-width:1024px){
+  .coupon-collapse-wrapper{padding:0 0 16px}
+  .coupon-input-group{max-width:500px}
+}
+
+/* Section Help Text */
+.section-help-text{
+  padding:12px 16px;
+  margin-bottom:12px;
+  background:rgba(99,102,241,0.1);
+  border:1px solid rgba(99,102,241,0.3);
+  border-radius:10px;
+  color:var(--primary);
+  font-size:14px;
+  font-weight:600;
+  text-align:center;
+  animation:fadeIn 0.3s ease;
+  transition:opacity 0.3s ease,transform 0.3s ease;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+}
+
+.section-help-text::before{
+  content:'👆';
+  font-size:16px;
+}
+
+@keyframes fadeIn{
+  from{opacity:0;transform:translateY(-5px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+@media (max-width:480px){
+  .section-help-text{
+    font-size:13px;
+    padding:10px 14px;
+  }
+}
+
+/* Radio Options - Estado no seleccionado más obvio */
+.checkout-radio-option{
+  position:relative;
+  transition:all 0.2s;
+}
+
+.checkout-radio-option:not(:has(input:checked)){
+  opacity:0.85;
+  border-color:rgba(99,102,241,0.3);
+}
+
+.checkout-radio-option:not(:has(input:checked)):hover{
+  opacity:1;
+  border-color:var(--primary);
+  transform:translateX(4px);
+}
+
+/* Submit Button Disabled State */
+.cart-summary-cta:disabled,
+.cart-sticky-cta:disabled{
+  opacity:0.6;
+  cursor:not-allowed;
+  pointer-events:none;
+  background:linear-gradient(135deg,#4b5563,#6b7280);
+  box-shadow:none;
+  transform:none;
+}
+
+.cart-summary-cta:disabled:hover,
+.cart-sticky-cta:disabled:hover{
+  transform:none;
+  box-shadow:none;
+  filter:none;
+}
+
+/* Submit Button Processing State */
+.cart-summary-cta[data-processing="true"],
+.cart-sticky-cta[data-processing="true"]{
+  opacity:0.8;
+  cursor:wait;
+  pointer-events:none;
+}
+
+/* Submit Button Tooltip on Hover when Disabled */
+.cart-summary-cta:disabled::after,
+.cart-sticky-cta:disabled::after{
+  content:attr(title);
+  position:absolute;
+  bottom:calc(100% + 10px);
+  left:50%;
+  transform:translateX(-50%) scale(0);
+  background:rgba(0,0,0,0.9);
+  color:white;
+  padding:8px 12px;
+  border-radius:6px;
+  font-size:12px;
+  white-space:nowrap;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity 0.2s,transform 0.2s;
+  z-index:1000;
+}
+
+.cart-summary-cta:disabled:hover::after,
+.cart-sticky-cta:disabled:hover::after{
+  opacity:1;
+  transform:translateX(-50%) scale(1);
+  pointer-events:auto;
+}
+
+.cart-summary-cta,
+.cart-sticky-cta{
+  position:relative;
+}
