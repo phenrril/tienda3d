@@ -17,13 +17,13 @@
   </div>
   {{else}}
   
-  <!-- Progress Bar Minimalista -->
-  <div class="cart-progress">
-    <div class="cart-progress-dot active"></div>
-    <div class="cart-progress-line"></div>
-    <div class="cart-progress-dot"></div>
-    <div class="cart-progress-line"></div>
-    <div class="cart-progress-dot"></div>
+  <!-- Progress Bar Dinámica -->
+  <div class="cart-progress-bar">
+    <div class="progress-bar-fill" id="progressBarFill" style="width: 0%"></div>
+    <div class="progress-bar-label">
+      <span class="progress-text">Paso <span id="currentStep">1</span> de 3</span>
+      <span class="progress-percent"><span id="progressPercent">0</span>%</span>
+    </div>
   </div>
   
   <!-- Header Mobile Optimizado -->
@@ -100,10 +100,13 @@
     
     <!-- Sección 1: Datos de Contacto -->
     <div class="checkout-section" data-section="contact">
-      <button type="button" class="checkout-section-header active" data-toggle="contact">
+      <button type="button" class="checkout-section-header active" data-toggle="contact" data-section-name="contact">
         <div class="checkout-section-icon">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <svg class="section-main-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+          <svg class="section-check-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
         </div>
         <div class="checkout-section-title">
@@ -116,18 +119,21 @@
       </button>
       
       <div class="checkout-section-content active">
-        <input type="text" name="name" placeholder="Nombre completo *" required class="checkout-input" />
-        <input type="email" name="email" placeholder="Email *" required class="checkout-input" />
-        <input type="tel" name="phone" placeholder="Teléfono *" required class="checkout-input" />
+        <input type="text" name="name" placeholder="Nombre completo *" required autocomplete="name" class="checkout-input" />
+        <input type="email" name="email" placeholder="Email *" required autocomplete="email" inputmode="email" class="checkout-input" />
+        <input type="tel" name="phone" placeholder="Teléfono *" required autocomplete="tel" inputmode="tel" pattern="[0-9]*" class="checkout-input" />
       </div>
     </div>
 
     <!-- Sección 2: Método de Entrega -->
     <div class="checkout-section" data-section="shipping">
-      <button type="button" class="checkout-section-header" data-toggle="shipping">
+      <button type="button" class="checkout-section-header disabled" data-toggle="shipping" data-section-name="shipping">
         <div class="checkout-section-icon">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <svg class="section-main-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/>
+          </svg>
+          <svg class="section-check-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
         </div>
         <div class="checkout-section-title">
@@ -140,8 +146,9 @@
       </button>
       
       <div class="checkout-section-content">
+        <div class="section-help-text">Seleccioná cómo querés recibir tu pedido</div>
         <label class="checkout-radio-option">
-          <input type="radio" name="shipping" value="retiro" checked />
+          <input type="radio" name="shipping" value="retiro" />
           <div class="checkout-radio-content">
             <div class="checkout-radio-icon">🏪</div>
             <div class="checkout-radio-info">
@@ -194,10 +201,13 @@
 
     <!-- Sección 3: Método de Pago -->
     <div class="checkout-section" data-section="payment">
-      <button type="button" class="checkout-section-header" data-toggle="payment">
+      <button type="button" class="checkout-section-header disabled" data-toggle="payment" data-section-name="payment">
         <div class="checkout-section-icon">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <svg class="section-main-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/>
+          </svg>
+          <svg class="section-check-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
         </div>
         <div class="checkout-section-title">
@@ -210,8 +220,9 @@
       </button>
       
       <div class="checkout-section-content">
+        <div class="section-help-text">Seleccioná cómo querés pagar tu pedido</div>
         <label class="checkout-radio-option">
-          <input type="radio" name="payment_method" value="efectivo" checked />
+          <input type="radio" name="payment_method" value="efectivo" />
           <div class="checkout-radio-content">
             <div class="checkout-radio-icon">💵</div>
             <div class="checkout-radio-info">
@@ -248,27 +259,18 @@
       </div>
     </div>
 
-    <!-- Sección 4: Cupón de Descuento -->
-    <div class="checkout-section" data-section="coupon">
-      <button type="button" class="checkout-section-header" data-toggle="coupon">
-        <div class="checkout-section-icon">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 14l2 2 4-4m0-7v1a3 3 0 01-3 3h-1m0-4H8a3 3 0 00-3 3v1m0 0v10a3 3 0 003 3h8a3 3 0 003-3v-1m0-9a3 3 0 01-3 3m-3 0h1a3 3 0 003-3V5a3 3 0 00-3-3h-1m-1 13a3 3 0 01-3 3"/>
-          </svg>
-        </div>
-        <div class="checkout-section-title">
-          <span class="checkout-section-number">4</span>
-          <span>Cupón de descuento (opcional)</span>
-        </div>
-        <svg class="checkout-section-arrow" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M6 9l6 6 6-6"/>
+    <!-- Cupón de Descuento (Colapsable) -->
+    <div class="coupon-collapse-wrapper">
+      <button type="button" class="coupon-toggle-link" id="couponToggleLink">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 14l2 2 4-4m0-7v1a3 3 0 01-3 3h-1m0-4H8a3 3 0 00-3 3v1m0 0v10a3 3 0 003 3h8a3 3 0 003-3v-1m0-9a3 3 0 01-3 3m-3 0h1a3 3 0 003-3V5a3 3 0 00-3-3h-1m-1 13a3 3 0 01-3 3"/>
         </svg>
+        <span>¿Tenés un cupón de descuento?</span>
       </button>
-      
-      <div class="checkout-section-content">
-        <div class="coupon-input-wrapper">
-          <input type="text" name="coupon_code" id="coupon_code" placeholder="Ingresá tu código" class="checkout-input" autocomplete="off" />
-          <button type="button" id="validate-coupon-btn" class="coupon-validate-btn">Validar</button>
+      <div class="coupon-field-wrapper" id="couponFieldWrapper" style="display:none">
+        <div class="coupon-input-group">
+          <input type="text" name="coupon_code" id="coupon_code" placeholder="Código de cupón" class="checkout-input" autocomplete="off" />
+          <button type="button" id="validate-coupon-btn" class="coupon-validate-btn">Aplicar</button>
         </div>
         <div id="coupon-message" class="coupon-message" style="display:none"></div>
       </div>

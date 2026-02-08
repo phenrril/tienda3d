@@ -1406,11 +1406,415 @@ if ('serviceWorker' in navigator) {
   
   if(!checkoutForm) return; // No estamos en la página del carrito
   
-  // ============ ACORDEÓN CHECKOUT ============
+  // ============ VALIDACIÓN Y HELPERS ============
+  
+  // Validar email
+  function isValidEmail(email) {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  }
+  
+  // Formatear teléfono mientras escribe
+  function formatPhoneNumber(value) {
+    const numbers = value.replace(/\D/g, '');
+    return numbers;
+  }
+  
+  // Mostrar error en campo
+  function showFieldError(field, message) {
+    if(!field) return;
+    
+    // Remover error previo si existe
+    clearFieldError(field);
+    
+    field.classList.add('field-invalid');
+    
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'field-error';
+    errorDiv.textContent = message;
+    errorDiv.setAttribute('data-error-for', field.name);
+    
+    field.parentNode.insertBefore(errorDiv, field.nextSibling);
+    
+    // Limpiar error al escribir
+    field.addEventListener('input', () => clearFieldError(field), { once: true });
+  }
+  
+  // Limpiar error de campo
+  function clearFieldError(field) {
+    if(!field) return;
+    field.classList.remove('field-invalid');
+    field.classList.remove('field-valid');
+    
+    const errorDiv = field.parentNode.querySelector(`[data-error-for="${field.name}"]`);
+    if(errorDiv) errorDiv.remove();
+  }
+  
+  // Marcar campo como válido
+  function markFieldValid(field) {
+    if(!field) return;
+    clearFieldError(field);
+    field.classList.add('field-valid');
+  }
+  
+  // ============ AUTO-FILL CON LOCALSTORAGE ============
+  
+  function loadFormData() {
+    try {
+      const saved = localStorage.getItem('checkoutData');
+      if(saved) {
+        const data = JSON.parse(saved);
+        const nameInput = document.querySelector('input[name="name"]');
+        const emailInput = document.querySelector('input[name="email"]');
+        const phoneInput = document.querySelector('input[name="phone"]');
+        
+        if(nameInput && data.name) nameInput.value = data.name;
+        if(emailInput && data.email) emailInput.value = data.email;
+        if(phoneInput && data.phone) phoneInput.value = data.phone;
+      }
+    } catch(e) {
+      console.error('Error loading form data:', e);
+    }
+  }
+  
+  function saveFormData() {
+    try {
+      const nameInput = document.querySelector('input[name="name"]');
+      const emailInput = document.querySelector('input[name="email"]');
+      const phoneInput = document.querySelector('input[name="phone"]');
+      
+      const formData = {
+        name: nameInput ? nameInput.value : '',
+        email: emailInput ? emailInput.value : '',
+        phone: phoneInput ? phoneInput.value : ''
+      };
+      
+      localStorage.setItem('checkoutData', JSON.stringify(formData));
+    } catch(e) {
+      console.error('Error saving form data:', e);
+    }
+  }
+  
+  // Cargar datos guardados al inicio
+  loadFormData();
+  
+  // ============ BARRA DE PROGRESO DINÁMICA ============
+  
+  function updateProgressBar(step) {
+    const progressFill = document.getElementById('progressBarFill');
+    const currentStepEl = document.getElementById('currentStep');
+    const progressPercentEl = document.getElementById('progressPercent');
+    
+    const percentages = {
+      1: 0,
+      2: 33,
+      3: 66,
+      4: 100
+    };
+    
+    const percent = percentages[step] || 0;
+    
+    if(progressFill) progressFill.style.width = percent + '%';
+    if(currentStepEl) currentStepEl.textContent = step;
+    if(progressPercentEl) progressPercentEl.textContent = percent;
+  }
+  
+  // ============ NAVEGACIÓN ENTRE SECCIONES ============
+  
   const sectionHeaders = document.querySelectorAll('.checkout-section-header');
+  const sections = ['contact', 'shipping', 'payment'];
+  let completedSections = new Set();
+  
+  function collapseSection(sectionName) {
+    const header = document.querySelector(`[data-section-name="${sectionName}"]`);
+    const content = header ? header.nextElementSibling : null;
+    
+    if(header) header.classList.remove('active');
+    if(content) content.classList.remove('active');
+  }
+  
+  function openSection(sectionName) {
+    const header = document.querySelector(`[data-section-name="${sectionName}"]`);
+    const content = header ? header.nextElementSibling : null;
+    
+    if(header && !header.classList.contains('disabled')) {
+      header.classList.add('active');
+      if(content) content.classList.add('active');
+    }
+  }
+  
+  function enableSection(sectionName) {
+    const header = document.querySelector(`[data-section-name="${sectionName}"]`);
+    if(header) header.classList.remove('disabled');
+  }
+  
+  function markSectionComplete(sectionName) {
+    const header = document.querySelector(`[data-section-name="${sectionName}"]`);
+    if(header) {
+      header.classList.add('completed');
+      completedSections.add(sectionName);
+      
+      // Actualizar estado de botones de submit
+      setTimeout(() => {
+        if(typeof updateSubmitButtons === 'function') {
+          updateSubmitButtons();
+        }
+      }, 100);
+    }
+  }
+  
+  function scrollToSection(sectionName) {
+    const header = document.querySelector(`[data-section-name="${sectionName}"]`);
+    if(header) {
+      const offset = 100;
+      const y = header.getBoundingClientRect().top + window.pageYOffset - offset;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+  }
+  
+  function focusFirstInput(sectionName) {
+    const header = document.querySelector(`[data-section-name="${sectionName}"]`);
+    const content = header ? header.nextElementSibling : null;
+    if(content) {
+      const firstInput = content.querySelector('input:not([type="radio"]):not([type="hidden"]), select');
+      if(firstInput) {
+        setTimeout(() => firstInput.focus(), 400);
+      }
+    }
+  }
+  
+  function moveToNextSection(currentSection) {
+    const currentIndex = sections.indexOf(currentSection);
+    const nextSection = sections[currentIndex + 1];
+    
+    if(nextSection) {
+      collapseSection(currentSection);
+      markSectionComplete(currentSection);
+      
+      setTimeout(() => {
+        enableSection(nextSection);
+        openSection(nextSection);
+        scrollToSection(nextSection);
+        focusFirstInput(nextSection);
+        
+        // Actualizar barra de progreso
+        updateProgressBar(currentIndex + 2);
+      }, 300);
+    } else {
+      // Última sección completada
+      markSectionComplete(currentSection);
+      updateProgressBar(4);
+    }
+  }
+  
+  // ============ VALIDACIÓN PROGRESIVA ============
+  
+  function validateContactSection() {
+    const nameInput = document.querySelector('input[name="name"]');
+    const emailInput = document.querySelector('input[name="email"]');
+    const phoneInput = document.querySelector('input[name="phone"]');
+    
+    let isValid = true;
+    
+    // Validar nombre
+    if(!nameInput || !nameInput.value.trim()) {
+      if(nameInput) showFieldError(nameInput, 'El nombre es requerido');
+      isValid = false;
+    } else {
+      if(nameInput) markFieldValid(nameInput);
+    }
+    
+    // Validar email
+    if(!emailInput || !emailInput.value.trim()) {
+      if(emailInput) showFieldError(emailInput, 'El email es requerido');
+      isValid = false;
+    } else if(!isValidEmail(emailInput.value.trim())) {
+      showFieldError(emailInput, 'Ingresá un email válido');
+      isValid = false;
+    } else {
+      markFieldValid(emailInput);
+    }
+    
+    // Validar teléfono
+    if(!phoneInput || !phoneInput.value.trim()) {
+      if(phoneInput) showFieldError(phoneInput, 'El teléfono es requerido');
+      isValid = false;
+    } else if(phoneInput.value.trim().length < 8) {
+      showFieldError(phoneInput, 'Ingresá un teléfono válido (mínimo 8 dígitos)');
+      isValid = false;
+    } else {
+      markFieldValid(phoneInput);
+    }
+    
+    if(isValid) {
+      saveFormData();
+    }
+    
+    return isValid;
+  }
+  
+  function validateShippingSection() {
+    const shippingMethod = document.querySelector('input[name="shipping"]:checked');
+    
+    if(!shippingMethod) {
+      showToast('Seleccioná un método de envío', 'error');
+      return false;
+    }
+    
+    // Validar campos condicionales de cadete
+    if(shippingMethod.value === 'cadete') {
+      const addressCadete = document.querySelector('input[name="address_cadete"]');
+      if(!addressCadete || !addressCadete.value.trim()) {
+        if(addressCadete) showFieldError(addressCadete, 'La dirección es requerida');
+        return false;
+      } else {
+        markFieldValid(addressCadete);
+      }
+    }
+    
+    // Validar campos condicionales de envío
+    if(shippingMethod.value === 'envio') {
+      const provinceSelect = document.querySelector('select[name="province"]');
+      const addressEnvio = document.querySelector('input[name="address_envio"]');
+      const postalCode = document.querySelector('input[name="postal_code"]');
+      const dni = document.querySelector('input[name="dni"]');
+      
+      let isValid = true;
+      
+      if(!provinceSelect || !provinceSelect.value) {
+        if(provinceSelect) showFieldError(provinceSelect, 'Seleccioná una provincia');
+        isValid = false;
+      } else {
+        if(provinceSelect) markFieldValid(provinceSelect);
+      }
+      
+      if(!addressEnvio || !addressEnvio.value.trim()) {
+        if(addressEnvio) showFieldError(addressEnvio, 'La dirección es requerida');
+        isValid = false;
+      } else {
+        if(addressEnvio) markFieldValid(addressEnvio);
+      }
+      
+      if(!postalCode || !postalCode.value.trim()) {
+        if(postalCode) showFieldError(postalCode, 'El código postal es requerido');
+        isValid = false;
+      } else {
+        if(postalCode) markFieldValid(postalCode);
+      }
+      
+      if(!dni || !dni.value.trim()) {
+        if(dni) showFieldError(dni, 'El DNI es requerido');
+        isValid = false;
+      } else {
+        if(dni) markFieldValid(dni);
+      }
+      
+      return isValid;
+    }
+    
+    return true;
+  }
+  
+  function validatePaymentSection() {
+    const paymentMethod = document.querySelector('input[name="payment_method"]:checked');
+    
+    if(!paymentMethod) {
+      showToast('Seleccioná un método de pago', 'error');
+      return false;
+    }
+    
+    return true;
+  }
+  
+  // ============ VALIDACIÓN EN TIEMPO REAL ============
+  
+  // Validación de contacto en tiempo real
+  const nameInput = document.querySelector('input[name="name"]');
+  const emailInput = document.querySelector('input[name="email"]');
+  const phoneInput = document.querySelector('input[name="phone"]');
+  
+  if(nameInput) {
+    nameInput.addEventListener('blur', () => {
+      if(nameInput.value.trim()) {
+        markFieldValid(nameInput);
+      }
+      
+      // Auto-avanzar si todos los campos están completos
+      if(validateContactSection()) {
+        setTimeout(() => {
+          if(document.querySelector('[data-section-name="contact"]').classList.contains('active')) {
+            moveToNextSection('contact');
+          }
+        }, 500);
+      }
+    });
+  }
+  
+  if(emailInput) {
+    emailInput.addEventListener('blur', () => {
+      const email = emailInput.value.trim();
+      if(email && isValidEmail(email)) {
+        markFieldValid(emailInput);
+      }
+      
+      // Auto-avanzar si todos los campos están completos
+      if(validateContactSection()) {
+        setTimeout(() => {
+          if(document.querySelector('[data-section-name="contact"]').classList.contains('active')) {
+            moveToNextSection('contact');
+          }
+        }, 500);
+      }
+    });
+    
+    // Validación en tiempo real
+    emailInput.addEventListener('input', () => {
+      const email = emailInput.value.trim();
+      if(email.length > 3 && !isValidEmail(email)) {
+        emailInput.classList.add('field-invalid');
+      } else if(email && isValidEmail(email)) {
+        emailInput.classList.remove('field-invalid');
+        emailInput.classList.add('field-valid');
+      } else {
+        emailInput.classList.remove('field-invalid');
+        emailInput.classList.remove('field-valid');
+      }
+    });
+  }
+  
+  if(phoneInput) {
+    // Formatear teléfono
+    phoneInput.addEventListener('input', (e) => {
+      const formatted = formatPhoneNumber(e.target.value);
+      e.target.value = formatted;
+      
+      if(formatted.length >= 8) {
+        markFieldValid(phoneInput);
+      }
+    });
+    
+    phoneInput.addEventListener('blur', () => {
+      // Auto-avanzar si todos los campos están completos
+      if(validateContactSection()) {
+        setTimeout(() => {
+          if(document.querySelector('[data-section-name="contact"]').classList.contains('active')) {
+            moveToNextSection('contact');
+          }
+        }, 500);
+      }
+    });
+  }
+  
+  // ============ ACORDEÓN CHECKOUT CON VALIDACIÓN ============
   
   sectionHeaders.forEach(header => {
     header.addEventListener('click', function(){
+      // No permitir clic en secciones deshabilitadas
+      if(this.classList.contains('disabled')) {
+        showToast('Completá la sección anterior primero', 'warning');
+        return;
+      }
+      
       const section = this.getAttribute('data-toggle');
       const content = this.nextElementSibling;
       const isActive = this.classList.contains('active');
@@ -1435,14 +1839,8 @@ if ('serviceWorker' in navigator) {
     });
   });
   
-  // ============ STICKY BOTTOM BAR ============
-  if(stickyToggle && stickyBottom) {
-    stickyToggle.addEventListener('click', function(){
-      stickyBottom.classList.toggle('expanded');
-    });
-  }
+  // ============ AUTO-AVANCE EN MÉTODOS DE ENVÍO Y PAGO ============
   
-  // ============ CAMPOS CONDICIONALES (Envío/Cadete) ============
   const shippingRadios = document.querySelectorAll('input[name="shipping"]');
   const cadeteGroup = document.getElementById('cadeteGroup');
   const envioGroup = document.getElementById('envioGroup');
@@ -1454,13 +1852,169 @@ if ('serviceWorker' in navigator) {
       
       if(this.value === 'cadete' && cadeteGroup) {
         cadeteGroup.style.display = 'flex';
+        // Focus en el primer campo
+        setTimeout(() => {
+          const firstInput = cadeteGroup.querySelector('input');
+          if(firstInput) firstInput.focus();
+        }, 100);
       } else if(this.value === 'envio' && envioGroup) {
         envioGroup.style.display = 'flex';
+        // Focus en el primer campo
+        setTimeout(() => {
+          const firstSelect = envioGroup.querySelector('select');
+          if(firstSelect) firstSelect.focus();
+        }, 100);
+      } else if(this.value === 'retiro') {
+        // Si es retiro, auto-validar y avanzar después de un breve delay
+        setTimeout(() => {
+          if(validateShippingSection()) {
+            setTimeout(() => {
+              if(document.querySelector('[data-section-name="shipping"]').classList.contains('active')) {
+                moveToNextSection('shipping');
+              }
+            }, 500);
+          }
+        }, 300);
       }
       
       updateTotals();
     });
   });
+  
+  // Validar automáticamente cuando se completan campos de cadete
+  if(cadeteGroup) {
+    const addressCadete = cadeteGroup.querySelector('input[name="address_cadete"]');
+    if(addressCadete) {
+      addressCadete.addEventListener('blur', () => {
+        if(addressCadete.value.trim()) {
+          markFieldValid(addressCadete);
+          // Auto-avanzar
+          setTimeout(() => {
+            if(validateShippingSection()) {
+              setTimeout(() => {
+                if(document.querySelector('[data-section-name="shipping"]').classList.contains('active')) {
+                  moveToNextSection('shipping');
+                }
+              }, 500);
+            }
+          }, 300);
+        }
+      });
+    }
+  }
+  
+  // Validar automáticamente cuando se completan campos de envío
+  if(envioGroup) {
+    const dniInput = envioGroup.querySelector('input[name="dni"]');
+    if(dniInput) {
+      dniInput.addEventListener('blur', () => {
+        if(dniInput.value.trim()) {
+          markFieldValid(dniInput);
+          // Auto-avanzar si todo está completo
+          setTimeout(() => {
+            if(validateShippingSection()) {
+              setTimeout(() => {
+                if(document.querySelector('[data-section-name="shipping"]').classList.contains('active')) {
+                  moveToNextSection('shipping');
+                }
+              }, 500);
+            }
+          }, 300);
+        }
+      });
+    }
+  }
+  
+  // Ocultar mensajes de ayuda al seleccionar
+  shippingRadios.forEach(radio => {
+    radio.addEventListener('change', function(){
+      const shippingSection = document.querySelector('[data-section="shipping"] .checkout-section-content');
+      const helpText = shippingSection ? shippingSection.querySelector('.section-help-text') : null;
+      if(helpText) {
+        helpText.style.opacity = '0';
+        helpText.style.transform = 'translateY(-5px)';
+        setTimeout(() => {
+          if(helpText.parentNode) helpText.parentNode.removeChild(helpText);
+        }, 300);
+      }
+    }, { once: true });
+  });
+  
+  // Auto-avance en método de pago
+  const paymentRadios = document.querySelectorAll('input[name="payment_method"]');
+  paymentRadios.forEach(radio => {
+    radio.addEventListener('change', function(){
+      // Ocultar mensaje de ayuda
+      const paymentSection = document.querySelector('[data-section="payment"] .checkout-section-content');
+      const helpText = paymentSection ? paymentSection.querySelector('.section-help-text') : null;
+      if(helpText) {
+        helpText.style.opacity = '0';
+        helpText.style.transform = 'translateY(-5px)';
+        setTimeout(() => {
+          if(helpText.parentNode) helpText.parentNode.removeChild(helpText);
+        }, 300);
+      }
+      
+      updateTotals();
+      
+      // Auto-validar y completar
+      setTimeout(() => {
+        if(validatePaymentSection()) {
+          setTimeout(() => {
+            if(document.querySelector('[data-section-name="payment"]').classList.contains('active')) {
+              markSectionComplete('payment');
+              updateProgressBar(4);
+              
+              // Cerrar la sección de pago
+              collapseSection('payment');
+              
+              // Scroll al botón de confirmar con animación
+              setTimeout(() => {
+                const submitBtn = document.querySelector('.cart-summary-cta, .cart-sticky-cta');
+                if(submitBtn) {
+                  submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  // Pulsar el botón para llamar la atención
+                  submitBtn.style.animation = 'ctaPulse 2s ease-in-out infinite';
+                }
+              }, 400);
+            }
+          }, 500);
+        }
+      }, 300);
+    });
+  });
+  
+  // ============ TOGGLE CUPÓN COLAPSABLE ============
+  
+  const couponToggleLink = document.getElementById('couponToggleLink');
+  const couponFieldWrapper = document.getElementById('couponFieldWrapper');
+  
+  if(couponToggleLink && couponFieldWrapper) {
+    couponToggleLink.addEventListener('click', function() {
+      const isHidden = couponFieldWrapper.style.display === 'none';
+      
+      if(isHidden) {
+        couponFieldWrapper.style.display = 'block';
+        couponToggleLink.classList.add('active');
+        
+        // Focus en el input
+        setTimeout(() => {
+          const couponInput = couponFieldWrapper.querySelector('#coupon_code');
+          if(couponInput) couponInput.focus();
+        }, 100);
+      } else {
+        couponFieldWrapper.style.display = 'none';
+        couponToggleLink.classList.remove('active');
+      }
+    });
+  }
+  
+  // ============ STICKY BOTTOM BAR ============
+  if(stickyToggle && stickyBottom) {
+    stickyToggle.addEventListener('click', function(){
+      stickyBottom.classList.toggle('expanded');
+    });
+  }
   
   // ============ CÁLCULO DE TOTALES ============
   function updateTotals() {
@@ -1524,12 +2078,7 @@ if ('serviceWorker' in navigator) {
     updateDisplay('stickyDiscount', discount);
   }
   
-  // Escuchar cambios en método de pago y provincia
-  const paymentRadios = document.querySelectorAll('input[name="payment_method"]');
-  paymentRadios.forEach(radio => {
-    radio.addEventListener('change', updateTotals);
-  });
-  
+  // Escuchar cambios en provincia
   const provinceSelect = document.getElementById('provinceSelect');
   if(provinceSelect) {
     provinceSelect.addEventListener('change', updateTotals);
@@ -1537,6 +2086,9 @@ if ('serviceWorker' in navigator) {
   
   // Calcular totales al cargar
   updateTotals();
+  
+  // Actualizar barra de progreso inicial
+  updateProgressBar(1);
   
   // ============ VALIDACIÓN DE CUPONES ============
   const validateCouponBtn = document.getElementById('validate-coupon-btn');
@@ -1695,18 +2247,107 @@ if ('serviceWorker' in navigator) {
     });
   }
   
-  // ============ VALIDACIÓN MEJORADA ============
+  // ============ CONTROL DE BOTONES DE SUBMIT ============
+  
+  const submitBtnDesktop = document.querySelector('.cart-summary-cta');
+  const submitBtnMobile = document.querySelector('.cart-sticky-cta');
+  let isSubmitting = false; // Flag para prevenir múltiples submits
+  
+  // Función para verificar si todas las secciones están completadas
+  function areAllSectionsComplete() {
+    // Verificar que las 3 secciones obligatorias estén completadas
+    const requiredSections = ['contact', 'shipping', 'payment'];
+    return requiredSections.every(section => completedSections.has(section));
+  }
+  
+  // Función para actualizar estado de botones
+  function updateSubmitButtons() {
+    const allComplete = areAllSectionsComplete();
+    
+    [submitBtnDesktop, submitBtnMobile].forEach(btn => {
+      if(!btn) return;
+      
+      if(allComplete && !isSubmitting) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+        btn.title = '';
+      } else if(isSubmitting) {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        btn.style.cursor = 'not-allowed';
+        btn.title = 'Procesando pedido...';
+      } else {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        btn.style.cursor = 'not-allowed';
+        btn.title = 'Completá todos los campos requeridos';
+      }
+    });
+  }
+  
+  // Deshabilitar botones inicialmente
+  updateSubmitButtons();
+  
+  // ============ VALIDACIÓN COMPLETA AL SUBMIT ============
   checkoutForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    
+    // Prevenir múltiples submits
+    if(isSubmitting) {
+      showToast('Tu pedido ya está siendo procesado', 'warning');
+      return false;
+    }
+    
+    // Validar que todas las secciones estén completas
+    if(!areAllSectionsComplete()) {
+      showToast('Por favor completá todos los campos requeridos', 'error');
+      
+      // Abrir la primera sección incompleta
+      const incompleteSections = ['contact', 'shipping', 'payment'].filter(s => !completedSections.has(s));
+      if(incompleteSections.length > 0) {
+        const firstIncomplete = incompleteSections[0];
+        openSection(firstIncomplete);
+        scrollToSection(firstIncomplete);
+        focusFirstInput(firstIncomplete);
+      }
+      
+      return false;
+    }
+    
+    // Validar secciones individualmente
+    if(!validateContactSection()) {
+      openSection('contact');
+      scrollToSection('contact');
+      showToast('Por favor completá tus datos de contacto correctamente', 'error');
+      return false;
+    }
+    
+    if(!validateShippingSection()) {
+      openSection('shipping');
+      scrollToSection('shipping');
+      showToast('Por favor completá los datos de envío correctamente', 'error');
+      return false;
+    }
+    
+    if(!validatePaymentSection()) {
+      openSection('payment');
+      scrollToSection('payment');
+      showToast('Por favor seleccioná un método de pago', 'error');
+      return false;
+    }
+    
     const shippingMethod = document.querySelector('input[name="shipping"]:checked');
     
     // Validar campos de cadete
     if(shippingMethod && shippingMethod.value === 'cadete') {
       const addressCadete = document.querySelector('input[name="address_cadete"]');
       if(addressCadete && !addressCadete.value.trim()) {
-        e.preventDefault();
         showToast('Por favor ingresá la dirección para el cadete', 'error');
+        openSection('shipping');
+        scrollToSection('shipping');
         addressCadete.focus();
-        return;
+        return false;
       }
     }
     
@@ -1717,41 +2358,59 @@ if ('serviceWorker' in navigator) {
       const postalCode = document.querySelector('input[name="postal_code"]');
       const dni = document.querySelector('input[name="dni"]');
       
-      if(!province.value) {
-        e.preventDefault();
+      if(!province || !province.value) {
         showToast('Por favor seleccioná una provincia', 'error');
-        province.focus();
-        return;
+        openSection('shipping');
+        scrollToSection('shipping');
+        if(province) province.focus();
+        return false;
       }
       
-      if(!address.value.trim()) {
-        e.preventDefault();
+      if(!address || !address.value.trim()) {
         showToast('Por favor ingresá la dirección de envío', 'error');
-        address.focus();
-        return;
+        openSection('shipping');
+        scrollToSection('shipping');
+        if(address) address.focus();
+        return false;
       }
       
-      if(!postalCode.value.trim()) {
-        e.preventDefault();
+      if(!postalCode || !postalCode.value.trim()) {
         showToast('Por favor ingresá el código postal', 'error');
-        postalCode.focus();
-        return;
+        openSection('shipping');
+        scrollToSection('shipping');
+        if(postalCode) postalCode.focus();
+        return false;
       }
       
-      if(!dni.value.trim()) {
-        e.preventDefault();
+      if(!dni || !dni.value.trim()) {
         showToast('Por favor ingresá tu DNI', 'error');
-        dni.focus();
-        return;
+        openSection('shipping');
+        scrollToSection('shipping');
+        if(dni) dni.focus();
+        return false;
       }
     }
     
-    // Mostrar loading en el botón
-    const submitBtn = this.querySelector('button[type="submit"]');
-    if(submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0110 10"/></svg><span>Procesando...</span>';
-    }
+    // Marcar como enviando
+    isSubmitting = true;
+    updateSubmitButtons();
+    
+    // Mostrar loading en ambos botones
+    [submitBtnDesktop, submitBtnMobile].forEach(btn => {
+      if(btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0110 10"/></svg><span>Procesando...</span>';
+      }
+    });
+    
+    // Guardar datos para futuras compras
+    saveFormData();
+    
+    // Mostrar mensaje de confirmación
+    showToast('Procesando tu pedido...', 'info', 2000);
+    
+    // Enviar el formulario
+    this.submit();
   });
   
   // ============ FOMO DINÁMICO ============
