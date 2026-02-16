@@ -23,12 +23,13 @@ type CustomerRepo interface {
 }
 
 type ProductFilter struct {
-	Category    string
-	ReadyToShip *bool
-	Sort        string
-	Page        int
-	PageSize    int
-	Query       string
+	Category          string
+	ReadyToShip       *bool
+	Sort              string
+	Page              int
+	PageSize          int
+	Query             string
+	ExcludeCategories []string
 }
 
 type OrderRepo interface {
@@ -62,6 +63,11 @@ type FeaturedProductRepo interface {
 	FindAll(ctx context.Context) ([]FeaturedProduct, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	Count(ctx context.Context) (int64, error)
+}
+
+type HiddenCategoryRepo interface {
+	FindAll(ctx context.Context) ([]HiddenCategory, error)
+	ReplaceAll(ctx context.Context, categories []string) error
 }
 
 type CouponRepo interface {
