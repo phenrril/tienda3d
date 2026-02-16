@@ -34,8 +34,9 @@ type App struct {
 	WhatsAppUC          *usecase.WhatsAppUC
 	CouponUC            *usecase.CouponUseCase
 	ModelRepo           domain.UploadedModelRepo
-	FeaturedProductRepo domain.FeaturedProductRepo
-	ShippingMethod      string  `gorm:"size:30"`
+	FeaturedProductRepo  domain.FeaturedProductRepo
+	HiddenCategoryRepo   domain.HiddenCategoryRepo
+	ShippingMethod       string  `gorm:"size:30"`
 	ShippingCost        float64 `gorm:"type:decimal(12,2)"`
 	Storage             domain.FileStorage
 	Customers           domain.CustomerRepo
@@ -51,6 +52,7 @@ func NewApp(db *gorm.DB) (*App, error) {
 	custRepo := postgres.NewCustomerRepo(db)
 	featuredRepo := postgres.NewFeaturedProductRepo(db)
 	couponRepo := postgres.NewCouponRepo(db)
+	hiddenCatRepo := postgres.NewHiddenCategoryRepo(db)
 	storageDir := os.Getenv("STORAGE_DIR")
 	if storageDir == "" {
 		storageDir = "uploads"
@@ -118,6 +120,7 @@ func NewApp(db *gorm.DB) (*App, error) {
 	app.DB = db
 	app.ModelRepo = modelRepo
 	app.FeaturedProductRepo = featuredRepo
+	app.HiddenCategoryRepo = hiddenCatRepo
 	app.Storage = storage
 	app.Customers = custRepo
 	app.OAuthConfig = oauthCfg
@@ -233,12 +236,12 @@ func NewApp(db *gorm.DB) (*App, error) {
 }
 
 func (a *App) HTTPHandler() http.Handler {
-	return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.WhatsAppUC, a.CouponUC, a.ModelRepo, a.Storage, a.Customers, a.OAuthConfig, a.FeaturedProductRepo, a.EmailService)
+	return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.WhatsAppUC, a.CouponUC, a.ModelRepo, a.Storage, a.Customers, a.OAuthConfig, a.FeaturedProductRepo, a.EmailService, a.HiddenCategoryRepo)
 }
 
 func (a *App) MigrateAndSeed() error {
 	if err := a.DB.AutoMigrate(
-		&domain.Product{}, &domain.Variant{}, &domain.Image{}, &domain.Order{}, &domain.OrderItem{}, &domain.UploadedModel{}, &domain.Quote{}, &domain.Page{}, &domain.Customer{}, &domain.WhatsAppOrder{}, &domain.WhatsAppProductSync{}, &domain.FeaturedProduct{}, &domain.Coupon{}, &domain.CouponUsage{},
+		&domain.Product{}, &domain.Variant{}, &domain.Image{}, &domain.Order{}, &domain.OrderItem{}, &domain.UploadedModel{}, &domain.Quote{}, &domain.Page{}, &domain.Customer{}, &domain.WhatsAppOrder{}, &domain.WhatsAppProductSync{}, &domain.FeaturedProduct{}, &domain.Coupon{}, &domain.CouponUsage{}, &domain.HiddenCategory{},
 	); err != nil {
 		return err
 	}

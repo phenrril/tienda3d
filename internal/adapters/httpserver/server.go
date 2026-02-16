@@ -43,11 +43,12 @@ type Server struct {
 	whatsapp         *usecase.WhatsAppUC
 	coupons          *usecase.CouponUseCase
 	models           domain.UploadedModelRepo
-	featuredProducts domain.FeaturedProductRepo
-	storage          domain.FileStorage
-	customers        domain.CustomerRepo
-	oauthCfg         *oauth2.Config
-	emailService     domain.EmailService
+	featuredProducts   domain.FeaturedProductRepo
+	hiddenCategories   domain.HiddenCategoryRepo
+	storage            domain.FileStorage
+	customers          domain.CustomerRepo
+	oauthCfg           *oauth2.Config
+	emailService       domain.EmailService
 
 	adminAllowed map[string]struct{}
 	adminSecret  []byte
@@ -55,8 +56,8 @@ type Server struct {
 
 var emailRe = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
 
-func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, c *usecase.CouponUseCase, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config, fp domain.FeaturedProductRepo, emailSvc domain.EmailService) http.Handler {
-	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, coupons: c, models: m, featuredProducts: fp, storage: fs, customers: customers, oauthCfg: oauthCfg, emailService: emailSvc, mux: http.NewServeMux()}
+func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, c *usecase.CouponUseCase, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config, fp domain.FeaturedProductRepo, emailSvc domain.EmailService, hc domain.HiddenCategoryRepo) http.Handler {
+	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, coupons: c, models: m, featuredProducts: fp, hiddenCategories: hc, storage: fs, customers: customers, oauthCfg: oauthCfg, emailService: emailSvc, mux: http.NewServeMux()}
 
 	allowed := map[string]struct{}{}
 	if raw := os.Getenv("ADMIN_ALLOWED_EMAILS"); raw != "" {
@@ -161,6 +162,10 @@ func (s *Server) routes() {
 	// Admin: Calculadora de costos
 	s.mux.HandleFunc("/admin/costs", s.handleAdminCosts)
 	s.mux.HandleFunc("/admin/costs/calculate", s.handleAdminCostsCalculate)
+
+	// Admin: Categorías ocultas
+	s.mux.HandleFunc("/admin/categorias", s.handleAdminCategories)
+	s.mux.HandleFunc("/admin/categorias/guardar", s.handleAdminCategoriesSave)
 
 	// Admin: Cupones de descuento
 	s.mux.HandleFunc("/admin/cupones", s.handleAdminCouponsList)
@@ -279,7 +284,8 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	list, _, err := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 8})
+	excludeCats := s.hiddenCategoryNames(r.Context())
+	list, _, err := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 8, ExcludeCategories: excludeCats})
 	if err != nil {
 		http.Error(w, "err", 500)
 		return
@@ -381,7 +387,8 @@ func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
 	query := qv.Get("q")
 	category := qv.Get("category")
 	pageSize := 24
-	list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: page, PageSize: pageSize, Sort: sort, Query: query, Category: category})
+	excludeCats := s.hiddenCategoryNames(r.Context())
+	list, total, _ := s.products.List(r.Context(), domain.ProductFilter{Page: page, PageSize: pageSize, Sort: sort, Query: query, Category: category, ExcludeCategories: excludeCats})
 	// Filtrar imágenes inexistentes y descartar productos sin imágenes válidas
 	filteredProducts := make([]domain.Product, 0, len(list))
 	for i := range list {
@@ -398,6 +405,20 @@ func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
 		pages = 1
 	}
 	cats, _ := s.products.Categories(r.Context())
+	// Filtrar categorías ocultas del dropdown
+	if len(excludeCats) > 0 {
+		hiddenSet := map[string]bool{}
+		for _, c := range excludeCats {
+			hiddenSet[c] = true
+		}
+		visible := make([]string, 0, len(cats))
+		for _, c := range cats {
+			if !hiddenSet[c] {
+				visible = append(visible, c)
+			}
+		}
+		cats = visible
+	}
 	base := s.canonicalBase(r)
 	data := map[string]any{
 		"Products":     list,
@@ -1515,7 +1536,8 @@ func (s *Server) apiSearchSuggestions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Buscar sin límite de página, pero limitar a 10 resultados
-	list, _, err := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 10, Query: query})
+	excludeCats := s.hiddenCategoryNames(r.Context())
+	list, _, err := s.products.List(r.Context(), domain.ProductFilter{Page: 1, PageSize: 10, Query: query, ExcludeCategories: excludeCats})
 	if err != nil {
 		http.Error(w, "error", 500)
 		return
@@ -3383,6 +3405,64 @@ func (s *Server) handleValidateCouponAPI(w http.ResponseWriter, r *http.Request)
 
 // ============================================
 // ADMIN: CUPONES DE DESCUENTO
+// ============================================
+
+// hiddenCategoryNames returns the list of hidden category names for filtering.
+func (s *Server) hiddenCategoryNames(ctx context.Context) []string {
+	hidden, err := s.hiddenCategories.FindAll(ctx)
+	if err != nil {
+		return nil
+	}
+	names := make([]string, len(hidden))
+	for i, h := range hidden {
+		names[i] = h.Category
+	}
+	return names
+}
+
+func (s *Server) handleAdminCategories(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", 302)
+		return
+	}
+	cats, _ := s.products.Categories(r.Context())
+	hidden, _ := s.hiddenCategories.FindAll(r.Context())
+	hiddenSet := map[string]bool{}
+	for _, h := range hidden {
+		hiddenSet[h.Category] = true
+	}
+	msg := r.URL.Query().Get("msg")
+	data := map[string]any{
+		"Categories": cats,
+		"HiddenSet":  hiddenSet,
+		"Msg":        msg,
+		"AdminToken": s.readAdminToken(r),
+	}
+	s.render(w, "admin_categories.html", data)
+}
+
+func (s *Server) handleAdminCategoriesSave(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", 302)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
+	hiddenCats := r.Form["hidden"]
+	if err := s.hiddenCategories.ReplaceAll(r.Context(), hiddenCats); err != nil {
+		log.Error().Err(err).Msg("error guardando categorías ocultas")
+		http.Redirect(w, r, "/admin/categorias?msg=error", 302)
+		return
+	}
+	http.Redirect(w, r, "/admin/categorias?msg=ok", 302)
+}
+
 // ============================================
 
 func (s *Server) handleAdminCouponsList(w http.ResponseWriter, r *http.Request) {

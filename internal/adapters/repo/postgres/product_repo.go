@@ -67,6 +67,9 @@ func (r *ProductRepo) List(ctx context.Context, f domain.ProductFilter) ([]domai
 	if f.Category != "" {
 		q = q.Where("category = ?", f.Category)
 	}
+	if len(f.ExcludeCategories) > 0 {
+		q = q.Where("category NOT IN ?", f.ExcludeCategories)
+	}
 	if f.ReadyToShip != nil {
 		q = q.Where("ready_to_ship = ?", *f.ReadyToShip)
 	}

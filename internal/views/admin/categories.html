@@ -1,0 +1,89 @@
+{{define "admin_categories.html"}}
+{{template "layout_start" .}}
+<div class="admin-header">
+  <h1>Gestión de Categorías</h1>
+  <nav class="admin-nav">
+    <a href="/admin/products">Productos</a>
+    <a href="/admin/orders">Órdenes</a>
+    <a href="/admin/sales">Ventas</a>
+    <a href="/admin/destacada">Destacada</a>
+    <a href="/admin/costs">Calculadora</a>
+    <a href="/admin/categorias" class="active">Categorías</a>
+    <a href="/admin/cupones">Cupones</a>
+    <a href="/admin/logout" class="admin-nav-logout">Salir</a>
+  </nav>
+</div>
+
+{{if eq .Msg "ok"}}
+<div style="background:#065f46;color:#d1fae5;padding:12px 20px;border-radius:10px;margin-bottom:20px;font-size:14px">
+  Categorías actualizadas correctamente.
+</div>
+{{end}}
+{{if eq .Msg "error"}}
+<div style="background:#7f1d1d;color:#fecaca;padding:12px 20px;border-radius:10px;margin-bottom:20px;font-size:14px">
+  Error al guardar los cambios. Intentá de nuevo.
+</div>
+{{end}}
+
+<div class="admin-card" style="max-width:700px">
+  <h2 style="margin:0 0 8px;font-size:18px">Visibilidad de categorías</h2>
+  <p style="color:var(--muted);font-size:14px;margin:0 0 20px">
+    Desmarcá una categoría para ocultar todos sus productos de la tienda. Los productos no se eliminan, solo dejan de mostrarse en la página pública.
+  </p>
+
+  {{if not .Categories}}
+  <p style="color:var(--muted);text-align:center;padding:40px 0">No hay categorías definidas en los productos.</p>
+  {{else}}
+  <form method="POST" action="/admin/categorias/guardar" id="catForm">
+    <div style="display:grid;gap:10px;margin-bottom:24px">
+      {{range .Categories}}
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,0.04);cursor:pointer;transition:background .15s"
+             onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
+        <input type="checkbox" name="visible" value="{{.}}" {{if not (index $.HiddenSet .)}}checked{{end}}
+               style="width:20px;height:20px;accent-color:#6366f1;cursor:pointer" />
+        <span style="font-size:15px">{{.}}</span>
+        {{if index $.HiddenSet .}}
+        <span style="margin-left:auto;font-size:12px;color:#f87171;background:rgba(248,113,113,0.12);padding:2px 8px;border-radius:6px">Oculta</span>
+        {{else}}
+        <span style="margin-left:auto;font-size:12px;color:#34d399;background:rgba(52,211,153,0.12);padding:2px 8px;border-radius:6px">Visible</span>
+        {{end}}
+      </label>
+      {{end}}
+    </div>
+
+    <div style="display:flex;gap:12px;align-items:center">
+      <button type="submit" class="btn-primary" style="padding:10px 28px">Guardar cambios</button>
+      <span id="catStatus" style="font-size:13px;color:var(--muted)"></span>
+    </div>
+  </form>
+
+  <script>
+  (function(){
+    var form = document.getElementById('catForm');
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var allCats = [];
+      var visibleCats = {};
+      form.querySelectorAll('input[name="visible"]').forEach(function(cb){
+        allCats.push(cb.value);
+        if(cb.checked) visibleCats[cb.value] = true;
+      });
+      var hiddenInput = '';
+      allCats.forEach(function(cat){
+        if(!visibleCats[cat]){
+          hiddenInput += '<input type="hidden" name="hidden" value="'+cat+'" />';
+        }
+      });
+      var tmp = document.createElement('form');
+      tmp.method = 'POST';
+      tmp.action = '/admin/categorias/guardar';
+      tmp.innerHTML = hiddenInput;
+      document.body.appendChild(tmp);
+      tmp.submit();
+    });
+  })();
+  </script>
+  {{end}}
+</div>
+{{template "layout_end" .}}
+{{end}}

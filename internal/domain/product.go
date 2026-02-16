@@ -56,3 +56,9 @@ type FeaturedProduct struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+type HiddenCategory struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	Category  string    `gorm:"uniqueIndex;size:100;not null"`
+	CreatedAt time.Time
+}
