@@ -960,6 +960,84 @@ if ('serviceWorker' in navigator) {
   if(mgrClose) mgrClose.addEventListener('click', mgrCloseFn);
   if(mgrClose2) mgrClose2.addEventListener('click', mgrCloseFn);
   if(mgrDelBtn){ mgrDelBtn.addEventListener('click', async (e)=>{ e.preventDefault(); if(mgrSelected.size===0) return; if(!token){ alert('Sesión no válida'); return; } if(!confirm('Eliminar imágenes seleccionadas?')) return; const ids=[...mgrSelected]; await Promise.all(ids.map(id=>fetch('/api/product_images/'+encodeURIComponent(id),{method:'DELETE', headers:{Authorization:'Bearer '+token}}))); ids.forEach(id=>{ const el=grid && grid.querySelector('.img-card[data-id="'+CSS.escape(id)+'"]'); if(el) el.remove(); }); mgrSelected.clear(); mgrUpdateSel(); await reloadProductAndSync(); }); }
+
+  // Bulk inline price editing
+  const bulkSaveBtn=document.getElementById('bulkSaveBtn');
+  const pendingPrices=new Map();
+
+  function bulkUpdateBtn(){
+    if(!bulkSaveBtn) return;
+    const n=pendingPrices.size;
+    if(n===0){ bulkSaveBtn.style.display='none'; return; }
+    bulkSaveBtn.textContent='Guardar '+n+' cambio'+(n>1?'s':'');
+    bulkSaveBtn.style.display='block';
+  }
+
+  if(tbl){
+    tbl.addEventListener('input', function(e){
+      const inp=e.target.closest('.inline-price');
+      if(!inp) return;
+      const slug=inp.getAttribute('data-slug');
+      const field=inp.getAttribute('data-field');
+      const original=inp.getAttribute('data-original');
+      const current=parseFloat(inp.value);
+      const orig=parseFloat(original);
+      const changed=!isNaN(current) && (isNaN(orig) ? current!==0 : Math.abs(current-orig)>0.001);
+      if(changed){
+        inp.classList.add('changed');
+        if(!pendingPrices.has(slug)) pendingPrices.set(slug,{});
+        pendingPrices.get(slug)[field]=current;
+      } else {
+        inp.classList.remove('changed');
+        if(pendingPrices.has(slug)){
+          delete pendingPrices.get(slug)[field];
+          if(Object.keys(pendingPrices.get(slug)).length===0) pendingPrices.delete(slug);
+        }
+      }
+      bulkUpdateBtn();
+    });
+  }
+
+  if(bulkSaveBtn){
+    bulkSaveBtn.addEventListener('click', async function(){
+      if(pendingPrices.size===0) return;
+      if(!token){ showToast('Sesión no válida','error'); return; }
+      const items=[];
+      pendingPrices.forEach(function(fields,slug){
+        const item={slug:slug};
+        if('base_price' in fields) item.base_price=fields.base_price;
+        if('gross_price' in fields) item.gross_price=fields.gross_price;
+        if('profit' in fields) item.profit=fields.profit;
+        items.push(item);
+      });
+      bulkSaveBtn.disabled=true;
+      bulkSaveBtn.textContent='Guardando...';
+      try{
+        const res=await fetch('/api/products/bulk-prices',{
+          method:'PATCH',
+          headers:Object.assign({'Content-Type':'application/json'},token?{Authorization:'Bearer '+token}:{}),
+          body:JSON.stringify(items)
+        });
+        if(!res.ok){
+          const txt=await res.text();
+          showToast('Error: '+txt,'error');
+          return;
+        }
+        document.querySelectorAll('.inline-price.changed').forEach(function(inp){
+          inp.setAttribute('data-original',parseFloat(inp.value).toFixed(2));
+          inp.classList.remove('changed');
+        });
+        pendingPrices.clear();
+        bulkUpdateBtn();
+        showToast('Precios actualizados','success');
+      } catch(err){
+        showToast('Error de red','error');
+      } finally{
+        bulkSaveBtn.disabled=false;
+        bulkUpdateBtn();
+      }
+    });
+  }
 })();
 
 // Admin: calculadora de costos
