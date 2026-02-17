@@ -52,12 +52,13 @@ type Server struct {
 
 	adminAllowed map[string]struct{}
 	adminSecret  []byte
+	assetVersion string
 }
 
 var emailRe = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
 
 func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, c *usecase.CouponUseCase, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config, fp domain.FeaturedProductRepo, emailSvc domain.EmailService, hc domain.HiddenCategoryRepo) http.Handler {
-	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, coupons: c, models: m, featuredProducts: fp, hiddenCategories: hc, storage: fs, customers: customers, oauthCfg: oauthCfg, emailService: emailSvc, mux: http.NewServeMux()}
+	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, coupons: c, models: m, featuredProducts: fp, hiddenCategories: hc, storage: fs, customers: customers, oauthCfg: oauthCfg, emailService: emailSvc, mux: http.NewServeMux(), assetVersion: strconv.FormatInt(time.Now().Unix(), 10)}
 
 	allowed := map[string]struct{}{}
 	if raw := os.Getenv("ADMIN_ALLOWED_EMAILS"); raw != "" {
@@ -1717,6 +1718,9 @@ func (s *Server) render(w http.ResponseWriter, name string, data any) {
 		if _, exists := m["Year"]; !exists {
 			m["Year"] = time.Now().Year()
 		}
+		if _, exists := m["AssetVersion"]; !exists {
+			m["AssetVersion"] = s.assetVersion
+		}
 		if _, exists := m["User"]; !exists {
 			if u := readUserSession(w, nil); u != nil {
 				m["User"] = u
@@ -1724,7 +1728,7 @@ func (s *Server) render(w http.ResponseWriter, name string, data any) {
 		}
 		data = m
 	} else {
-		m2 := map[string]any{"Year": time.Now().Year()}
+		m2 := map[string]any{"Year": time.Now().Year(), "AssetVersion": s.assetVersion}
 		if u := readUserSession(w, nil); u != nil {
 			m2["User"] = u
 		}
