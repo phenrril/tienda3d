@@ -15,6 +15,7 @@ type ProductRepo interface {
 	FindImageByID(ctx context.Context, id uuid.UUID) (*Image, error)
 	DeleteImageByID(ctx context.Context, id uuid.UUID) error
 	DistinctCategories(ctx context.Context) ([]string, error)
+	BulkUpdatePrices(ctx context.Context, updates []PriceUpdate) error
 }
 
 type CustomerRepo interface {

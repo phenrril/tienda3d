@@ -137,6 +137,34 @@ func (r *ProductRepo) DeleteFullBySlug(ctx context.Context, slug string) ([]stri
 	})
 }
 
+func (r *ProductRepo) BulkUpdatePrices(ctx context.Context, updates []domain.PriceUpdate) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, u := range updates {
+			fields := map[string]interface{}{}
+			if u.BasePrice != nil {
+				fields["base_price"] = *u.BasePrice
+			}
+			if u.GrossPrice != nil {
+				fields["gross_price"] = *u.GrossPrice
+			}
+			if u.Profit != nil {
+				fields["profit"] = *u.Profit
+			}
+			if len(fields) == 0 {
+				continue
+			}
+			res := tx.Model(&domain.Product{}).Where("slug = ?", u.Slug).Updates(fields)
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected == 0 {
+				return domain.ErrNotFound
+			}
+		}
+		return nil
+	})
+}
+
 func (r *ProductRepo) DistinctCategories(ctx context.Context) ([]string, error) {
 	cats := []string{}
 	if err := r.db.WithContext(ctx).Model(&domain.Product{}).

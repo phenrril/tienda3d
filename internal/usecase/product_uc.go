@@ -94,6 +94,27 @@ func (uc *ProductUC) DeleteFullBySlug(ctx context.Context, slug string) ([]strin
 	return nil, uc.DeleteBySlug(ctx, slug)
 }
 
+func (uc *ProductUC) BulkUpdatePrices(ctx context.Context, updates []domain.PriceUpdate) error {
+	if len(updates) == 0 {
+		return errors.New("sin cambios")
+	}
+	for _, u := range updates {
+		if u.Slug == "" {
+			return errors.New("slug vacío en bulk update")
+		}
+		if u.BasePrice != nil && *u.BasePrice < 0 {
+			return errors.New("precio base negativo")
+		}
+		if u.GrossPrice != nil && *u.GrossPrice < 0 {
+			return errors.New("precio bruto negativo")
+		}
+		if u.Profit != nil && *u.Profit < 0 {
+			return errors.New("ganancia negativa")
+		}
+	}
+	return uc.Products.BulkUpdatePrices(ctx, updates)
+}
+
 func (uc *ProductUC) Categories(ctx context.Context) ([]string, error) {
 	if repo, ok := uc.Products.(interface {
 		DistinctCategories(context.Context) ([]string, error)

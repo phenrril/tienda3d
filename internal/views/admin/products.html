@@ -137,7 +137,7 @@
               <div class="show-mobile" style="font-size:11px;color:var(--muted);margin-top:2px">{{if .Category}}{{.Category}}{{else}}<span style="color:#f59e0b">Sin categoría</span>{{end}}</div>
             </td>
             <td class="hide-mobile" style="font-family:monospace;font-size:12px">{{.Slug}}</td>
-            <td style="font-weight:600">${{formatPrice .BasePrice}}</td>
+            <td><input type="number" step="0.01" min="0" class="inline-price" data-field="base_price" data-slug="{{.Slug}}" data-original="{{printf "%.2f" .BasePrice}}" value="{{printf "%.2f" .BasePrice}}" /></td>
             <td class="hide-mobile">{{if .Category}}{{.Category}}{{else}}<span style="color:#f59e0b;font-size:12px">Sin cat.</span>{{end}}</td>
             <td class="hide-mobile">{{printf "%.0f" .WidthMM}}</td>
             <td class="hide-mobile">{{printf "%.0f" .HeightMM}}</td>
@@ -145,8 +145,8 @@
             <td class="hide-small">{{if .ReadyToShip}}<span style="color:#10b981">✔</span>{{else}}<span style="color:var(--muted)">-</span>{{end}}</td>
             <td class="hide-mobile">{{printf "%.0f" .Grams}}</td>
             <td class="hide-mobile">{{printf "%.1f" .Hours}}</td>
-            <td class="hide-mobile">${{formatPrice .GrossPrice}}</td>
-            <td class="hide-mobile">${{formatPrice .Profit}}</td>
+            <td class="hide-mobile"><input type="number" step="0.01" min="0" class="inline-price" data-field="gross_price" data-slug="{{.Slug}}" data-original="{{printf "%.2f" .GrossPrice}}" value="{{printf "%.2f" .GrossPrice}}" /></td>
+            <td class="hide-mobile"><input type="number" step="0.01" min="0" class="inline-price" data-field="profit" data-slug="{{.Slug}}" data-original="{{printf "%.2f" .Profit}}" value="{{printf "%.2f" .Profit}}" /></td>
             <td class="hide-small">{{if gt (len .Images) 0}}<span style="color:#10b981">{{len .Images}}</span>{{else}}<span style="color:#ef4444">0</span>{{end}}</td>
             <td style="text-align:right">
               <div class="table-actions">
@@ -165,6 +165,14 @@
       </div>
     </div>
   </div>
+  <button type="button" id="bulkSaveBtn" style="display:none;position:fixed;bottom:24px;right:24px;z-index:999;padding:12px 24px;border:none;border-radius:10px;background:#3b82f6;color:#fff;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(59,130,246,.45);transition:opacity .2s,transform .2s" onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">Guardar cambios</button>
 </section>
+<style>
+.inline-price{width:90px;padding:4px 6px;border:1px solid transparent;border-radius:6px;background:transparent;color:#e5f0ff;font-size:13px;font-weight:600;text-align:right;font-family:inherit;transition:border-color .2s,background .2s}
+.inline-price:focus{outline:none;border-color:#3b82f6;background:#0d1d2e}
+.inline-price.changed{border-color:#f59e0b;background:rgba(245,158,11,.08)}
+input[type=number].inline-price::-webkit-inner-spin-button,input[type=number].inline-price::-webkit-outer-spin-button{opacity:0}
+input[type=number].inline-price:hover::-webkit-inner-spin-button,input[type=number].inline-price:hover::-webkit-outer-spin-button{opacity:1}
+</style>
 {{template "layout_end" .}}
 {{end}}

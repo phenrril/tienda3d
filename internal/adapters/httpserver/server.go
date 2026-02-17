@@ -127,6 +127,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/checkout", s.apiCheckout)
 	s.mux.HandleFunc("/api/validate-coupon", s.handleValidateCouponAPI)
 	s.mux.HandleFunc("/webhooks/mp", s.webhookMP)
+	s.mux.HandleFunc("/api/products/bulk-prices", s.apiBulkPrices)
 	s.mux.HandleFunc("/api/products/delete", s.apiProductsBulkDelete)
 
 	// Featured Products API
@@ -671,6 +672,69 @@ func (s *Server) apiProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Error(w, "method", 405)
+}
+
+func (s *Server) apiBulkPrices(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	if r.Method != http.MethodPatch {
+		http.Error(w, "method", 405)
+		return
+	}
+	var items []struct {
+		Slug       string   `json:"slug"`
+		BasePrice  *float64 `json:"base_price,omitempty"`
+		GrossPrice *float64 `json:"gross_price,omitempty"`
+		Profit     *float64 `json:"profit,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&items); err != nil {
+		http.Error(w, "json", 400)
+		return
+	}
+	if len(items) == 0 {
+		http.Error(w, "vacío", 400)
+		return
+	}
+	if len(items) > 200 {
+		http.Error(w, "máximo 200 items", 400)
+		return
+	}
+	updates := make([]domain.PriceUpdate, 0, len(items))
+	for _, it := range items {
+		if it.Slug == "" {
+			http.Error(w, "slug vacío", 400)
+			return
+		}
+		if it.BasePrice != nil && *it.BasePrice < 0 {
+			http.Error(w, "precio negativo", 400)
+			return
+		}
+		if it.GrossPrice != nil && *it.GrossPrice < 0 {
+			http.Error(w, "precio negativo", 400)
+			return
+		}
+		if it.Profit != nil && *it.Profit < 0 {
+			http.Error(w, "precio negativo", 400)
+			return
+		}
+		updates = append(updates, domain.PriceUpdate{
+			Slug:       it.Slug,
+			BasePrice:  it.BasePrice,
+			GrossPrice: it.GrossPrice,
+			Profit:     it.Profit,
+		})
+	}
+	if err := s.products.BulkUpdatePrices(r.Context(), updates); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			http.Error(w, "producto no encontrado", 404)
+			return
+		}
+		log.Error().Err(err).Msg("bulk price update")
+		http.Error(w, "error", 500)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"updated": len(updates)})
 }
 
 func (s *Server) apiProductByID(w http.ResponseWriter, r *http.Request) {

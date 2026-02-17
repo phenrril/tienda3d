@@ -62,3 +62,10 @@ type HiddenCategory struct {
 	Category  string    `gorm:"uniqueIndex;size:100;not null"`
 	CreatedAt time.Time
 }
+
+type PriceUpdate struct {
+	Slug       string
+	BasePrice  *float64
+	GrossPrice *float64
+	Profit     *float64
+}
