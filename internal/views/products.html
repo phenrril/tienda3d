@@ -79,11 +79,11 @@
       {{end}}
     </div>
     <div class="card-body">
-      <h3 class="card-title"><a href="/product/{{$p.Slug}}">{{$p.Name}}</a></h3>
+      <h3 class="card-title"><a href="/product/{{$p.Slug}}" data-product-id="{{$p.Slug}}" data-product-name="{{$p.Name}}" data-category="{{$p.Category}}">{{$p.Name}}</a></h3>
       <div class="card-meta">{{$p.Category}}</div>
       <div class="price-row"><span class="price">${{formatPrice $p.BasePrice}}</span></div>
       <div class="actions">
-        <a href="/product/{{$p.Slug}}" class="btn-secondary btn-full">Ver detalles ›</a>
+        <a href="/product/{{$p.Slug}}" class="btn-secondary btn-full" data-product-id="{{$p.Slug}}" data-product-name="{{$p.Name}}" data-category="{{$p.Category}}">Ver detalles ›</a>
       </div>
     </div>
   </div>

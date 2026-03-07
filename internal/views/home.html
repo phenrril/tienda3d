@@ -43,7 +43,7 @@
   <div class="hero-carousel" id="heroCarousel">
     {{range $i, $item := .CarouselItems}}
       {{if $item.Slug}}
-        <a href="/product/{{$item.Slug}}" class="hc-slide-link{{if eq $i 0}} active{{end}}">
+        <a href="/product/{{$item.Slug}}" class="hc-slide-link{{if eq $i 0}} active{{end}}" data-product-id="{{$item.Slug}}" data-product-name="{{$item.Alt}}">
           <img class="hc-slide{{if eq $i 0}} active{{end}}" src="{{img $item.Image}}" alt="{{$item.Alt}}" sizes="100vw" {{if eq $i 0}}fetchpriority="high"{{else}}loading="lazy"{{end}} decoding="async" />
         </a>
       {{else if $item.Image}}
@@ -127,7 +127,7 @@
   <div class="cards cards--home cards--featured">
     {{range .Products}}
     <div class="card card--featured">
-      <a href="/product/{{.Slug}}" class="card-link">
+      <a href="/product/{{.Slug}}" class="card-link" data-product-id="{{.Slug}}" data-product-name="{{.Name}}" data-category="{{.Category}}">
         <div class="card-media card-media--featured ar-1-1">
           {{if .Images}}
             <img src="{{img (index .Images 0).URL}}"
