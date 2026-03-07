@@ -60,19 +60,87 @@ function formatPrice(num) {
   return result + '.' + decStr;
 }
 
-// Analytics GA4: eventos de negocio (clicks y atribución)
+// Analytics GA4: embudo de interés -> contacto
+// page_view -> category_click -> product_click -> whatsapp_click
+// Estos eventos permiten medir qué categorías/productos generan más intención y mensajes.
 (function(){
   const SESSION_START_KEY='chroma_session_start_ms';
   const INSTAGRAM_SEEN_KEY='chroma_instagram_seen';
+  const ATTRIBUTION_KEY='chroma_ga4_attribution_v1';
 
   function gaAvailable(){
     return typeof window.gtag === 'function';
   }
 
+  function cleanValue(v){
+    return (v || '').toString().trim();
+  }
+
+  function compactParams(params){
+    const out={};
+    Object.entries(params || {}).forEach(([k,v])=>{
+      if(v == null) return;
+      if(typeof v === 'string'){
+        const s=v.trim();
+        if(s !== '') out[k]=s;
+        return;
+      }
+      if(typeof v === 'number'){
+        if(Number.isFinite(v)) out[k]=v;
+        return;
+      }
+      if(typeof v === 'boolean'){
+        out[k]=v;
+        return;
+      }
+      if(Array.isArray(v)){
+        if(v.length > 0) out[k]=v;
+        return;
+      }
+      out[k]=v;
+    });
+    return out;
+  }
+
+  function buildAttributionFromCurrentPage(){
+    const current=new URL(window.location.href);
+    const utmSource=cleanValue(current.searchParams.get('utm_source')).toLowerCase();
+    const utmMedium=cleanValue(current.searchParams.get('utm_medium')).toLowerCase();
+    const utmCampaign=cleanValue(current.searchParams.get('utm_campaign')).toLowerCase();
+    return compactParams({
+      utm_source: utmSource,
+      utm_medium: utmMedium,
+      utm_campaign: utmCampaign
+    });
+  }
+
+  function getSessionAttribution(){
+    try{
+      const cached=sessionStorage.getItem(ATTRIBUTION_KEY);
+      if(cached){
+        const parsed=JSON.parse(cached);
+        return compactParams(parsed);
+      }
+    }catch{}
+    const fresh=buildAttributionFromCurrentPage();
+    try{
+      sessionStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(fresh));
+    }catch{}
+    return fresh;
+  }
+
   function trackEvent(name, params){
     if(!gaAvailable()) return;
+    // Sanitizamos payload, pero no inyectamos source/medium/campaign custom.
+    // Para análisis principal se usan las dimensiones oficiales de GA4:
+    // Session source / Session medium / Session campaign.
+    const payload=compactParams(params || {});
     try{
-      window.gtag('event', name, params || {});
+      if(Object.keys(payload).length){
+        window.gtag('event', name, payload);
+      } else {
+        window.gtag('event', name);
+      }
     }catch{}
   }
 
@@ -116,6 +184,49 @@ function formatPrice(num) {
     return m ? decodeURIComponent(m[1]) : '';
   }
 
+  function categoryFromCard(a){
+    const card=a.closest('.card');
+    if(!card) return '';
+    const meta=card.querySelector('.card-meta, .card-category-badge');
+    return cleanValue(meta ? meta.textContent : '');
+  }
+
+  function nameFromCard(a){
+    const card=a.closest('.card');
+    if(!card) return '';
+    const title=card.querySelector('.card-title');
+    return cleanValue(title ? title.textContent : '');
+  }
+
+  function currentProductContext(){
+    const root=document.querySelector('.product-detail');
+    if(!root) return null;
+    const pid=cleanValue(root.getAttribute('data-product-id'));
+    const pname=cleanValue(root.getAttribute('data-product-name'));
+    const pcat=cleanValue(root.getAttribute('data-category'));
+    const fallbackSlug=extractProductSlug(window.location.pathname);
+    if(!pid && !fallbackSlug && !pname) return null;
+    return {
+      product_id: pid || fallbackSlug,
+      product_name: pname,
+      category: pcat
+    };
+  }
+
+  function productContextFromLink(a, href){
+    const slug=extractProductSlug(href);
+    if(!slug) return null;
+    const dataset=a.dataset || {};
+    const pid=cleanValue(dataset.productId) || slug;
+    const pname=cleanValue(dataset.productName) || nameFromCard(a);
+    const pcat=cleanValue(dataset.category) || categoryFromCard(a);
+    return {
+      product_id: pid,
+      product_name: pname,
+      category: pcat
+    };
+  }
+
   function isWhatsAppURL(rawHref){
     const u=parseURL(rawHref);
     if(!u) return false;
@@ -150,9 +261,14 @@ function formatPrice(num) {
   // Registra cada click en enlaces/botones de WhatsApp para medir intención de contacto.
   // Este evento alimenta GA4 con un objetivo de engagement comparable entre páginas/campañas.
   function trackWhatsAppClick(meta){
+    const productCtx=currentProductContext();
     const payload=Object.assign({}, meta || {}, {
       event_category: 'engagement',
       event_label: 'whatsapp_button',
+      product_name: productCtx ? productCtx.product_name : '',
+      product_id: productCtx ? productCtx.product_id : '',
+      category: productCtx ? productCtx.category : '',
+      click_context: productCtx ? 'product_page' : 'general_cta',
       seconds_to_whatsapp: secondsSinceSessionStart(),
       page_path: window.location.pathname
     });
@@ -162,7 +278,8 @@ function formatPrice(num) {
   // Expuesto para usar desde otros módulos de este mismo archivo.
   window.__chromaAnalytics={
     trackEvent,
-    trackWhatsAppClick
+    trackWhatsAppClick,
+    currentProductContext
   };
 
   document.addEventListener('click', (e)=>{
@@ -173,11 +290,12 @@ function formatPrice(num) {
     const href=(a.getAttribute('href')||'').trim();
     if(!href) return;
 
-    const slug=extractProductSlug(href);
-    if(slug){
+    const productCtx=productContextFromLink(a, href);
+    if(productCtx){
       trackEvent('product_click',{
-        product_slug: slug,
-        click_context: getEventContext(a),
+        product_name: productCtx.product_name,
+        product_id: productCtx.product_id,
+        category: productCtx.category,
         page_path: window.location.pathname
       });
       return;
@@ -191,6 +309,37 @@ function formatPrice(num) {
     }
   }, {capture:true});
 
+  // category_click: mide interés por categorías en filtros/menús del listado.
+  // Se dispara al seleccionar categoría y al aplicar filtro para analizar intención y conversión.
+  const categorySelect=document.getElementById('category');
+  if(categorySelect){
+    categorySelect.addEventListener('change', ()=>{
+      const categoryName=cleanValue(categorySelect.value);
+      if(!categoryName) return;
+      trackEvent('category_click',{
+        category_name: categoryName,
+        source: 'menu_filter',
+        page_path: window.location.pathname
+      });
+    });
+  }
+
+  const filtersForm=document.getElementById('filtersForm');
+  if(filtersForm){
+    filtersForm.addEventListener('submit', ()=>{
+      const select=filtersForm.querySelector('#category');
+      const categoryName=cleanValue(select ? select.value : '');
+      if(!categoryName) return;
+      trackEvent('category_click',{
+        category_name: categoryName,
+        source: 'menu_filter_apply',
+        page_path: window.location.pathname
+      });
+    });
+  }
+
+  // Persistimos UTMs de la landing en sessionStorage para referencia de sesión.
+  getSessionAttribution();
   trackInstagramVisitOnce();
 })();
 

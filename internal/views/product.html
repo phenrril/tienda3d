@@ -7,7 +7,7 @@
   <span class="bc-sep">›</span>
   <span class="bc-current">{{.Product.Name}}</span>
 </nav>
-<article class="product-detail">
+<article class="product-detail" data-product-id="{{.Product.Slug}}" data-product-name="{{.Product.Name}}" data-category="{{.Product.Category}}">
   <div class="pd-media">
     {{if .Product.Images}}
       <div class="pd-carousel" id="pdCarousel" data-count="{{len .Product.Images}}">
