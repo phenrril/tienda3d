@@ -34,6 +34,15 @@
 <meta name="twitter:description" content="{{if .PageDescription}}{{.PageDescription}}{{else}}Descripción por defecto de Chroma3D: impresión 3D mayorista y minorista{{end}}">
 <meta name="twitter:image" content="{{.OGImage}}">
 {{with .SchemaJSON}}<script type="application/ld+json">{{.}}</script>{{end}}
+{{with .GoogleAnalyticsID}}
+<script async src="https://www.googletagmanager.com/gtag/js?id={{.}}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', '{{.}}');
+</script>
+{{end}}
 <!-- JS unificado de UI - deferido para no bloquear render -->
 <script type="module" src="/public/assets/app.js?v={{.AssetVersion}}" defer></script>
 </head>

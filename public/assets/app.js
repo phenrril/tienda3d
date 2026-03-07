@@ -60,6 +60,134 @@ function formatPrice(num) {
   return result + '.' + decStr;
 }
 
+// Analytics GA4: eventos de negocio (clicks y atribución)
+(function(){
+  const SESSION_START_KEY='chroma_session_start_ms';
+  const INSTAGRAM_SEEN_KEY='chroma_instagram_seen';
+
+  function gaAvailable(){
+    return typeof window.gtag === 'function';
+  }
+
+  function trackEvent(name, params){
+    if(!gaAvailable()) return;
+    try{
+      window.gtag('event', name, params || {});
+    }catch{}
+  }
+
+  function ensureSessionStart(){
+    let startedAt=sessionStorage.getItem(SESSION_START_KEY);
+    if(!startedAt){
+      startedAt=String(Date.now());
+      sessionStorage.setItem(SESSION_START_KEY, startedAt);
+    }
+    return Number(startedAt) || Date.now();
+  }
+
+  function secondsSinceSessionStart(){
+    const startedAt=ensureSessionStart();
+    const diffMs=Math.max(0, Date.now()-startedAt);
+    return Math.round(diffMs/1000);
+  }
+
+  function getEventContext(el){
+    if(!el) return '';
+    const explicit=(el.getAttribute('data-analytics-context')||'').trim();
+    if(explicit) return explicit;
+    if(el.id) return `#${el.id}`;
+    const cls=(el.className||'').toString().trim().split(/\s+/).filter(Boolean)[0];
+    if(cls) return `.${cls}`;
+    return el.tagName ? el.tagName.toLowerCase() : 'unknown';
+  }
+
+  function parseURL(raw){
+    try{
+      return new URL(raw, window.location.origin);
+    }catch{
+      return null;
+    }
+  }
+
+  function extractProductSlug(rawHref){
+    const u=parseURL(rawHref);
+    if(!u) return '';
+    const m=u.pathname.match(/^\/product\/([^/?#]+)/i);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+
+  function isWhatsAppURL(rawHref){
+    const u=parseURL(rawHref);
+    if(!u) return false;
+    const host=u.hostname.toLowerCase();
+    return host.includes('wa.me') || host.includes('whatsapp.com');
+  }
+
+  function isInstagramVisit(){
+    const url=new URL(window.location.href);
+    const utmSource=(url.searchParams.get('utm_source')||'').toLowerCase();
+    const utmMedium=(url.searchParams.get('utm_medium')||'').toLowerCase();
+    const ref=(document.referrer||'').toLowerCase();
+    if(utmSource.includes('instagram') || utmSource === 'ig') return true;
+    if(utmMedium.includes('instagram') || utmMedium === 'ig') return true;
+    return ref.includes('instagram.com') || ref.includes('l.instagram.com') || ref.includes('lm.instagram.com');
+  }
+
+  function trackInstagramVisitOnce(){
+    ensureSessionStart();
+    if(!isInstagramVisit()) return;
+    if(sessionStorage.getItem(INSTAGRAM_SEEN_KEY)==='1') return;
+    sessionStorage.setItem(INSTAGRAM_SEEN_KEY,'1');
+    const url=new URL(window.location.href);
+    trackEvent('visit_from_instagram',{
+      source: (url.searchParams.get('utm_source')||'').toLowerCase() || 'instagram',
+      medium: (url.searchParams.get('utm_medium')||'').toLowerCase() || 'social',
+      campaign: (url.searchParams.get('utm_campaign')||'').toLowerCase(),
+      landing_path: window.location.pathname
+    });
+  }
+
+  function trackWhatsAppClick(meta){
+    const payload=Object.assign({}, meta || {}, {
+      seconds_to_whatsapp: secondsSinceSessionStart(),
+      page_path: window.location.pathname
+    });
+    trackEvent('whatsapp_click', payload);
+  }
+
+  // Expuesto para usar desde otros módulos de este mismo archivo.
+  window.__chromaAnalytics={
+    trackEvent,
+    trackWhatsAppClick
+  };
+
+  document.addEventListener('click', (e)=>{
+    const a=e.target.closest('a');
+    if(!a) return;
+    const href=(a.getAttribute('href')||'').trim();
+    if(!href) return;
+
+    const slug=extractProductSlug(href);
+    if(slug){
+      trackEvent('product_click',{
+        product_slug: slug,
+        click_context: getEventContext(a),
+        page_path: window.location.pathname
+      });
+      return;
+    }
+
+    if(isWhatsAppURL(href)){
+      trackWhatsAppClick({
+        click_context: getEventContext(a),
+        link_url: href
+      });
+    }
+  }, {capture:true});
+
+  trackInstagramVisitOnce();
+})();
+
 // Nav drawer
 (function(){
   const btn=document.querySelector('.nav-toggle');
@@ -484,6 +612,12 @@ if ('serviceWorker' in navigator) {
       if(!copied){ try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); ta.remove(); copied=true; }catch{} }
       flash(copied?'Enlace copiado':'No se pudo copiar');
     } else if(kind==='whatsapp'){
+      if(window.__chromaAnalytics && typeof window.__chromaAnalytics.trackWhatsAppClick==='function'){
+        window.__chromaAnalytics.trackWhatsAppClick({
+          click_context: 'product_share_whatsapp',
+          product_name: productName
+        });
+      }
       const enc=encodeURIComponent(text);
       const w1=`https://wa.me/?text=${enc}`;
       const w2=`https://api.whatsapp.com/send?text=${enc}`;
