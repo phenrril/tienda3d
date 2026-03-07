@@ -147,8 +147,12 @@ function formatPrice(num) {
     });
   }
 
+  // Registra cada click en enlaces/botones de WhatsApp para medir intención de contacto.
+  // Este evento alimenta GA4 con un objetivo de engagement comparable entre páginas/campañas.
   function trackWhatsAppClick(meta){
     const payload=Object.assign({}, meta || {}, {
+      event_category: 'engagement',
+      event_label: 'whatsapp_button',
       seconds_to_whatsapp: secondsSinceSessionStart(),
       page_path: window.location.pathname
     });
@@ -162,7 +166,9 @@ function formatPrice(num) {
   };
 
   document.addEventListener('click', (e)=>{
-    const a=e.target.closest('a');
+    const target=e.target;
+    if(!(target instanceof Element)) return;
+    const a=target.closest('a');
     if(!a) return;
     const href=(a.getAttribute('href')||'').trim();
     if(!href) return;
