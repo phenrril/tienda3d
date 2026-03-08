@@ -614,12 +614,17 @@ body.drawer-open{overflow:hidden}
   .wa-float::after{animation:none}
 }
 
-/* New FAB WhatsApp simplified class */
-.fab-whatsapp{position:fixed;right:16px;bottom:16px;width:56px;height:56px;border-radius:999px;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(37,211,102,.4);z-index:120;border:2px solid #fff;transition:transform .2s,box-shadow .2s}
+/* FAB redes sociales (Instagram + WhatsApp) */
+.fab-social{position:fixed;right:16px;bottom:16px;display:flex;align-items:center;gap:12px;z-index:120}
+.fab-whatsapp,.fab-instagram{width:56px;height:56px;border-radius:999px;color:#fff;display:flex;align-items:center;justify-content:center;border:2px solid #fff;transition:transform .2s,box-shadow .2s;flex-shrink:0}
+.fab-whatsapp{background:#25D366;box-shadow:0 8px 24px rgba(37,211,102,.4)}
 .fab-whatsapp:hover{transform:scale(1.1);box-shadow:0 12px 32px rgba(37,211,102,.6)}
+.fab-instagram{background:linear-gradient(135deg,#f09433,#e6683c 35%,#dc2743 55%,#cc2366 75%,#bc1888);box-shadow:0 8px 24px rgba(225,48,108,.4)}
+.fab-instagram:hover{transform:scale(1.1);box-shadow:0 12px 32px rgba(225,48,108,.5)}
+.fab-instagram svg{color:#fff}
 
 /* Ocultar FAB cuando drawer abierto */
-body.drawer-open .fab-whatsapp{display:none}
+body.drawer-open .fab-social{display:none}
 
 
 /* CTA Section */
