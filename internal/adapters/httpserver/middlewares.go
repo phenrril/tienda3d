@@ -94,7 +94,7 @@ func SecurityAndStaticCache(next http.Handler) http.Handler {
 		coop   = "same-origin"
 	)
 	// Permite Google Fonts CSS y gstatic para fonts
-	const csp = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-hashes' https://www.googletagmanager.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.mercadopago.com https://fonts.googleapis.com https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com"
+	const csp = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' 'unsafe-hashes' https://www.googletagmanager.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.mercadopago.com https://fonts.googleapis.com https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com"
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Headers de seguridad globales

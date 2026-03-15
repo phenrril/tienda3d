@@ -28,6 +28,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"golang.org/x/oauth2"
 
+	"github.com/phenrril/tienda3d/internal/adapters/analytics"
 	"github.com/phenrril/tienda3d/internal/adapters/payments/mercadopago"
 	"github.com/phenrril/tienda3d/internal/domain"
 	"github.com/phenrril/tienda3d/internal/usecase"
@@ -54,6 +55,7 @@ type Server struct {
 	adminSecret  []byte
 	assetVersion string
 	analyticsID  string
+	ga4          *analytics.Client
 }
 
 var emailRe = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
@@ -61,6 +63,7 @@ var emailRe = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,
 func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, c *usecase.CouponUseCase, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config, fp domain.FeaturedProductRepo, emailSvc domain.EmailService, hc domain.HiddenCategoryRepo) http.Handler {
 	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, coupons: c, models: m, featuredProducts: fp, hiddenCategories: hc, storage: fs, customers: customers, oauthCfg: oauthCfg, emailService: emailSvc, mux: http.NewServeMux(), assetVersion: strconv.FormatInt(time.Now().Unix(), 10)}
 	s.analyticsID = strings.TrimSpace(os.Getenv("GOOGLE_ANALYTICS_ID"))
+	s.ga4 = analytics.NewClient()
 
 	allowed := map[string]struct{}{}
 	if raw := os.Getenv("ADMIN_ALLOWED_EMAILS"); raw != "" {
@@ -154,6 +157,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/admin/products", s.handleAdminProducts)
 
 	s.mux.HandleFunc("/admin/sales", s.handleAdminSales)
+	s.mux.HandleFunc("/admin/analytics", s.handleAdminAnalytics)
 	s.mux.HandleFunc("/admin/destacada", s.handleAdminDestacada)
 
 	// Admin: reparación de imágenes huérfanas
@@ -2357,6 +2361,48 @@ func (s *Server) handleAdminSales(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, layout, data)
+}
+
+func (s *Server) handleAdminAnalytics(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", 302)
+		return
+	}
+
+	const layoutIn = "2006-01-02"
+	q := r.URL.Query()
+
+	var to, from time.Time
+	var err error
+	if ds := q.Get("to"); ds != "" {
+		to, err = time.Parse(layoutIn, ds)
+		if err != nil {
+			to = time.Now()
+		}
+	} else {
+		to = time.Now()
+	}
+	if ds := q.Get("from"); ds != "" {
+		from, err = time.Parse(layoutIn, ds)
+		if err != nil {
+			from = to.AddDate(0, 0, -29)
+		}
+	} else {
+		from = to.AddDate(0, 0, -29)
+	}
+	if from.After(to) {
+		from, to = to, from
+	}
+
+	dashboard := s.ga4.FetchDashboard(r.Context(), from, to)
+
+	data := map[string]any{
+		"From":       from.Format(layoutIn),
+		"To":         to.Format(layoutIn),
+		"Dashboard":  dashboard,
+		"AdminToken": s.readAdminToken(r),
+	}
+	s.render(w, "admin_analytics.html", data)
 }
 
 func (s *Server) handleAdminAuth(w http.ResponseWriter, r *http.Request) {
