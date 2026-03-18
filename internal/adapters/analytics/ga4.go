@@ -35,15 +35,16 @@ type DashboardData struct {
 	From string
 	To   string
 
-	TotalUsers         int64
+	TotalUsers          int64
 	TotalWhatsAppClicks int64
-	AvgSessionDuration float64
+	AvgSessionDuration  float64
 
 	Daily      []DailyRow
 	Categories []CategoryRow
 	Traffic    []TrafficRow
 
-	Error string
+	Error    string
+	Warnings []string
 }
 
 type Client struct {
@@ -194,6 +195,10 @@ func (c *Client) fetchWhatsAppDaily(ctx context.Context, prop string, dr *analyt
 }
 
 func (c *Client) fetchCategories(ctx context.Context, prop string, dr *analyticsdata.DateRange, d *DashboardData) {
+	// Intentamos primero con el parámetro de evento personalizado.
+	// Requiere que "category_name" esté registrado como dimensión personalizada en GA4
+	// (Admin → Definiciones personalizadas → Crear dimensión personalizada → Ámbito: Evento → Nombre del parámetro: category_name)
+	// o que haya eventos recientes (últimos 60 días) con ese parámetro.
 	req := &analyticsdata.RunReportRequest{
 		DateRanges: []*analyticsdata.DateRange{dr},
 		Dimensions: []*analyticsdata.Dimension{
@@ -219,7 +224,8 @@ func (c *Client) fetchCategories(ctx context.Context, prop string, dr *analytics
 
 	resp, err := c.svc.Properties.RunReport(prop, req).Context(ctx).Do()
 	if err != nil {
-		log.Error().Err(err).Msg("GA4: fetchCategories")
+		log.Error().Err(err).Msg("GA4: fetchCategories con customEvent:category_name")
+		d.Warnings = append(d.Warnings, "Categorías: "+err.Error())
 		return
 	}
 
@@ -232,6 +238,11 @@ func (c *Client) fetchCategories(ctx context.Context, prop string, dr *analytics
 			Name:  name,
 			Count: parseInt64(row.MetricValues[0].Value),
 		})
+	}
+
+	// Si no hay filas útiles, registramos aviso para ayudar al diagnóstico.
+	if len(d.Categories) == 0 {
+		d.Warnings = append(d.Warnings, `Categorías: no hay datos. Si nunca se registraron eventos "category_click" en este período, o el parámetro "category_name" no está registrado como dimensión personalizada en GA4, este panel estará vacío.`)
 	}
 }
 
@@ -255,6 +266,7 @@ func (c *Client) fetchTraffic(ctx context.Context, prop string, dr *analyticsdat
 	resp, err := c.svc.Properties.RunReport(prop, req).Context(ctx).Do()
 	if err != nil {
 		log.Error().Err(err).Msg("GA4: fetchTraffic")
+		d.Warnings = append(d.Warnings, "Tráfico: "+err.Error())
 		return
 	}
 
@@ -265,6 +277,10 @@ func (c *Client) fetchTraffic(ctx context.Context, prop string, dr *analyticsdat
 			Campaign: row.DimensionValues[2].Value,
 			Sessions: parseInt64(row.MetricValues[0].Value),
 		})
+	}
+
+	if len(d.Traffic) == 0 {
+		d.Warnings = append(d.Warnings, "Tráfico: la consulta no devolvió filas para este período.")
 	}
 }
 
