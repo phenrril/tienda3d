@@ -252,7 +252,7 @@ func (c *Client) fetchTraffic(ctx context.Context, prop string, dr *analyticsdat
 		Dimensions: []*analyticsdata.Dimension{
 			{Name: "sessionSource"},
 			{Name: "sessionMedium"},
-			{Name: "sessionCampaign"},
+			{Name: "sessionCampaignName"},
 		},
 		Metrics: []*analyticsdata.Metric{
 			{Name: "sessions"},
