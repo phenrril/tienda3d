@@ -30,6 +30,7 @@ import (
 
 	"github.com/phenrril/tienda3d/internal/adapters/analytics"
 	"github.com/phenrril/tienda3d/internal/adapters/payments/mercadopago"
+	"github.com/phenrril/tienda3d/internal/adapters/telegram"
 	"github.com/phenrril/tienda3d/internal/domain"
 	"github.com/phenrril/tienda3d/internal/usecase"
 )
@@ -56,12 +57,14 @@ type Server struct {
 	assetVersion string
 	analyticsID  string
 	ga4          *analytics.Client
+
+	workshop *WorkshopAdmin
 }
 
 var emailRe = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
 
-func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, c *usecase.CouponUseCase, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config, fp domain.FeaturedProductRepo, emailSvc domain.EmailService, hc domain.HiddenCategoryRepo) http.Handler {
-	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, coupons: c, models: m, featuredProducts: fp, hiddenCategories: hc, storage: fs, customers: customers, oauthCfg: oauthCfg, emailService: emailSvc, mux: http.NewServeMux(), assetVersion: strconv.FormatInt(time.Now().Unix(), 10)}
+func New(t *template.Template, p *usecase.ProductUC, q *usecase.QuoteUC, o *usecase.OrderUC, pay *usecase.PaymentUC, w *usecase.WhatsAppUC, c *usecase.CouponUseCase, m domain.UploadedModelRepo, fs domain.FileStorage, customers domain.CustomerRepo, oauthCfg *oauth2.Config, fp domain.FeaturedProductRepo, emailSvc domain.EmailService, hc domain.HiddenCategoryRepo, wa *WorkshopAdmin) http.Handler {
+	s := &Server{tmpl: t, products: p, quotes: q, orders: o, payments: pay, whatsapp: w, coupons: c, models: m, featuredProducts: fp, hiddenCategories: hc, storage: fs, customers: customers, oauthCfg: oauthCfg, emailService: emailSvc, mux: http.NewServeMux(), assetVersion: strconv.FormatInt(time.Now().Unix(), 10), workshop: wa}
 	s.analyticsID = strings.TrimSpace(os.Getenv("GOOGLE_ANALYTICS_ID"))
 	s.ga4 = analytics.NewClient()
 
@@ -157,6 +160,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/admin/products", s.handleAdminProducts)
 
 	s.mux.HandleFunc("/admin/sales", s.handleAdminSales)
+	s.mux.HandleFunc("/admin/sales/gasto", s.handleAdminSalesExpense)
+	s.mux.HandleFunc("/admin/sales/filamento", s.handleAdminSalesFilamentPurchase)
 	s.mux.HandleFunc("/admin/analytics", s.handleAdminAnalytics)
 	s.mux.HandleFunc("/admin/destacada", s.handleAdminDestacada)
 
@@ -183,6 +188,18 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/admin/cupones/actualizar", s.handleAdminCouponsUpdate)
 	s.mux.HandleFunc("/admin/cupones/toggle", s.handleAdminCouponsToggle)
 	s.mux.HandleFunc("/admin/cupones/estadisticas", s.handleAdminCouponsStats)
+
+	// Admin: pedidos taller (cuaderno)
+	s.mux.HandleFunc("/admin/pedidos", s.handleAdminPedidos)
+	s.mux.HandleFunc("/admin/pedidos/nuevo", s.handleAdminPedidosNew)
+	s.mux.HandleFunc("/admin/pedidos/crear", s.handleAdminPedidosCreate)
+	s.mux.HandleFunc("/admin/pedidos/editar", s.handleAdminPedidosEdit)
+	s.mux.HandleFunc("/admin/pedidos/guardar", s.handleAdminPedidosSave)
+	s.mux.HandleFunc("/admin/pedidos/eliminar", s.handleAdminPedidosDelete)
+	s.mux.HandleFunc("/admin/pedidos/sena", s.handleAdminPedidosDeposit)
+	s.mux.HandleFunc("/admin/pedidos/estado", s.handleAdminPedidosStatus)
+
+	s.mux.HandleFunc("/api/telegram/webhook", s.handleTelegramWebhook)
 
 	// WhatsApp Business API endpoints
 	s.mux.HandleFunc("/api/whatsapp/webhook", s.handleWhatsAppWebhook)
@@ -2358,9 +2375,169 @@ func (s *Server) handleAdminSales(w http.ResponseWriter, r *http.Request) {
 		"TopProducts":          prodList,
 		"DailySeries":          daySeries,
 		"AdminToken":           s.readAdminToken(r),
+		"WorkshopModule":       s.workshop != nil,
+	}
+
+	if s.workshop != nil {
+		ctx := r.Context()
+		var workshopRevenue float64
+		wlist, werr := s.workshop.Orders.ListDeliveredInRange(ctx, from, to)
+		if werr == nil {
+			for _, wo := range wlist {
+				if !wo.IsBarter && wo.TotalAmount != nil {
+					workshopRevenue += *wo.TotalAmount
+				}
+			}
+			data["WorkshopDeliveredCount"] = len(wlist)
+		} else {
+			data["WorkshopDeliveredCount"] = 0
+		}
+		expSum, _ := s.workshop.Expenses.SumInRange(ctx, from, to)
+		filPurch, _ := s.workshop.Filament.TotalPurchasesInRange(ctx, from, to)
+		cogs, _ := workshopFilamentCOGS(ctx, s.workshop.Filament, from, to)
+		stock, _ := s.workshop.Filament.StockByColor(ctx)
+		ledEntries, _ := s.workshop.Filament.ListInRange(ctx, from, to)
+		expList, _ := s.workshop.Expenses.ListInRange(ctx, from, to)
+		totalIngresos := totalRevenue + workshopRevenue
+		gross := totalIngresos - cogs
+		net := gross - expSum
+		data["WorkshopRevenue"] = workshopRevenue
+		data["StoreRevenue"] = totalRevenue
+		data["TotalIngresos"] = totalIngresos
+		data["FilamentPurchasesPeriod"] = filPurch
+		data["BusinessExpensesSum"] = expSum
+		data["FilamentCOGS"] = cogs
+		data["GrossProfit"] = gross
+		data["NetProfit"] = net
+		data["FilamentStock"] = stock
+		data["LedgerEntries"] = ledEntries
+		data["ExpenseList"] = expList
 	}
 
 	s.render(w, layout, data)
+}
+
+func workshopFilamentCOGS(ctx context.Context, fl domain.FilamentLedgerRepo, from, to time.Time) (float64, error) {
+	entries, err := fl.ListInRange(ctx, from, to)
+	if err != nil {
+		return 0, err
+	}
+	totals, err := fl.PurchaseTotalsByColor(ctx)
+	if err != nil {
+		return 0, err
+	}
+	avg := make(map[string]float64)
+	for color, t := range totals {
+		if t.Grams > 0 {
+			avg[color] = t.Cost / float64(t.Grams)
+		}
+	}
+	var cogs float64
+	for _, e := range entries {
+		if e.EntryType != domain.FilamentEntryConsumption {
+			continue
+		}
+		g := float64(-e.DeltaGrams)
+		if g <= 0 {
+			continue
+		}
+		cogs += g * avg[e.ColorSlug]
+	}
+	return cogs, nil
+}
+
+func (s *Server) handleAdminSalesExpense(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", http.StatusFound)
+		return
+	}
+	if s.workshop == nil {
+		http.Error(w, "no disponible", http.StatusServiceUnavailable)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "form", http.StatusBadRequest)
+		return
+	}
+	amt, err := parseARSFloat(r.FormValue("amount"))
+	if err != nil || amt <= 0 {
+		http.Error(w, "monto inválido", http.StatusBadRequest)
+		return
+	}
+	spent, err := time.Parse("2006-01-02", strings.TrimSpace(r.FormValue("spent_at")))
+	if err != nil {
+		http.Error(w, "fecha inválida", http.StatusBadRequest)
+		return
+	}
+	e := &domain.BusinessExpense{
+		Amount:      amt,
+		SpentAt:     spent,
+		Category:    strings.TrimSpace(r.FormValue("category")),
+		Description: strings.TrimSpace(r.FormValue("description")),
+	}
+	if err := s.workshop.Expenses.Save(r.Context(), e); err != nil {
+		log.Error().Err(err).Msg("sales expense")
+		http.Error(w, "err", http.StatusInternalServerError)
+		return
+	}
+	redir := "/admin/sales?from=" + url.QueryEscape(r.FormValue("from")) + "&to=" + url.QueryEscape(r.FormValue("to"))
+	http.Redirect(w, r, redir, http.StatusFound)
+}
+
+func (s *Server) handleAdminSalesFilamentPurchase(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Redirect(w, r, "/admin/auth", http.StatusFound)
+		return
+	}
+	if s.workshop == nil {
+		http.Error(w, "no disponible", http.StatusServiceUnavailable)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "form", http.StatusBadRequest)
+		return
+	}
+	color := strings.TrimSpace(strings.ToLower(strings.ReplaceAll(r.FormValue("color_slug"), " ", "_")))
+	if !workshopClientSlugRe.MatchString(color) {
+		http.Error(w, "color inválido (snake_case)", http.StatusBadRequest)
+		return
+	}
+	cost, err := parseARSFloat(r.FormValue("cost"))
+	if err != nil || cost <= 0 {
+		http.Error(w, "costo inválido", http.StatusBadRequest)
+		return
+	}
+	grams := 1000
+	if g := strings.TrimSpace(r.FormValue("grams")); g != "" {
+		if v, err := strconv.Atoi(g); err == nil && v > 0 {
+			grams = v
+		}
+	}
+	note := strings.TrimSpace(r.FormValue("note"))
+	if err := s.workshop.Filament.AddPurchase(r.Context(), color, grams, cost, note); err != nil {
+		log.Error().Err(err).Msg("filament purchase")
+		http.Error(w, "err", http.StatusInternalServerError)
+		return
+	}
+	redir := "/admin/sales?from=" + url.QueryEscape(r.FormValue("from")) + "&to=" + url.QueryEscape(r.FormValue("to"))
+	http.Redirect(w, r, redir, http.StatusFound)
+}
+
+func parseARSFloat(s string) (float64, error) {
+	s = strings.TrimSpace(strings.ReplaceAll(s, ".", ""))
+	s = strings.ReplaceAll(s, ",", ".")
+	if s == "" {
+		return 0, fmt.Errorf("vacío")
+	}
+	return strconv.ParseFloat(s, 64)
 }
 
 func (s *Server) handleAdminAnalytics(w http.ResponseWriter, r *http.Request) {
@@ -2736,16 +2913,6 @@ func sendOrderEmail(o *domain.Order, success bool) error {
 }
 
 func sendOrderTelegram(o *domain.Order, success bool) error {
-	token := os.Getenv("TELEGRAM_BOT_TOKEN")
-	// Soportar múltiples IDs: TELEGRAM_CHAT_IDS (coma-separado) o fallback TELEGRAM_CHAT_ID
-	rawIDs := os.Getenv("TELEGRAM_CHAT_IDS")
-	if strings.TrimSpace(rawIDs) == "" {
-		rawIDs = os.Getenv("TELEGRAM_CHAT_ID")
-	}
-	if token == "" || strings.TrimSpace(rawIDs) == "" {
-		return fmt.Errorf("telegram vars faltantes")
-	}
-
 	// Determinar el texto del estado según método de pago
 	var statusTxt string
 	if !success {
@@ -2797,38 +2964,7 @@ func sendOrderTelegram(o *domain.Order, success bool) error {
 		}
 	}
 	fmt.Fprintf(&b, "Total: $%.2f (Envio: $%.2f)\n", o.Total, o.ShippingCost)
-	apiURL := "https://api.telegram.org/bot" + token + "/sendMessage"
-	// Separar por coma y enviar a cada destino
-	ids := []string{}
-	for _, part := range strings.Split(rawIDs, ",") {
-		id := strings.TrimSpace(part)
-		if id != "" {
-			ids = append(ids, id)
-		}
-	}
-	if len(ids) == 0 {
-		return fmt.Errorf("telegram chat ids vacios")
-	}
-	var lastErr error
-	for _, id := range ids {
-		form := url.Values{}
-		form.Set("chat_id", id)
-		form.Set("text", b.String())
-		form.Set("disable_web_page_preview", "1")
-		resp, err := http.PostForm(apiURL, form)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		func() {
-			defer resp.Body.Close()
-			if resp.StatusCode >= 300 {
-				body, _ := io.ReadAll(resp.Body)
-				lastErr = fmt.Errorf("telegram status %d: %s", resp.StatusCode, string(body))
-			}
-		}()
-	}
-	return lastErr
+	return telegram.SendPlain(b.String())
 }
 
 func (s *Server) sendOrderNotify(o *domain.Order, success bool) {

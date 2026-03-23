@@ -246,6 +246,9 @@ Recomendadas / adicionales:
 - `STORAGE_DIR` carpeta para archivos subidos (default `uploads`)
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `ORDER_NOTIFY_EMAIL` (notificación email)
 - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` o `TELEGRAM_CHAT_IDS` (notificación Telegram). `TELEGRAM_CHAT_IDS` permite múltiples destinos separados por coma, p. ej.: `-1001234567890,@SoyCanalla`.
+- `TELEGRAM_WEBHOOK_SECRET` (recomendado en producción): token que envía Telegram en el header `X-Telegram-Bot-Api-Secret-Token` al llamar `POST /api/telegram/webhook`. Configurar el webhook con `setWebhook` y el mismo `secret_token`. Comando soportado: `/estado <estado> <cliente_snake_case>` (mismos chats que `TELEGRAM_CHAT_IDS`), para actualizar el estado del pedido taller más reciente no entregado de ese cliente.
+- `WORKSHOP_DIGEST_TZ` zona horaria del recordatorio diario de entregas (default `America/Argentina/Buenos_Aires`).
+- `WORKSHOP_DIGEST_HOUR` hora local (0-23) para enviar el resumen Telegram de pedidos con entrega en los próximos 5 días (default `9`).
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (OAuth Google)
 - `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` (WhatsApp Business API)
 
@@ -345,7 +348,10 @@ Opción recomendada: `POST /api/products/upload` (multipart) con uno o más camp
 ### 👨‍💼 Panel Administrativo
 - `GET /admin/orders` - Listado de órdenes (paginado)
 - `GET /admin/products` - Gestión de productos
-- `GET /admin/sales` - Vista de ventas
+- `GET /admin/sales` - Vista de ventas (incluye cruce con pedidos taller, filamento y gastos)
+- `GET /admin/pedidos` - Pedidos personalizados (taller)
+- `POST /admin/pedidos/*` - Crear/editar/seña/estado (ver formularios en la UI)
+- `POST /api/telegram/webhook` - Webhook del bot (comando `/estado`)
 - `GET /admin/costs` - Calculadora de costos
 - `POST /admin/costs/calculate` - Calcular costos
 - `GET /admin/repair_images` - Reparar imágenes huérfanas (con ?dry=1)

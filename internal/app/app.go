@@ -33,6 +33,7 @@ type App struct {
 	PaymentUC           *usecase.PaymentUC
 	WhatsAppUC          *usecase.WhatsAppUC
 	CouponUC            *usecase.CouponUseCase
+	WorkshopAdmin       *httpserver.WorkshopAdmin
 	ModelRepo           domain.UploadedModelRepo
 	FeaturedProductRepo  domain.FeaturedProductRepo
 	HiddenCategoryRepo   domain.HiddenCategoryRepo
@@ -117,6 +118,12 @@ func NewApp(db *gorm.DB) (*App, error) {
 		Payments:     &usecase.PaymentUC{Orders: orderRepo, Gateway: payment},
 	}
 	app.CouponUC = usecase.NewCouponUseCase(couponRepo, orderRepo)
+	app.WorkshopAdmin = &httpserver.WorkshopAdmin{
+		Orders:   postgres.NewWorkshopRepo(db),
+		Filament: postgres.NewFilamentLedgerRepo(db),
+		Expenses: postgres.NewBusinessExpenseRepo(db),
+		Settings: postgres.NewAppSettingRepo(db),
+	}
 	app.DB = db
 	app.ModelRepo = modelRepo
 	app.FeaturedProductRepo = featuredRepo
@@ -129,6 +136,29 @@ func NewApp(db *gorm.DB) (*App, error) {
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
+		"deref": func(p *float64) float64 {
+			if p == nil {
+				return 0
+			}
+			return *p
+		},
+		// seq: igual que el builtin de plantillas en Go 1.22+; definido acá para imágenes Docker con Go más viejo.
+		"seq": func(start, end int) []int {
+			if end < start {
+				return nil
+			}
+			out := make([]int, 0, end-start+1)
+			for i := start; i <= end; i++ {
+				out = append(out, i)
+			}
+			return out
+		},
+		"filamentAt": func(list []domain.WorkshopOrderFilament, idx int) domain.WorkshopOrderFilament {
+			if idx < 0 || idx >= len(list) {
+				return domain.WorkshopOrderFilament{}
+			}
+			return list[idx]
+		},
 		// colorhex: convierte un nombre genérico (es) o cualquier string a un hex de swatch
 		"colorhex": func(s string) string {
 			v := strings.TrimSpace(strings.ToLower(s))
@@ -236,12 +266,13 @@ func NewApp(db *gorm.DB) (*App, error) {
 }
 
 func (a *App) HTTPHandler() http.Handler {
-	return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.WhatsAppUC, a.CouponUC, a.ModelRepo, a.Storage, a.Customers, a.OAuthConfig, a.FeaturedProductRepo, a.EmailService, a.HiddenCategoryRepo)
+	return httpserver.New(a.Tmpl, a.ProductUC, a.QuoteUC, a.OrderUC, a.PaymentUC, a.WhatsAppUC, a.CouponUC, a.ModelRepo, a.Storage, a.Customers, a.OAuthConfig, a.FeaturedProductRepo, a.EmailService, a.HiddenCategoryRepo, a.WorkshopAdmin)
 }
 
 func (a *App) MigrateAndSeed() error {
 	if err := a.DB.AutoMigrate(
 		&domain.Product{}, &domain.Variant{}, &domain.Image{}, &domain.Order{}, &domain.OrderItem{}, &domain.UploadedModel{}, &domain.Quote{}, &domain.Page{}, &domain.Customer{}, &domain.WhatsAppOrder{}, &domain.WhatsAppProductSync{}, &domain.FeaturedProduct{}, &domain.Coupon{}, &domain.CouponUsage{}, &domain.HiddenCategory{},
+		&domain.WorkshopOrder{}, &domain.WorkshopDeposit{}, &domain.WorkshopOrderFilament{}, &domain.FilamentLedgerEntry{}, &domain.BusinessExpense{}, &domain.AppSetting{},
 	); err != nil {
 		return err
 	}

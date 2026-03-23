@@ -113,3 +113,37 @@ type Clock interface{ Now() time.Time }
 type RealClock struct{}
 
 func (RealClock) Now() time.Time { return time.Now() }
+
+type WorkshopRepo interface {
+	List(ctx context.Context) ([]WorkshopOrder, error)
+	FindByID(ctx context.Context, id uuid.UUID) (*WorkshopOrder, error)
+	Save(ctx context.Context, o *WorkshopOrder) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	AddDeposit(ctx context.Context, d *WorkshopDeposit) error
+	ListDeposits(ctx context.Context, orderID uuid.UUID) ([]WorkshopDeposit, error)
+	SumDeposits(ctx context.Context, orderID uuid.UUID) (float64, error)
+	ListUpcomingForDigest(ctx context.Context, from, toDate time.Time) ([]WorkshopOrder, error)
+	FindUndeliveredByClientSlug(ctx context.Context, slug string) ([]WorkshopOrder, error)
+	ListDeliveredInRange(ctx context.Context, from, to time.Time) ([]WorkshopOrder, error)
+	SaveOrderWithFilaments(ctx context.Context, o *WorkshopOrder, filaments []WorkshopOrderFilament) error
+	UpdateStatus(ctx context.Context, id uuid.UUID, st WorkshopOrderStatus) error
+}
+
+type FilamentLedgerRepo interface {
+	AddPurchase(ctx context.Context, colorSlug string, grams int, unitCost float64, note string) error
+	ListInRange(ctx context.Context, from, to time.Time) ([]FilamentLedgerEntry, error)
+	PurchaseTotalsByColor(ctx context.Context) (map[string]struct{ Grams int64; Cost float64 }, error)
+	TotalPurchasesInRange(ctx context.Context, from, to time.Time) (float64, error)
+	StockByColor(ctx context.Context) (map[string]int, error)
+}
+
+type BusinessExpenseRepo interface {
+	Save(ctx context.Context, e *BusinessExpense) error
+	ListInRange(ctx context.Context, from, to time.Time) ([]BusinessExpense, error)
+	SumInRange(ctx context.Context, from, to time.Time) (float64, error)
+}
+
+type AppSettingRepo interface {
+	Get(ctx context.Context, key string) (string, error)
+	Set(ctx context.Context, key, value string) error
+}
