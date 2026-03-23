@@ -1,0 +1,54 @@
+#!/usr/bin/env sh
+set -eu
+
+CORE_PATTERNS="internal/adapters/httpserver/ internal/app/ internal/domain/ internal/adapters/repo/postgres/ internal/views/admin/"
+SENSITIVE_PATTERNS="internal/adapters/httpserver/server.go internal/app/app.go internal/adapters/payments/ internal/domain/order.go"
+MAX_CORE_DIFF_LINES="${MAX_CORE_DIFF_LINES:-300}"
+
+staged_files="$(git diff --cached --name-only --diff-filter=ACMRT || true)"
+[ -z "$staged_files" ] && exit 0
+
+is_core_touched=0
+for f in $staged_files; do
+  for p in $CORE_PATTERNS; do
+    case "$f" in
+      "$p"*) is_core_touched=1 ;;
+    esac
+  done
+done
+
+[ "$is_core_touched" -eq 0 ] && exit 0
+
+is_sensitive_touched=0
+for f in $staged_files; do
+  for p in $SENSITIVE_PATTERNS; do
+    case "$f" in
+      "$p"*) is_sensitive_touched=1 ;;
+    esac
+  done
+done
+
+if [ "$is_sensitive_touched" -eq 1 ] && [ "${CORE_CHANGE_ACK:-}" != "1" ]; then
+  echo "[core-guard] Se tocaron archivos ultra sensibles."
+  echo "[core-guard] Confirmá intención explícita con:"
+  echo "  CORE_CHANGE_ACK=1 git commit -m \"...\""
+  exit 1
+fi
+
+core_diff_lines="$(
+  git diff --cached --numstat \
+    -- internal/adapters/httpserver internal/app internal/domain internal/adapters/repo/postgres internal/views/admin \
+  | awk '{a+=$1; d+=$2} END {print a+d+0}'
+)"
+
+if [ "${core_diff_lines:-0}" -gt "$MAX_CORE_DIFF_LINES" ] && [ "${CORE_DIFF_BYPASS:-}" != "1" ]; then
+  echo "[core-guard] Diff core demasiado grande: $core_diff_lines líneas (máximo: $MAX_CORE_DIFF_LINES)."
+  echo "[core-guard] Dividí en commits más chicos o confirmá bypass:"
+  echo "  CORE_DIFF_BYPASS=1 git commit -m \"...\""
+  exit 1
+fi
+
+echo "[core-guard] Core detectado: ejecutando validaciones..."
+go build ./...
+go test ./...
+echo "[core-guard] OK"

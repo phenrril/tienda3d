@@ -1,0 +1,29 @@
+---
+description: Protección para cambios en archivos core
+globs: {internal/adapters/httpserver/**/*.go,internal/app/**/*.go,internal/domain/**/*.go,internal/adapters/repo/postgres/**/*.go,internal/views/admin/**/*.html}
+alwaysApply: false
+---
+
+# Core Change Guard
+
+## Objetivo
+Evitar cambios accidentales en archivos críticos (rutas, dominio, repositorio, app bootstrap y vistas admin).
+
+## Protocolo obligatorio antes de editar
+- Explicar en 3-6 líneas: qué se va a cambiar, por qué y qué riesgo funcional existe.
+- Mantener el cambio mínimo (sin refactors laterales).
+- No cambiar contratos públicos ni reglas de negocio sin confirmación explícita del usuario.
+
+## Restricciones fuertes
+- No usar comandos destructivos (`git reset --hard`, `git checkout --`, borrados masivos).
+- No tocar autenticación, pagos, estados o cálculos monetarios “de paso”.
+- No eliminar validaciones existentes sin justificarlo y validarlo.
+
+## Reglas de implementación
+- Si un cambio impacta estados o stock, preservar consistencia y rollback claro en caso de error.
+- Si un cambio toca reportes de ventas, mantener trazabilidad de ingresos/gastos/costos.
+- Si hay ambigüedad funcional, hacer 1-2 preguntas críticas antes de implementar.
+
+## Verificación obligatoria
+- Ejecutar build y tests relevantes después de cambios core.
+- Reportar al usuario: archivos tocados, impacto funcional y cómo se validó.

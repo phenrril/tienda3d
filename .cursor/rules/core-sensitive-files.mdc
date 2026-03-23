@@ -1,0 +1,24 @@
+---
+description: Confirmación explícita en archivos ultra sensibles
+globs: {internal/adapters/httpserver/server.go,internal/app/app.go,internal/adapters/payments/**/*.go,internal/domain/order.go}
+alwaysApply: false
+---
+
+# Sensitive Files Guard
+
+## Política
+Estos archivos son ultra sensibles (routing, bootstrap, pagos y orden de negocio).
+
+## Requisito
+- Antes de editar, confirmar explícitamente:
+  - objetivo exacto del cambio,
+  - riesgo principal,
+  - cómo se valida que no rompe checkout/pagos/admin.
+
+## Prohibiciones
+- No hacer refactor cosmético aquí.
+- No mezclar cambios funcionales distintos en una sola edición.
+- No alterar contratos de API o payloads de pago sin aprobación explícita.
+
+## Regla práctica
+Si el cambio no es estrictamente necesario para la tarea actual, no tocar estos archivos.
