@@ -1,0 +1,172 @@
+{{define "admin_pedidos_form.html"}}
+{{template "layout_start" .}}
+{{if .Edit}}
+<h1>Editar pedido</h1>
+{{else}}
+<h1>Nuevo pedido</h1>
+{{end}}
+<nav class="admin-nav"><a href="/admin/products">Productos</a> | <a href="/admin/orders">Órdenes</a> | <a href="/admin/pedidos" class="active">Pedidos</a> | <a href="/admin/sales">Ventas</a> | <a href="/admin/analytics">Analytics</a> | <a href="/admin/destacada">Destacada</a> | <a href="/admin/costs">Calculadora</a> | <a href="/admin/categorias">Categorías</a> | <a href="/admin/cupones">Cupones</a> | <a href="/admin/logout">Salir</a></nav>
+<p><a href="/admin/pedidos">← Volver al listado</a></p>
+{{if .Error}}
+<div id="pedidos_error_popup" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px">
+  <div style="width:100%;max-width:460px;background:#0f1924;border:1px solid #223140;border-radius:14px;padding:18px;box-shadow:0 20px 50px rgba(0,0,0,.45)">
+    <h3 style="margin:0 0 10px;font-size:18px;color:#fca5a5">No se pudo guardar el pedido</h3>
+    <p style="margin:0 0 16px;color:#e2e8f0;line-height:1.4">{{.Error}}</p>
+    <div style="display:flex;justify-content:flex-end">
+      <button type="button" id="close_pedidos_error_popup" class="btn-primary">Entendido</button>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{if .Stock}}
+<div class="admin-card" style="padding:12px 14px;margin:12px 0;font-size:13px">
+  <strong>Stock filamento (g)</strong>
+  <span style="color:var(--muted);margin-left:8px">{{range $k,$v := .Stock}}{{$k}}: {{$v}}g &nbsp; {{end}}</span>
+</div>
+{{end}}
+
+{{if .Edit}}
+<form method="POST" action="/admin/pedidos/guardar" class="admin-card" style="padding:18px;max-width:720px">
+  <input type="hidden" name="id" value="{{.Order.ID}}" />
+{{else}}
+<form method="POST" action="/admin/pedidos/crear" class="admin-card" style="padding:18px;max-width:720px">
+{{end}}
+  <label style="display:block;margin-bottom:12px">
+    <span style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Cliente (snake_case)</span>
+    <input name="client_slug" required value="{{if .Order}}{{.Order.ClientSlug}}{{end}}" style="width:100%;padding:10px;border-radius:10px;background:#0f1924;border:1px solid #223140;color:#fff" placeholder="fede_bertoqui" />
+  </label>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <label>
+      <span style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Fecha solicitud</span>
+      <input type="date" name="requested_at" required value="{{if .Order}}{{.Order.RequestedAt.Format "2006-01-02"}}{{end}}" style="width:100%;padding:10px;border-radius:10px;background:#0f1924;border:1px solid #223140;color:#fff" />
+    </label>
+    <label>
+      <span style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Fecha entrega</span>
+      <input type="date" name="delivery_date" required value="{{if .Order}}{{.Order.DeliveryDate.Format "2006-01-02"}}{{end}}" style="width:100%;padding:10px;border-radius:10px;background:#0f1924;border:1px solid #223140;color:#fff" />
+    </label>
+  </div>
+  <label style="display:block;margin:12px 0">
+    <span style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Detalle</span>
+    <textarea name="detail" rows="4" style="width:100%;padding:10px;border-radius:10px;background:#0f1924;border:1px solid #223140;color:#fff">{{if .Order}}{{.Order.Detail}}{{end}}</textarea>
+  </label>
+  <label style="display:flex;align-items:center;gap:8px;margin:8px 0">
+    <input type="checkbox" name="is_barter" value="1" {{if .Order}}{{if .Order.IsBarter}}checked{{end}}{{end}} id="barter" />
+    <span>CANJE (sin monto)</span>
+  </label>
+  <label style="display:block;margin:12px 0">
+    <span style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Total ($)</span>
+    <input name="total" id="total_field" value="{{if .Order}}{{if not .Order.IsBarter}}{{if .Order.TotalAmount}}{{formatPrice (deref .Order.TotalAmount)}}{{end}}{{end}}{{end}}" style="width:100%;max-width:240px;padding:10px;border-radius:10px;background:#0f1924;border:1px solid #223140;color:#fff" placeholder="40500" />
+  </label>
+  <label style="display:block;margin:12px 0">
+    <span style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Estado</span>
+    <select name="status" style="width:100%;max-width:320px;padding:10px;border-radius:10px;background:#0f1924;border:1px solid #223140;color:#fff">
+      {{range .Statuses}}
+      <option value="{{.}}" {{if and $.Order (eq . $.Order.Status)}}selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+  </label>
+  <h3 style="margin:20px 0 8px;font-size:15px">Filamento usado (g)</h3>
+  <p style="font-size:12px;color:var(--muted);margin:0 0 8px">Color en snake_case (ej. blanco, azul_petroleo). Se descuenta del inventario al guardar.</p>
+  <div id="filament_rows">
+    {{if .Filaments}}
+    {{range $f := .Filaments}}
+    <div class="fil-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+      <input name="fil_color" placeholder="color" style="flex:1;padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff"
+        value="{{$f.ColorSlug}}" />
+      <input name="fil_grams" type="number" min="1" placeholder="g" style="width:100px;padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff"
+        value="{{if $f.Grams}}{{$f.Grams}}{{end}}" />
+      <button type="button" class="btn-secondary fil-remove" style="padding:7px 10px">Quitar</button>
+    </div>
+    {{end}}
+    {{else}}
+    <div class="fil-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+      <input name="fil_color" placeholder="color" style="flex:1;padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" />
+      <input name="fil_grams" type="number" min="1" placeholder="g" style="width:100px;padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" />
+      <button type="button" class="btn-secondary fil-remove" style="padding:7px 10px">Quitar</button>
+    </div>
+    {{end}}
+  </div>
+  <button type="button" id="add_filament_row" class="btn-secondary" style="margin-top:2px">+ Agregar fila de filamento</button>
+  <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+    {{if .Edit}}
+    <button class="btn-primary" type="submit">Guardar cambios</button>
+    {{else}}
+    <button class="btn-primary" type="submit">Crear pedido</button>
+    {{end}}
+  </div>
+</form>
+
+{{if .Edit}}
+<form method="POST" action="/admin/pedidos/eliminar" style="margin-top:10px" onsubmit="return confirm('¿Eliminar pedido y revertir consumo de filamento en el ledger?');">
+  <input type="hidden" name="id" value="{{.Order.ID}}" />
+  <button class="btn-secondary" type="submit">Eliminar pedido</button>
+</form>
+<div class="admin-card" style="padding:18px;max-width:720px;margin-top:16px">
+  <h3 style="margin:0 0 12px;font-size:15px">Agregar seña</h3>
+  <p style="font-size:12px;color:var(--muted)">La suma de señas no puede superar el total.</p>
+  <form method="POST" action="/admin/pedidos/sena" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:10px">
+    <input type="hidden" name="order_id" value="{{.Order.ID}}" />
+    <label>Monto $<input name="amount" required style="width:120px;padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" /></label>
+    <label>Fecha <input type="date" name="paid_at" required style="padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" /></label>
+    <button class="btn-primary" type="submit">Agregar seña</button>
+  </form>
+  <h4 style="margin:16px 0 8px;font-size:13px">Señas registradas</h4>
+  <ul style="margin:0;padding-left:18px;font-size:13px">
+    {{range .Order.Deposits}}<li>${{formatPrice .Amount}} — {{.PaidAt.Format "2006-01-02"}}</li>{{else}}<li style="color:var(--muted)">Ninguna</li>{{end}}
+  </ul>
+</div>
+{{end}}
+
+<script>
+(function(){
+  var b=document.getElementById('barter');
+  var t=document.getElementById('total_field');
+  if(!b||!t) return;
+  function sync(){ t.disabled=b.checked; if(b.checked)t.value=''; }
+  b.addEventListener('change',sync);
+  sync();
+})();
+
+(function(){
+  var rowsWrap=document.getElementById('filament_rows');
+  var addBtn=document.getElementById('add_filament_row');
+  if(!rowsWrap||!addBtn) return;
+
+  function createRow(){
+    var row=document.createElement('div');
+    row.className='fil-row';
+    row.style.cssText='display:flex;gap:8px;margin-bottom:8px;align-items:center';
+    row.innerHTML=''
+      + '<input name="fil_color" placeholder="color" style="flex:1;padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" />'
+      + '<input name="fil_grams" type="number" min="1" placeholder="g" style="width:100px;padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" />'
+      + '<button type="button" class="btn-secondary fil-remove" style="padding:7px 10px">Quitar</button>';
+    return row;
+  }
+
+  addBtn.addEventListener('click', function(){
+    rowsWrap.appendChild(createRow());
+  });
+
+  rowsWrap.addEventListener('click', function(e){
+    var btn=e.target.closest('.fil-remove');
+    if(!btn) return;
+    var row=btn.closest('.fil-row');
+    if(!row) return;
+    row.remove();
+  });
+})();
+
+(function(){
+  var popup=document.getElementById('pedidos_error_popup');
+  if(!popup) return;
+  var closeBtn=document.getElementById('close_pedidos_error_popup');
+  function close(){ popup.style.display='none'; }
+  if(closeBtn) closeBtn.addEventListener('click', close);
+  popup.addEventListener('click', function(e){
+    if(e.target===popup){ close(); }
+  });
+})();
+</script>
+{{template "layout_end" .}}
+{{end}}

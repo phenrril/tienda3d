@@ -1,0 +1,97 @@
+{{define "admin_pedidos.html"}}
+{{template "layout_start" .}}
+<h1>Pedidos taller</h1>
+<nav class="admin-nav"><a href="/admin/products">Productos</a> | <a href="/admin/orders">Órdenes</a> | <a href="/admin/pedidos" class="active">Pedidos</a> | <a href="/admin/sales">Ventas</a> | <a href="/admin/analytics">Analytics</a> | <a href="/admin/destacada">Destacada</a> | <a href="/admin/costs">Calculadora</a> | <a href="/admin/categorias">Categorías</a> | <a href="/admin/cupones">Cupones</a> | <a href="/admin/logout">Salir</a></nav>
+<p style="color:var(--muted);font-size:14px;margin-top:8px">Cliente en <code>snake_case</code>. Estados: flujo único (pendiente → diseñado → en impresión → listo entrega → entregado).</p>
+{{if .FlashError}}
+<div id="pedidos_flash_error" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px">
+  <div style="width:100%;max-width:520px;background:#0f1924;border:1px solid #223140;border-radius:14px;padding:18px;box-shadow:0 20px 50px rgba(0,0,0,.45)">
+    <h3 style="margin:0 0 10px;font-size:18px;color:#fca5a5">No se pudo actualizar el estado</h3>
+    <p style="margin:0 0 16px;color:#e2e8f0;line-height:1.45">{{.FlashError}}</p>
+    <div style="display:flex;justify-content:flex-end">
+      <button type="button" id="close_pedidos_flash_error" class="btn-primary">Entendido</button>
+    </div>
+  </div>
+</div>
+{{end}}
+<div style="margin:14px 0">
+  <a class="btn-primary" href="/admin/pedidos/nuevo">Nuevo pedido</a>
+</div>
+{{if .Stock}}
+<div class="admin-card" style="padding:12px 14px;margin-bottom:14px;font-size:13px">
+  <strong>Stock filamento (g)</strong>
+  <span style="color:var(--muted);margin-left:8px">{{range $k,$v := .Stock}}{{$k}}: {{$v}}g &nbsp; {{end}}</span>
+</div>
+{{end}}
+<div style="overflow-x:auto">
+<table class="table" style="width:100%;font-size:0.82rem;min-width:980px">
+  <thead>
+    <tr>
+      <th>Cliente</th>
+      <th>F. solic.</th>
+      <th>Detalle</th>
+      <th>F. entrega</th>
+      <th>Total</th>
+      <th>Señas</th>
+      <th>Estado</th>
+      <th>Filamento</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Orders}}
+    <tr>
+      <td><code>{{.ClientSlug}}</code></td>
+      <td>{{.RequestedAt.Format "2006-01-02"}}</td>
+      <td style="max-width:220px;white-space:pre-wrap;word-break:break-word">{{.Detail}}</td>
+      <td>{{.DeliveryDate.Format "2006-01-02"}}</td>
+      <td>{{if .IsBarter}}<strong>CANJE</strong>{{else if .TotalAmount}}${{formatPrice (deref .TotalAmount)}}{{else}}-{{end}}</td>
+      <td style="font-size:11px">
+        {{range .Deposits}}<div>${{formatPrice .Amount}} · {{.PaidAt.Format "2006-01-02"}}</div>{{else}}-{{end}}
+      </td>
+      <td>
+        <form method="POST" action="/admin/pedidos/estado" class="status-form" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          {{$cur := .Status}}
+          <input type="hidden" name="id" value="{{.ID}}" />
+          <select name="status" class="status-select" data-prev="{{$cur}}" style="background:#0f1924;border:1px solid #223140;color:#fff;padding:4px 8px;border-radius:8px;font-size:11px">
+            {{range $.Statuses}}<option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>{{end}}
+          </select>
+          <noscript><button type="submit" class="btn-secondary small" style="padding:4px 8px;font-size:11px">Guardar estado</button></noscript>
+        </form>
+      </td>
+      <td style="font-size:11px">
+        {{range .Filaments}}<div>{{.ColorSlug}} {{.Grams}}g</div>{{else}}-{{end}}
+      </td>
+      <td><a href="/admin/pedidos/editar?id={{.ID}}">Editar</a></td>
+    </tr>
+    {{else}}
+    <tr><td colspan="9" style="text-align:center;color:var(--muted)">Sin pedidos</td></tr>
+    {{end}}
+  </tbody>
+</table>
+</div>
+<script>
+(function(){
+  var selects=document.querySelectorAll('.status-form .status-select');
+  selects.forEach(function(sel){
+    sel.addEventListener('change', function(){
+      var form=sel.closest('form');
+      if(!form) return;
+      form.submit();
+    });
+  });
+})();
+
+(function(){
+  var popup=document.getElementById('pedidos_flash_error');
+  if(!popup) return;
+  var closeBtn=document.getElementById('close_pedidos_flash_error');
+  function close(){ popup.style.display='none'; }
+  if(closeBtn) closeBtn.addEventListener('click', close);
+  popup.addEventListener('click', function(e){
+    if(e.target===popup){ close(); }
+  });
+})();
+</script>
+{{template "layout_end" .}}
+{{end}}

@@ -80,6 +80,10 @@ func main() {
 	backupCtx, backupCancel := context.WithCancel(context.Background())
 	defer backupCancel()
 
+	digestCtx, digestCancel := context.WithCancel(context.Background())
+	defer digestCancel()
+	application.RunWorkshopDigestLoop(digestCtx)
+
 	// Iniciar scheduler de backup
 	go func() {
 		// Pequeño delay para asegurar que los logs se muestren
@@ -127,7 +131,8 @@ func main() {
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 
-	// Detener scheduler de backup
+	// Detener schedulers
+	digestCancel()
 	backupCancel()
 	backupScheduler.Stop()
 
