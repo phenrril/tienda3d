@@ -2,7 +2,7 @@ APP=tienda3d
 PKG=github.com/phenrril/tienda3d
 PORT?=8080
 
-.PHONY: dev build test run docker-build docker-run db-up tidy
+.PHONY: dev build test run docker-build docker-run db-up tidy install-hooks core-guard
 
 dev:
 	go run ./cmd/tienda3d
@@ -30,4 +30,16 @@ tidy:
 
 print-env:
 	@echo "Using PORT=$(PORT)"
+
+install-hooks:
+	@mkdir -p .git/hooks
+	@cp .githooks/pre-commit .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "Git hooks instalados."
+
+core-guard:
+	@echo "Ejecutando core guard manual..."
+	@go build ./...
+	@go test ./...
+	@echo "Core guard OK."
 

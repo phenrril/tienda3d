@@ -393,6 +393,23 @@ Docker:
 docker compose up -d --build
 ```
 
+## Protección de cambios core
+- Rules de Cursor versionadas en el repo:
+  - `.cursor/rules/core-change-guard.mdc`
+  - `.cursor/rules/core-critical-flow.mdc`
+  - `.cursor/rules/core-sensitive-files.mdc`
+- Hook de git para cambios core:
+  - `.githooks/pre-commit`
+  - Ejecuta `go build ./...` y `go test ./...` cuando detecta archivos core staged.
+  - Bloquea commits grandes en core (default: 300 líneas; configurable con `MAX_CORE_DIFF_LINES`).
+  - Si toca archivos ultra sensibles, requiere confirmación explícita:
+    - `CORE_CHANGE_ACK=1 git commit -m "..."`
+
+Instalación local del hook:
+```bash
+make install-hooks
+```
+
 ## Pruebas manuales rápidas
 1. Login admin (`POST /admin/login`).
 2. Subir un producto (ver `carga.md`).
