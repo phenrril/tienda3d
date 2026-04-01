@@ -27,6 +27,18 @@ func (uc *ProductUC) GetBySlug(ctx context.Context, slug string) (*domain.Produc
 	return uc.Products.FindBySlug(ctx, slug)
 }
 
+func (uc *ProductUC) ListByIDs(ctx context.Context, ids []uuid.UUID) ([]domain.Product, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	if repo, ok := uc.Products.(interface {
+		ListByIDs(context.Context, []uuid.UUID) ([]domain.Product, error)
+	}); ok {
+		return repo.ListByIDs(ctx, ids)
+	}
+	return nil, errors.New("repo no soporta list by ids")
+}
+
 func (uc *ProductUC) Create(ctx context.Context, p *domain.Product) error {
 	if p.ID == uuid.Nil {
 		p.ID = uuid.New()
