@@ -46,6 +46,17 @@ func (r *ProductRepo) FindBySlug(ctx context.Context, slug string) (*domain.Prod
 	return &p, nil
 }
 
+func (r *ProductRepo) ListByIDs(ctx context.Context, ids []uuid.UUID) ([]domain.Product, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var list []domain.Product
+	if err := r.db.WithContext(ctx).Where("id IN ?", ids).Find(&list).Error; err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
 func (r *ProductRepo) FindImageByID(ctx context.Context, id uuid.UUID) (*domain.Image, error) {
 	var img domain.Image
 	if err := r.db.WithContext(ctx).First(&img, "id = ?", id).Error; err != nil {

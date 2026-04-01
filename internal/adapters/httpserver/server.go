@@ -45,12 +45,12 @@ type Server struct {
 	whatsapp         *usecase.WhatsAppUC
 	coupons          *usecase.CouponUseCase
 	models           domain.UploadedModelRepo
-	featuredProducts   domain.FeaturedProductRepo
-	hiddenCategories   domain.HiddenCategoryRepo
-	storage            domain.FileStorage
-	customers          domain.CustomerRepo
-	oauthCfg           *oauth2.Config
-	emailService       domain.EmailService
+	featuredProducts domain.FeaturedProductRepo
+	hiddenCategories domain.HiddenCategoryRepo
+	storage          domain.FileStorage
+	customers        domain.CustomerRepo
+	oauthCfg         *oauth2.Config
+	emailService     domain.EmailService
 
 	adminAllowed map[string]struct{}
 	adminSecret  []byte
@@ -59,6 +59,26 @@ type Server struct {
 	ga4          *analytics.Client
 
 	workshop *WorkshopAdmin
+}
+
+type adminOrderItemView struct {
+	Title      string
+	Color      string
+	Qty        int
+	ProductURL string
+	HasProduct bool
+}
+
+type adminOrderView struct {
+	ID             uuid.UUID
+	Email          string
+	Status         domain.OrderStatus
+	Total          float64
+	CouponCode     string
+	DiscountAmount float64
+	MPStatus       string
+	CreatedAt      time.Time
+	Items          []adminOrderItemView
 }
 
 var emailRe = regexp.MustCompile(`^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$`)
@@ -1098,7 +1118,7 @@ func (s *Server) webhookMP(w http.ResponseWriter, r *http.Request) {
 	if approved && !o.Notified {
 		o.Notified = true
 		notify = true
-		
+
 		// Registrar uso del cupón cuando el pago es aprobado
 		if o.CouponID != nil && o.CouponCode != "" {
 			if err := s.coupons.ApplyCoupon(r.Context(), *o.CouponID, o.ID, o.Email, o.DiscountAmount, o.Total+o.DiscountAmount); err != nil {
@@ -2111,8 +2131,62 @@ func (s *Server) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "err", 500)
 		return
 	}
+	productIDs := make([]uuid.UUID, 0)
+	seenProducts := make(map[uuid.UUID]struct{})
+	for _, order := range list {
+		for _, item := range order.Items {
+			if item.ProductID == nil || *item.ProductID == uuid.Nil {
+				continue
+			}
+			if _, ok := seenProducts[*item.ProductID]; ok {
+				continue
+			}
+			seenProducts[*item.ProductID] = struct{}{}
+			productIDs = append(productIDs, *item.ProductID)
+		}
+	}
+	productURLByID := make(map[uuid.UUID]string, len(productIDs))
+	if len(productIDs) > 0 {
+		products, err := s.products.ListByIDs(r.Context(), productIDs)
+		if err != nil {
+			http.Error(w, "err", 500)
+			return
+		}
+		for _, product := range products {
+			productURLByID[product.ID] = "/product/" + product.Slug
+		}
+	}
+	orderViews := make([]adminOrderView, 0, len(list))
+	for _, order := range list {
+		itemViews := make([]adminOrderItemView, 0, len(order.Items))
+		for _, item := range order.Items {
+			itemView := adminOrderItemView{
+				Title: item.Title,
+				Color: item.Color,
+				Qty:   item.Qty,
+			}
+			if item.ProductID != nil {
+				if productURL := productURLByID[*item.ProductID]; productURL != "" {
+					itemView.ProductURL = productURL
+					itemView.HasProduct = true
+				}
+			}
+			itemViews = append(itemViews, itemView)
+		}
+		orderViews = append(orderViews, adminOrderView{
+			ID:             order.ID,
+			Email:          order.Email,
+			Status:         order.Status,
+			Total:          order.Total,
+			CouponCode:     order.CouponCode,
+			DiscountAmount: order.DiscountAmount,
+			MPStatus:       order.MPStatus,
+			CreatedAt:      order.CreatedAt,
+			Items:          itemViews,
+		})
+	}
 	pages := (int(total) + 19) / 20
-	data := map[string]any{"Orders": list, "Page": page, "Pages": pages, "AdminToken": s.readAdminToken(r), "FilterApproved": filterApproved}
+	data := map[string]any{"Orders": orderViews, "Page": page, "Pages": pages, "AdminToken": s.readAdminToken(r), "FilterApproved": filterApproved}
 	s.render(w, "admin_orders.html", data)
 }
 
@@ -2163,7 +2237,7 @@ func (s *Server) handleAdminConfirmPayment(w http.ResponseWriter, r *http.Reques
 	// Actualizar el estado de la orden
 	oldStatus := order.Status
 	order.Status = domain.OrderStatusFinished
-	
+
 	// Actualizar MPStatus para reflejar la confirmación manual
 	if order.MPStatus == "efectivo_pending" {
 		order.MPStatus = "efectivo_confirmed"

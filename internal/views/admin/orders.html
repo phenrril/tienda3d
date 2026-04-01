@@ -14,7 +14,9 @@
   <tbody>
     {{range .Orders}}
     <tr>
-      <td style="font-family:monospace;font-size:11px">{{.ID}}</td>
+      <td style="font-family:monospace;font-size:11px">
+        <a href="#" onclick="return abrirDetalleOrden('{{.ID}}')" style="color:#60a5fa;text-decoration:none">{{.ID}}</a>
+      </td>
       <td>{{.Email}}</td>
       <td>{{.Status}}</td>
       <td>${{formatPrice .Total}}</td>
@@ -59,7 +61,64 @@
 </table>
 <div class="pager">Página {{.Page}} / {{.Pages}}</div>
 
+{{range .Orders}}
+<dialog id="order-items-{{.ID}}" style="max-width:640px;width:min(92vw,640px);border:none;border-radius:16px;padding:0;background:#111827;color:#f9fafb;box-shadow:0 24px 80px rgba(0,0,0,.45)">
+  <div style="padding:20px 22px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+    <div>
+      <div style="font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em">Venta</div>
+      <div style="font-family:monospace;font-size:13px;word-break:break-all">{{.ID}}</div>
+    </div>
+    <button type="button" onclick="cerrarDetalleOrden('{{.ID}}')" style="background:none;border:none;color:#9ca3af;font-size:24px;cursor:pointer;line-height:1">&times;</button>
+  </div>
+  <div style="padding:20px 22px">
+    {{if .Items}}
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="text-align:left;color:#9ca3af;font-size:12px">
+          <th style="padding:0 0 10px">Artículo</th>
+          <th style="padding:0 0 10px;width:90px">Cantidad</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Items}}
+        <tr>
+          <td style="padding:10px 0;border-top:1px solid rgba(255,255,255,.08)">
+            {{if .HasProduct}}
+              <a href="{{.ProductURL}}" target="_blank" rel="noopener noreferrer" style="color:#93c5fd;text-decoration:none">{{.Title}}</a>
+            {{else}}
+              <span>{{.Title}}</span>
+            {{end}}
+            {{if .Color}}
+              <div style="font-size:12px;color:#9ca3af;margin-top:4px">{{.Color}}</div>
+            {{end}}
+          </td>
+          <td style="padding:10px 0;border-top:1px solid rgba(255,255,255,.08);font-weight:600">{{.Qty}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+      <p style="margin:0;color:#9ca3af">Esta venta no tiene artículos cargados.</p>
+    {{end}}
+  </div>
+</dialog>
+{{end}}
+
 <script>
+function abrirDetalleOrden(orderID) {
+  const dialog = document.getElementById(`order-items-${orderID}`);
+  if (!dialog) return false;
+  dialog.showModal();
+  return false;
+}
+
+function cerrarDetalleOrden(orderID) {
+  const dialog = document.getElementById(`order-items-${orderID}`);
+  if (dialog) {
+    dialog.close();
+  }
+}
+
 function confirmarPago(orderID) {
   if(!confirm('¿Confirmar que se recibió el pago?\n\nEsto marcará la orden como finalizada y registrará el uso del cupón (si aplica).')) {
     return;
@@ -83,6 +142,16 @@ function confirmarPago(orderID) {
     alert('Error: ' + err);
   });
 }
+
+document.querySelectorAll('dialog').forEach(dialog => {
+  dialog.addEventListener('click', (event) => {
+    const rect = dialog.getBoundingClientRect();
+    const clickedInside = rect.top <= event.clientY && event.clientY <= rect.bottom && rect.left <= event.clientX && event.clientX <= rect.right;
+    if (!clickedInside) {
+      dialog.close();
+    }
+  });
+});
 </script>
 
 {{template "layout_end" .}}
