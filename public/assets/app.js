@@ -1795,13 +1795,14 @@ if ('serviceWorker' in navigator) {
     clearFieldError(field);
     
     field.classList.add('field-invalid');
+    const errorContainer = field.closest('.checkout-field') || field.parentNode;
     
     const errorDiv = document.createElement('div');
     errorDiv.className = 'field-error';
     errorDiv.textContent = message;
     errorDiv.setAttribute('data-error-for', field.name);
     
-    field.parentNode.insertBefore(errorDiv, field.nextSibling);
+    errorContainer.appendChild(errorDiv);
     
     // Limpiar error al escribir
     field.addEventListener('input', () => clearFieldError(field), { once: true });
@@ -1813,7 +1814,8 @@ if ('serviceWorker' in navigator) {
     field.classList.remove('field-invalid');
     field.classList.remove('field-valid');
     
-    const errorDiv = field.parentNode.querySelector(`[data-error-for="${field.name}"]`);
+    const errorContainer = field.closest('.checkout-field') || field.parentNode;
+    const errorDiv = errorContainer.querySelector(`[data-error-for="${field.name}"]`);
     if(errorDiv) errorDiv.remove();
   }
   
