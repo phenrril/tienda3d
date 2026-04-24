@@ -7,13 +7,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Preload de fuentes críticas -->
-<link rel="preload" as="font" type="font/woff2" crossorigin href="https://fonts.gstatic.com/s/poppins/v21/pxiEyp8kv8JHgFVrJJfecnFHGPc.woff2">
-<link rel="preload" as="font" type="font/woff2" crossorigin href="https://fonts.gstatic.com/s/poppins/v21/pxiByp8kv8JHgFVrLGT9Z1JlFd2JQEl8qw.woff2">
-<link rel="preload" as="font" type="font/woff2" crossorigin href="https://fonts.gstatic.com/s/poppins/v21/pxiByp8kv8JHgFVrLBuFFlOCKE.woff2">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
-<link rel="icon" type="image/svg+xml" href="/public/assets/img/favicon.svg" />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="/uploads/misc/chroma3d-favicon.svg" />
 <link rel="icon" type="image/png" href="/public/assets/img/chroma-logo.png" />
 <link rel="apple-touch-icon" href="/public/assets/img/chroma-logo.png" />
 <link rel="stylesheet" href="/public/assets/styles.css?v={{.AssetVersion}}" />
@@ -50,26 +46,28 @@
 <header class="topbar">
   <div class="container row between center">
     <a href="/" class="brand">
-      <img src="/public/assets/img/chroma-logo.png" alt="Chroma3D" class="brand-logo" width="64" height="64" loading="lazy" />
+      <img src="/uploads/misc/chroma3d-isotipo.svg" alt="" class="brand-logo" width="34" height="40" aria-hidden="true" />
       <span class="brand-text">
-        <span class="brand-title">Chroma3D</span>
-        <span class="brand-sub">Impresión 3D • Mayorista y minorista</span>
+        <span class="brand-title">chroma<em>3d</em></span>
+        <span class="brand-sub">Impresión 3D · Mayorista y minorista</span>
       </span>
     </a>
     
-    <form method="get" action="/products" class="header-search" style="flex:1;max-width:300px;margin:0 16px">
+    <form method="get" action="/products" class="header-search">
       <div class="search-wrapper">
-        <input type="text" id="searchInput" name="q" placeholder="Buscar productos..." aria-label="Buscar productos" autocomplete="off" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:#12202c;color:var(--text);font-size:14px" />
+        <input type="text" id="searchInput" name="q" placeholder="Buscar productos..." aria-label="Buscar productos" autocomplete="off" />
         <div id="searchResults" class="search-results" style="display:none"></div>
       </div>
     </form>
     
-    <button class="nav-toggle" aria-label="Abrir menú" aria-expanded="false">☰</button>
     <nav class="mainnav">
-      <a href="/products">🛍️ Productos</a>
-      <a href="/cart">🛒 Carrito</a>
-      <a href="https://wa.me/5493416620117?text=Buen%20día%2C%20quiero%20hacerte%20una%20consulta%20sobre%20los%20precios%20mayoristas" target="_blank" rel="noopener" class="btn-mayorista">
-        <span style="margin-right:4px">🏢</span> Mayorista
+      <a href="/products" class="nav-mobile-hide">Catálogo</a>
+      <a href="/cart" class="nav-mobile-show">Carrito</a>
+      <a href="https://wa.me/5493416620117?text=Buen%20día%2C%20quiero%20hacerte%20una%20consulta%20sobre%20los%20precios%20mayoristas" target="_blank" rel="noopener" class="btn-mayorista nav-mobile-show">
+        Mayorista
+      </a>
+      <a href="https://wa.me/5493416219815" target="_blank" rel="noopener" class="btn-primary nav-whatsapp nav-mobile-hide">
+        WhatsApp
       </a>
     </nav>
   </div>
@@ -97,22 +95,11 @@
     <div>
       <div class="f-title">Contacto</div>
       <p><a class="link" href="mailto:chroma3dimpresiones@gmail.com">chroma3dimpresiones@gmail.com</a></p>
-      
+      <p><a class="link" href="https://www.instagram.com/chroma3d.ok/" target="_blank" rel="noopener">@chroma3d.ok</a></p>
     </div>
   </div>
   <div class="copyright">© 2025 Chroma3D — <a class="link" href="https://www.roxiumlabs.com/" target="_blank" rel="noopener">Dev by RoxiumLabs</a></div>
 </footer>
-
-<div class="fab-social">
-  <a href="https://www.instagram.com/chroma3d.ok/" class="fab-instagram" aria-label="Instagram" target="_blank" rel="noopener">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" fill="currentColor"/></svg>
-  </a>
-  <a href="https://wa.me/5493416219815" class="fab-whatsapp" aria-label="WhatsApp" target="_blank" rel="noopener">
-    <img src="/public/assets/img/WhatsApp.svg" alt="WhatsApp" width="28" height="28" aria-hidden="true" />
-  </a>
-</div>
-
-
 
 </body>
 </html>

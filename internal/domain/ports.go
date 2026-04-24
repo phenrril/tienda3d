@@ -40,6 +40,7 @@ type OrderRepo interface {
 	UpdateStatus(ctx context.Context, id uuid.UUID, st OrderStatus) error
 	List(ctx context.Context, status *OrderStatus, mpStatus *string, page, pageSize int) ([]Order, int64, error)
 	ListInRange(ctx context.Context, from, to time.Time) ([]Order, error)
+	DeleteRange(ctx context.Context, from, to time.Time) (int64, error)
 	FindPendingByEmailAndCoupon(ctx context.Context, email, couponCode string) ([]Order, error)
 }
 
@@ -132,7 +133,10 @@ type WorkshopRepo interface {
 type FilamentLedgerRepo interface {
 	AddPurchase(ctx context.Context, colorSlug string, grams int, unitCost float64, note string) error
 	ListInRange(ctx context.Context, from, to time.Time) ([]FilamentLedgerEntry, error)
-	PurchaseTotalsByColor(ctx context.Context) (map[string]struct{ Grams int64; Cost float64 }, error)
+	PurchaseTotalsByColor(ctx context.Context) (map[string]struct {
+		Grams int64
+		Cost  float64
+	}, error)
 	TotalPurchasesInRange(ctx context.Context, from, to time.Time) (float64, error)
 	StockByColor(ctx context.Context) (map[string]int, error)
 }

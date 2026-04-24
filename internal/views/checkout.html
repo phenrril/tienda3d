@@ -1,18 +1,25 @@
 {{define "checkout.html"}}
-{{template "layout" .}}
-{{end}}
-{{define "content"}}
-<h1 class="text-2xl font-bold mb-4">Checkout</h1>
-<p class="mb-4 text-sm text-gray-600">Resumen (demo). El flujo real creará la preferencia de pago.</p>
-<form id="checkoutForm" class="space-y-4 max-w-md">
-  <input name="email" type="email" placeholder="Email" required class="border p-2 w-full" />
-  <input name="quote_id" placeholder="QuoteID" class="border p-2 w-full" />
-  <button class="px-4 py-2 bg-green-600 text-white rounded" type="submit">Pagar con MP (demo)</button>
-</form>
-<pre id="resp" class="mt-4 text-xs"></pre>
+{{template "layout_start" .}}
+<section class="checkout-demo-wrap">
+  <div class="checkout-demo-hero">
+    <div class="checkout-demo-label">Checkout · demo</div>
+    <h1 class="checkout-demo-title">Generá una <i>preferencia</i> de pago.</h1>
+    <p class="checkout-demo-copy">Esta pantalla mantiene el flujo demo actual: envía email y `quote_id` al endpoint de checkout para obtener la respuesta sin salir de la página.</p>
+  </div>
+
+  <div class="checkout-demo-card">
+    <form id="checkoutForm" class="checkout-demo-form">
+      <input name="email" type="email" placeholder="Email" required />
+      <input name="quote_id" placeholder="Quote ID" />
+      <button class="btn-primary" type="submit">Pagar con MP (demo)</button>
+    </form>
+    <pre id="resp" class="checkout-demo-response"></pre>
+  </div>
+</section>
+
 <script>
 const f=document.getElementById('checkoutForm');
 f.addEventListener('submit',async e=>{e.preventDefault();const fd=new FormData(f);let r=await fetch('/api/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:fd.get('email'),quote_id:fd.get('quote_id')})});document.getElementById('resp').textContent=await r.text();});
 </script>
+{{template "layout_end" .}}
 {{end}}
-

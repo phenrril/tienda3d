@@ -1,13 +1,19 @@
 {{define "products.html"}}
 {{template "layout_start" .}}
-<h1 class="section-title">Productos</h1>
+<div class="section-header">
+  <div class="section-header-content">
+    <div class="hero-badge">Catálogo · listos para enviar</div>
+    <h1 class="section-title">Piezas <i>que ya existen.</i></h1>
+    <p class="section-subtitle">Explorá el catálogo completo. Filtrá por categoría, buscá por nombre y seguí cargando productos sin salir de la vista.</p>
+  </div>
+</div>
 <p class="result-count">{{len .Products}} resultados de {{.Total}}{{if .Query}} para "{{.Query}}"{{end}}</p>
 <h2 class="sr-only">Filtros</h2>
 
 <!-- Barra de búsqueda mobile - visible arriba de los botones -->
 <form method="get" action="/products" class="products-search-mobile">
   <div class="search-wrapper">
-    <input type="text" id="mobileSearchInput" name="q" placeholder="Buscar productos..." aria-label="Buscar productos" autocomplete="off" value="{{.Query}}" style="width:100%;padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:#12202c;color:var(--text);font-size:14px" />
+    <input type="text" id="mobileSearchInput" name="q" placeholder="Buscar productos..." aria-label="Buscar productos" autocomplete="off" value="{{.Query}}" />
     <input type="hidden" name="category" value="{{.Category}}" />
     <input type="hidden" name="sort" value="{{.Sort}}" />
     <div id="mobileSearchResults" class="search-results" style="display:none"></div>
@@ -15,14 +21,16 @@
 </form>
 
 <div class="mobile-actions">
-  <button class="btn-filter" aria-expanded="false" aria-controls="filterSheet">Filtrar</button>
+  <button class="btn-filter" aria-expanded="false" aria-controls="filterSheet">Categorías</button>
   <button class="btn-sort" aria-expanded="false" aria-controls="sortSheet">Ordenar</button>
 </div>
+
+<div id="sheetBackdrop" class="sheet-backdrop" hidden aria-hidden="true"></div>
 
 <div id="filterSheet" class="sheet" hidden aria-hidden="true">
   <form id="filtersForm" method="get" action="/products">
     <header class="sheet-head">
-      <h2>Filtrar</h2>
+      <h2>Categorías</h2>
       <button type="button" class="sheet-close" aria-label="Cerrar">×</button>
     </header>
     
@@ -63,7 +71,7 @@
   </ul>
 </div>
 
-<div class="cards cards--products">
+<div class="cards cards--products catalog">
   {{range $idx, $p := .Products}}
   <div class="card">
     <div class="card-media ar-1-1">

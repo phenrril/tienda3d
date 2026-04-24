@@ -1,12 +1,22 @@
 {{define "admin_pedidos_form.html"}}
 {{template "layout_start" .}}
-{{if .Edit}}
-<h1>Editar pedido</h1>
-{{else}}
-<h1>Nuevo pedido</h1>
-{{end}}
-<nav class="admin-nav"><a href="/admin/products">Productos</a> | <a href="/admin/orders">Órdenes</a> | <a href="/admin/pedidos" class="active">Pedidos</a> | <a href="/admin/sales">Ventas</a> | <a href="/admin/analytics">Analytics</a> | <a href="/admin/destacada">Destacada</a> | <a href="/admin/costs">Calculadora</a> | <a href="/admin/categorias">Categorías</a> | <a href="/admin/cupones">Cupones</a> | <a href="/admin/logout">Salir</a></nav>
-<p><a href="/admin/pedidos">← Volver al listado</a></p>
+<div class="admin-header">
+  <h1>{{if .Edit}}Editar pedido{{else}}Nuevo pedido{{end}}</h1>
+  <nav class="admin-nav">
+    <a href="/admin/products">Productos</a>
+    <a href="/admin/orders">Órdenes</a>
+    <a href="/admin/pedidos" class="active">Pedidos</a>
+    <a href="/admin/sales">Ventas</a>
+    <a href="/admin/analytics">Analytics</a>
+    <a href="/admin/destacada">Destacada</a>
+    <a href="/admin/costs">Calculadora</a>
+    <a href="/admin/categorias">Categorías</a>
+    <a href="/admin/cupones">Cupones</a>
+    <a href="/admin/logout" class="admin-nav-logout">Salir</a>
+  </nav>
+</div>
+<section class="admin-shell">
+<p style="margin:0"><a href="/admin/pedidos" class="admin-link">← Volver al listado</a></p>
 {{if .Error}}
 <div id="pedidos_error_popup" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px">
   <div style="width:100%;max-width:460px;background:#0f1924;border:1px solid #223140;border-radius:14px;padding:18px;box-shadow:0 20px 50px rgba(0,0,0,.45)">
@@ -25,6 +35,8 @@
   <span style="color:var(--muted);margin-left:8px">{{range $k,$v := .Stock}}{{$k}}: {{$v}}g &nbsp; {{end}}</span>
 </div>
 {{end}}
+
+<div>
 
 {{if .Edit}}
 <form method="POST" action="/admin/pedidos/guardar" class="admin-card" style="padding:18px;max-width:720px">
@@ -117,6 +129,7 @@
   </ul>
 </div>
 {{end}}
+</div>
 
 <script>
 (function(){
@@ -168,5 +181,6 @@
   });
 })();
 </script>
+</section>
 {{template "layout_end" .}}
 {{end}}
