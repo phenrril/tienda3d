@@ -1922,7 +1922,7 @@ if ('serviceWorker' in navigator) {
     const percent = percentages[step] || 0;
     
     if(progressFill) progressFill.style.width = percent + '%';
-    if(currentStepEl) currentStepEl.textContent = step;
+    if(currentStepEl) currentStepEl.textContent = Math.min(step, 3);
     if(progressPercentEl) progressPercentEl.textContent = percent;
   }
   

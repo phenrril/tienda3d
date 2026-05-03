@@ -56,7 +56,6 @@
         <div class="pay-summary-row"><span><strong>Nombre</strong></span><span>{{.Order.Name}}</span></div>
         <div class="pay-summary-row"><span><strong>Email</strong></span><span>{{.Order.Email}}</span></div>
         <div class="pay-summary-row"><span><strong>Teléfono</strong></span><span>{{.Order.Phone}}</span></div>
-        <div class="pay-summary-row"><span><strong>DNI</strong></span><span>{{.Order.DNI}}</span></div>
         <div class="pay-summary-row">
           <span><strong>Método</strong></span>
           <span>{{if eq .Order.ShippingMethod "envio"}}Envío{{else if eq .Order.ShippingMethod "cadete"}}Cadete (Rosario){{else}}Retiro{{end}}</span>
