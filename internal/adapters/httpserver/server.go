@@ -379,10 +379,9 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	if !hasCarouselItems {
 		// Usar imágenes por defecto
 		carouselItems = []carouselItem{
-			{Image: "/public/assets/img/img1.webp", Alt: "Modelo 3D 1"},
-			{Image: "/public/assets/img/img2.webp", Alt: "Modelo 3D 2"},
-			{Image: "/public/assets/img/img3.webp", Alt: "Modelo 3D 3"},
-			{Image: "/public/assets/img/img4.webp", Alt: "Modelo 3D 4"},
+			{Image: "/public/assets/img/taller1.jpeg", Alt: "Taller Chroma3D 1"},
+			{Image: "/public/assets/img/taller2.jpeg", Alt: "Taller Chroma3D 2"},
+			{Image: "/public/assets/img/taller3.jpeg", Alt: "Taller Chroma3D 3"},
 		}
 	}
 
@@ -414,7 +413,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
 		"Products":      list,
 		"CanonicalURL":  base + "/",
-		"OGImage":       base + "/public/assets/img/chroma-logo.png",
+		"OGImage":       base + "/public/assets/img/chroma3d-wordmark-horizontal.svg",
 		"CarouselItems": carouselItems,
 	}
 	if u := readUserSession(w, r); u != nil {
@@ -476,7 +475,7 @@ func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
 		"Category":     category,
 		"Categories":   cats,
 		"CanonicalURL": base + "/products",
-		"OGImage":      base + "/public/assets/img/chroma-logo.png",
+		"OGImage":      base + "/public/assets/img/chroma3d-wordmark-horizontal.svg",
 	}
 	if u := readUserSession(w, r); u != nil {
 		data["User"] = u
@@ -557,7 +556,7 @@ func (s *Server) handleProduct(w http.ResponseWriter, r *http.Request) {
 		added = 1
 	}
 	base := s.canonicalBase(r)
-	og := base + "/public/assets/img/chroma-logo.png"
+	og := base + "/public/assets/img/chroma3d-wordmark-horizontal.svg"
 	if len(p.Images) > 0 && strings.TrimSpace(p.Images[0].URL) != "" {
 		if strings.HasPrefix(p.Images[0].URL, "http://") || strings.HasPrefix(p.Images[0].URL, "https://") {
 			og = p.Images[0].URL

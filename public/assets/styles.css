@@ -68,6 +68,10 @@ body:has(.admin-header) .container.content{padding:0;max-width:100%}
   object-fit:contain;
   flex-shrink:0;
 }
+.brand-logo--wordmark{
+  width:168px;
+  height:36px;
+}
 .brand-dot{width:10px;height:10px;border-radius:50%;background:var(--accent);flex-shrink:0}
 .brand-text{display:flex;flex-direction:column;line-height:1}
 .brand-title{
@@ -1976,6 +1980,7 @@ body.drawer-open{overflow:hidden}
 }
 @media (max-width:640px){
   .brand-logo{width:28px;height:33px}
+  .brand-logo--wordmark{width:132px;height:28px}
   .brand-title{font-size:26px}
   .brand-sub{display:none}
   body:has(.cart-container) .container.content{padding:0 8px}

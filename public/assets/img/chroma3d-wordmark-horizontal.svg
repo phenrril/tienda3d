@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 90" width="840" height="180">
+  <title>Chroma3D - Wordmark horizontal</title>
+  <g transform="translate(45,45)">
+    <ellipse cx="0" cy="42" rx="24" ry="3" fill="#1a1612" opacity=".12"></ellipse>
+    <polygon points="0,-38 28,0 0,7" fill="#7a3520"></polygon>
+    <polygon points="-28,0 0,-38 0,7" fill="#a44023"></polygon>
+    <polygon points="-28,0 0,7 0,38" fill="#c8502a"></polygon>
+    <polygon points="28,0 0,38 0,7" fill="#e89873"></polygon>
+    <line x1="0" y1="-38" x2="0" y2="38" stroke="#fff" stroke-opacity=".25" stroke-width=".8"></line>
+  </g>
+  <text x="108" y="60" font-family="&#39;Instrument Serif&#39;, &#39;Times New Roman&#39;, serif" font-size="56" fill="#1a1612" letter-spacing="-1.5">chroma<tspan font-style="italic" fill="#c8502a">3d</tspan></text>
+</svg>
