@@ -1,12 +1,9 @@
-const CACHE_NAME = 'chroma3d-v3';
+const CACHE_NAME = 'chroma3d-v6';
 const urlsToCache = [
   '/',
   '/public/assets/styles.css',
-  '/public/assets/img/chroma-logo.png',
-  '/public/assets/img/img1.webp',
-  '/public/assets/img/img2.webp',
-  '/public/assets/img/img3.webp',
-  '/public/assets/img/img4.webp'
+  '/public/assets/img/chroma3d-isotipo.svg',
+  '/public/assets/img/chroma3d-wordmark-horizontal.svg'
 ];
 
 self.addEventListener('install', event => {
