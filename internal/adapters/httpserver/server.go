@@ -177,6 +177,7 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("/admin/orders", s.handleAdminOrders)
 	s.mux.HandleFunc("/admin/orders/confirm-payment", s.handleAdminConfirmPayment)
+	s.mux.HandleFunc("/admin/orders/delete-range", s.handleAdminOrdersDeleteRange)
 	s.mux.HandleFunc("/admin/products", s.handleAdminProducts)
 
 	s.mux.HandleFunc("/admin/sales", s.handleAdminSales)
@@ -1145,10 +1146,11 @@ func (s *Server) webhookMP(w http.ResponseWriter, r *http.Request) {
 }
 
 type cartItem struct {
-	Slug  string  `json:"slug"`
-	Color string  `json:"color"`
-	Qty   int     `json:"qty"`
-	Price float64 `json:"price"`
+	Slug        string  `json:"slug"`
+	Color       string  `json:"color"`
+	Observation string  `json:"observation,omitempty"`
+	Qty         int     `json:"qty"`
+	Price       float64 `json:"price"`
 }
 
 type cartPayload struct {
@@ -1156,25 +1158,41 @@ type cartPayload struct {
 }
 
 type cartLine struct {
-	Slug      string
-	Color     string
-	Qty       int
-	UnitPrice float64
-	Subtotal  float64
-	Name      string
-	Image     string
+	Slug        string
+	Color       string
+	Observation string
+	Qty         int
+	UnitPrice   float64
+	Subtotal    float64
+	Name        string
+	Image       string
 }
 
 func aggregateCart(cp cartPayload, lookup func(slug string) (*domain.Product, error)) []cartLine {
-	m := map[string]*cartLine{}
+	type cartKey struct {
+		Slug        string
+		Color       string
+		Observation string
+	}
+	m := map[cartKey]*cartLine{}
 	for _, it := range cp.Items {
 		if it.Qty <= 0 {
 			continue
 		}
-		key := it.Slug + "|" + it.Color
+		key := cartKey{
+			Slug:        it.Slug,
+			Color:       normalizeColorName(it.Color),
+			Observation: normalizeCartObservation(it.Observation),
+		}
 		line, ok := m[key]
 		if !ok {
-			line = &cartLine{Slug: it.Slug, Color: it.Color, Qty: 0, UnitPrice: it.Price}
+			line = &cartLine{
+				Slug:        it.Slug,
+				Color:       key.Color,
+				Observation: key.Observation,
+				Qty:         0,
+				UnitPrice:   it.Price,
+			}
 			m[key] = line
 		}
 		line.Qty += it.Qty
@@ -1260,7 +1278,8 @@ func (s *Server) handleCart(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		slug := r.FormValue("slug")
-		color := r.FormValue("color")
+		color := normalizeColorName(r.FormValue("color"))
+		observation := normalizeCartObservation(r.FormValue("observation"))
 		// Intento fallback si slug vacío y multipart presente
 		if slug == "" && r.MultipartForm != nil {
 			if v, ok := r.MultipartForm.Value["slug"]; ok && len(v) > 0 {
@@ -1268,7 +1287,12 @@ func (s *Server) handleCart(w http.ResponseWriter, r *http.Request) {
 			}
 			if color == "" {
 				if v, ok := r.MultipartForm.Value["color"]; ok && len(v) > 0 {
-					color = v[0]
+					color = normalizeColorName(v[0])
+				}
+			}
+			if observation == "" {
+				if v, ok := r.MultipartForm.Value["observation"]; ok && len(v) > 0 {
+					observation = normalizeCartObservation(v[0])
 				}
 			}
 		}
@@ -1281,28 +1305,14 @@ func (s *Server) handleCart(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "prod", 404)
 			return
 		}
-		// Fallback de color: si llega vacío, usar el primer color disponible o #111827
-		if strings.TrimSpace(color) == "" {
-			// intentar deducir de variantes del producto
-			seen := map[string]struct{}{}
-			for _, v := range p.Variants {
-				c := strings.TrimSpace(v.Color)
-				if c == "" {
-					continue
-				}
-				if _, ok := seen[c]; ok {
-					continue
-				}
-				color = c
-				break
-			}
-			if strings.TrimSpace(color) == "" {
-				color = "#111827"
-			}
-		}
-		// Convertir SIEMPRE a nombre genérico cuando sea hex conocido
 		cart := readCart(r)
-		cart.Items = append(cart.Items, cartItem{Slug: slug, Color: normalizeColorName(color), Qty: 1, Price: p.BasePrice})
+		cart.Items = append(cart.Items, cartItem{
+			Slug:        slug,
+			Color:       color,
+			Observation: observation,
+			Qty:         1,
+			Price:       p.BasePrice,
+		})
 		writeCart(w, cart)
 		accept := r.Header.Get("Accept")
 		if strings.Contains(accept, "application/json") || r.Header.Get("X-Requested-With") == "fetch" {
@@ -1329,18 +1339,29 @@ func (s *Server) handleCartUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slug := r.FormValue("slug")
-	color := r.FormValue("color")
+	color := normalizeColorName(r.FormValue("color"))
+	observation := normalizeCartObservation(r.FormValue("observation"))
 	op := r.FormValue("op")
 	qtyStr := r.FormValue("qty")
 	cart := readCart(r)
 
-	agg := map[string]int{}
+	type cartKey struct {
+		Slug        string
+		Color       string
+		Observation string
+	}
+	agg := map[cartKey]int{}
 	for _, it := range cart.Items {
 		if it.Qty > 0 {
-			agg[it.Slug+"|"+it.Color] += it.Qty
+			key := cartKey{
+				Slug:        it.Slug,
+				Color:       normalizeColorName(it.Color),
+				Observation: normalizeCartObservation(it.Observation),
+			}
+			agg[key] += it.Qty
 		}
 	}
-	key := slug + "|" + color
+	key := cartKey{Slug: slug, Color: color, Observation: observation}
 	cur := agg[key]
 	switch op {
 	case "inc":
@@ -1366,8 +1387,12 @@ func (s *Server) handleCartUpdate(w http.ResponseWriter, r *http.Request) {
 		if q <= 0 {
 			continue
 		}
-		parts := strings.SplitN(k, "|", 2)
-		newCart.Items = append(newCart.Items, cartItem{Slug: parts[0], Color: normalizeColorName(parts[1]), Qty: q})
+		newCart.Items = append(newCart.Items, cartItem{
+			Slug:        k.Slug,
+			Color:       k.Color,
+			Observation: k.Observation,
+			Qty:         q,
+		})
 	}
 
 	for i := range newCart.Items {
@@ -1390,11 +1415,12 @@ func (s *Server) handleCartRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slug := r.FormValue("slug")
-	color := r.FormValue("color")
+	color := normalizeColorName(r.FormValue("color"))
+	observation := normalizeCartObservation(r.FormValue("observation"))
 	cart := readCart(r)
 	newItems := []cartItem{}
 	for _, it := range cart.Items {
-		if !(it.Slug == slug && it.Color == color) {
+		if !(it.Slug == slug && normalizeColorName(it.Color) == color && normalizeCartObservation(it.Observation) == observation) {
 			newItems = append(newItems, it)
 		}
 	}
@@ -1436,6 +1462,22 @@ func normalizeColorName(c string) string {
 		return name
 	}
 	return s
+}
+
+func normalizeCartObservation(s string) string {
+	clean := strings.Join(strings.Fields(strings.TrimSpace(s)), " ")
+	if len(clean) > 180 {
+		clean = clean[:180]
+	}
+	return clean
+}
+
+func buildCartItemTitle(baseTitle, observation string) string {
+	obs := normalizeCartObservation(observation)
+	if obs == "" {
+		return baseTitle
+	}
+	return fmt.Sprintf("%s | Obs: %s", baseTitle, obs)
 }
 
 func formatColorES(c string) string {
@@ -1532,9 +1574,9 @@ func (s *Server) handleCartCheckout(w http.ResponseWriter, r *http.Request) {
 		var title string
 		if p != nil {
 			pid = &p.ID
-			title = p.Name
+			title = buildCartItemTitle(p.Name, l.Observation)
 		} else {
-			title = "Producto"
+			title = buildCartItemTitle("Producto", l.Observation)
 		}
 		o.Items = append(o.Items, domain.OrderItem{ID: uuid.New(), ProductID: pid, Qty: l.Qty, UnitPrice: l.UnitPrice, Title: title, Color: normalizeColorName(l.Color)})
 		itemsTotal += l.UnitPrice * float64(l.Qty)
@@ -2286,6 +2328,73 @@ func (s *Server) handleAdminConfirmPayment(w http.ResponseWriter, r *http.Reques
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Pago confirmado exitosamente"))
+}
+
+func (s *Server) handleAdminOrdersDeleteRange(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdminSession(r) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	const layoutIn = "2006-01-02"
+	fromStr := strings.TrimSpace(r.FormValue("from"))
+	toStr := strings.TrimSpace(r.FormValue("to"))
+	if fromStr == "" || toStr == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "Elegí un período completo antes de eliminar."})
+		return
+	}
+
+	from, err := time.Parse(layoutIn, fromStr)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "La fecha desde no es válida."})
+		return
+	}
+	to, err := time.Parse(layoutIn, toStr)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "La fecha hasta no es válida."})
+		return
+	}
+	if from.After(to) {
+		from, to = to, from
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if r.FormValue("dry_run") == "1" {
+		list, err := s.orders.Orders.ListInRange(r.Context(), from, to)
+		if err != nil {
+			log.Error().Err(err).Str("from", fromStr).Str("to", toStr).Msg("admin orders delete dry-run")
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": "No pude calcular cuántas órdenes entran en ese período."})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"count": len(list)})
+		return
+	}
+
+	deleted, err := s.orders.Orders.DeleteRange(r.Context(), from, to)
+	if err != nil {
+		log.Error().Err(err).Str("from", fromStr).Str("to", toStr).Msg("admin orders delete range")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "No pude eliminar las órdenes del período seleccionado."})
+		return
+	}
+
+	log.Warn().
+		Str("from", fromStr).
+		Str("to", toStr).
+		Int64("deleted_orders", deleted).
+		Msg("admin deleted orders by range")
+	_ = json.NewEncoder(w).Encode(map[string]any{"deleted": deleted})
 }
 
 func (s *Server) handleAdminSales(w http.ResponseWriter, r *http.Request) {

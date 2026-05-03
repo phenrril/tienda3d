@@ -1,80 +1,116 @@
 {{define "admin_orders.html"}}
 {{template "layout_start" .}}
-<h1>Órdenes</h1>
-<nav class="admin-nav"><a href="/admin/products">Productos</a> | <a href="/admin/orders" class="active">Órdenes</a> | <a href="/admin/pedidos">Pedidos</a> | <a href="/admin/sales">Ventas</a> | <a href="/admin/analytics">Analytics</a> | <a href="/admin/destacada">Destacada</a> | <a href="/admin/costs">Calculadora</a> | <a href="/admin/categorias">Categorías</a> | <a href="/admin/cupones">Cupones</a> | <a href="/admin/logout">Salir</a></nav>
-<form method="GET" class="filter-bar" style="margin:12px 0 4px;display:flex;align-items:center;gap:16px">
-  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)">
-    <input type="checkbox" name="approved" value="1" {{if .FilterApproved}}checked{{end}} /> Solo aprobadas MP
-  </label>
-  <button class="btn-secondary small" type="submit" style="padding:6px 10px">Aplicar</button>
-  {{if .FilterApproved}}<a class="btn-secondary small" href="/admin/orders" style="padding:6px 10px">Limpiar</a>{{end}}
-</form>
-<table class="table" style="width:100%;font-size:0.9rem;margin-top:4px">
-  <thead><tr><th>ID</th><th>Email</th><th>Estado</th><th>Total</th><th>Cupón</th><th>MP</th><th>Creada</th><th>Acciones</th></tr></thead>
-  <tbody>
-    {{range .Orders}}
-    <tr>
-      <td style="font-family:monospace;font-size:11px">
-        <a href="#" onclick="return abrirDetalleOrden('{{.ID}}')" style="color:#60a5fa;text-decoration:none">{{.ID}}</a>
-      </td>
-      <td>{{.Email}}</td>
-      <td>{{.Status}}</td>
-      <td>${{formatPrice .Total}}</td>
-      <td>
-        {{if .CouponCode}}
-          <span style="color:#10b981;font-weight:600">{{.CouponCode}}</span>
-          <br/>
-          <small style="color:var(--muted)">-${{formatPrice .DiscountAmount}}</small>
-        {{else}}
-          -
+<div class="admin-header">
+  <h1>Órdenes</h1>
+  <nav class="admin-nav">
+    <a href="/admin/products">Productos</a>
+    <a href="/admin/orders" class="active">Órdenes</a>
+    <a href="/admin/pedidos">Pedidos</a>
+    <a href="/admin/sales">Ventas</a>
+    <a href="/admin/analytics">Analytics</a>
+    <a href="/admin/destacada">Destacada</a>
+    <a href="/admin/costs">Calculadora</a>
+    <a href="/admin/categorias">Categorías</a>
+    <a href="/admin/cupones">Cupones</a>
+    <a href="/admin/logout" class="admin-nav-logout">Salir</a>
+  </nav>
+</div>
+<section class="admin-shell">
+  <div class="admin-card admin-toolbar-card">
+    <div class="admin-toolbar admin-toolbar--split">
+      <form method="GET" class="admin-inline-form">
+        <label class="admin-checkbox-label" style="margin:0">
+          <input type="checkbox" name="approved" value="1" {{if .FilterApproved}}checked{{end}} />
+          <span>Solo aprobadas MP</span>
+        </label>
+        <button class="btn-secondary small" type="submit">Aplicar</button>
+        {{if .FilterApproved}}<a class="btn-secondary small" href="/admin/orders">Limpiar</a>{{end}}
+      </form>
+
+      <form id="deleteOrdersRangeForm" class="admin-inline-form admin-inline-form--danger">
+        <label class="admin-date-field">
+          <span>Desde</span>
+          <input class="admin-date-input" type="date" name="from" />
+        </label>
+        <label class="admin-date-field">
+          <span>Hasta</span>
+          <input class="admin-date-input" type="date" name="to" />
+        </label>
+        <button class="btn-danger" type="submit">Eliminar todo</button>
+      </form>
+    </div>
+    <p class="admin-note" style="margin:12px 0 0">
+      El borrado es permanente: elimina órdenes y sus items del período elegido.
+    </p>
+  </div>
+
+  <div class="admin-card admin-table-wrapper">
+    <table class="table admin-orders-table">
+      <thead><tr><th>ID</th><th>Email</th><th>Estado</th><th>Total</th><th>Cupón</th><th>MP</th><th>Creada</th><th>Acciones</th></tr></thead>
+      <tbody>
+        {{range .Orders}}
+        <tr>
+          <td style="font-family:monospace;font-size:11px">
+            <a href="#" onclick="return abrirDetalleOrden('{{.ID}}')" class="admin-link">{{.ID}}</a>
+          </td>
+          <td>{{.Email}}</td>
+          <td>{{.Status}}</td>
+          <td>${{formatPrice .Total}}</td>
+          <td>
+            {{if .CouponCode}}
+              <span class="order-coupon-code">{{.CouponCode}}</span>
+              <br/>
+              <small class="admin-note">-${{formatPrice .DiscountAmount}}</small>
+            {{else}}
+              <span class="admin-note">-</span>
+            {{end}}
+          </td>
+          <td>
+            {{if eq .MPStatus "efectivo_pending"}}
+              <span class="order-status-pill order-status-pill--warn">Efectivo pendiente</span>
+            {{else if eq .MPStatus "transferencia_pending"}}
+              <span class="order-status-pill order-status-pill--warn">Transferencia pendiente</span>
+            {{else if eq .MPStatus "approved"}}
+              <span class="order-status-pill order-status-pill--ok">Aprobado</span>
+            {{else}}
+              <span class="order-status-pill">{{.MPStatus}}</span>
+            {{end}}
+          </td>
+          <td style="font-size:11px">{{.CreatedAt.Format "02/01 15:04"}}</td>
+          <td>
+            <div class="order-actions">
+              {{if or (eq .MPStatus "efectivo_pending") (eq .MPStatus "transferencia_pending")}}
+                <button onclick="confirmarPago('{{.ID}}')" class="btn-primary small order-action-btn" type="button">Confirmar</button>
+              {{else if eq .Status "finished"}}
+                <span class="order-status-pill order-status-pill--ok">Confirmada</span>
+              {{else}}
+                <span class="order-status-pill">Sin acciones</span>
+              {{end}}
+            </div>
+          </td>
+        </tr>
         {{end}}
-      </td>
-      <td>
-        {{if eq .MPStatus "efectivo_pending"}}
-          <span style="color:#f59e0b">⏳ Efectivo</span>
-        {{else if eq .MPStatus "transferencia_pending"}}
-          <span style="color:#f59e0b">⏳ Transferencia</span>
-        {{else if eq .MPStatus "approved"}}
-          <span style="color:#10b981">✓ Aprobado</span>
-        {{else}}
-          {{.MPStatus}}
-        {{end}}
-      </td>
-      <td style="font-size:11px">{{.CreatedAt.Format "02/01 15:04"}}</td>
-      <td>
-        {{if or (eq .MPStatus "efectivo_pending") (eq .MPStatus "transferencia_pending")}}
-          <button 
-            onclick="confirmarPago('{{.ID}}')" 
-            class="btn-primary small"
-            style="padding:4px 8px;font-size:12px">
-            ✓ Confirmar
-          </button>
-        {{else if eq .Status "finished"}}
-          <span style="color:#10b981;font-size:11px">✓ Confirmada</span>
-        {{else}}
-          -
-        {{end}}
-      </td>
-    </tr>
-    {{end}}
-  </tbody>
-</table>
-<div class="pager">Página {{.Page}} / {{.Pages}}</div>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pager">Página {{.Page}} / {{.Pages}}</div>
+</section>
 
 {{range .Orders}}
-<dialog id="order-items-{{.ID}}" style="max-width:640px;width:min(92vw,640px);border:none;border-radius:16px;padding:0;background:#111827;color:#f9fafb;box-shadow:0 24px 80px rgba(0,0,0,.45)">
-  <div style="padding:20px 22px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+<dialog id="order-items-{{.ID}}" style="max-width:640px;width:min(92vw,640px);border:none;border-radius:16px;padding:0;background:#1b1511;color:#f4ede4;box-shadow:0 24px 80px rgba(0,0,0,.45)">
+  <div style="padding:20px 22px;border-bottom:1px solid #3a3027;display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
     <div>
-      <div style="font-size:12px;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em">Venta</div>
+      <div style="font-size:12px;color:#b9aa98;text-transform:uppercase;letter-spacing:.08em">Venta</div>
       <div style="font-family:monospace;font-size:13px;word-break:break-all">{{.ID}}</div>
     </div>
-    <button type="button" onclick="cerrarDetalleOrden('{{.ID}}')" style="background:none;border:none;color:#9ca3af;font-size:24px;cursor:pointer;line-height:1">&times;</button>
+    <button type="button" onclick="cerrarDetalleOrden('{{.ID}}')" style="background:none;border:none;color:#b9aa98;font-size:24px;cursor:pointer;line-height:1">&times;</button>
   </div>
   <div style="padding:20px 22px">
     {{if .Items}}
     <table style="width:100%;border-collapse:collapse">
       <thead>
-        <tr style="text-align:left;color:#9ca3af;font-size:12px">
+        <tr style="text-align:left;color:#b9aa98;font-size:12px">
           <th style="padding:0 0 10px">Artículo</th>
           <th style="padding:0 0 10px;width:90px">Cantidad</th>
         </tr>
@@ -82,23 +118,23 @@
       <tbody>
         {{range .Items}}
         <tr>
-          <td style="padding:10px 0;border-top:1px solid rgba(255,255,255,.08)">
+          <td style="padding:10px 0;border-top:1px solid #31271f">
             {{if .HasProduct}}
-              <a href="{{.ProductURL}}" target="_blank" rel="noopener noreferrer" style="color:#93c5fd;text-decoration:none">{{.Title}}</a>
+              <a href="{{.ProductURL}}" target="_blank" rel="noopener noreferrer" class="admin-link">{{.Title}}</a>
             {{else}}
               <span>{{.Title}}</span>
             {{end}}
             {{if .Color}}
-              <div style="font-size:12px;color:#9ca3af;margin-top:4px">{{.Color}}</div>
+              <div style="font-size:12px;color:#b9aa98;margin-top:4px">{{.Color}}</div>
             {{end}}
           </td>
-          <td style="padding:10px 0;border-top:1px solid rgba(255,255,255,.08);font-weight:600">{{.Qty}}</td>
+          <td style="padding:10px 0;border-top:1px solid #31271f;font-weight:600">{{.Qty}}</td>
         </tr>
         {{end}}
       </tbody>
     </table>
     {{else}}
-      <p style="margin:0;color:#9ca3af">Esta venta no tiene artículos cargados.</p>
+      <p style="margin:0;color:#b9aa98">Esta venta no tiene artículos cargados.</p>
     {{end}}
   </div>
 </dialog>
@@ -142,6 +178,85 @@ function confirmarPago(orderID) {
     alert('Error: ' + err);
   });
 }
+
+const deleteOrdersRangeForm = document.getElementById('deleteOrdersRangeForm');
+if (deleteOrdersRangeForm) {
+  deleteOrdersRangeForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const submitBtn = deleteOrdersRangeForm.querySelector('button[type="submit"]');
+    const formData = new FormData(deleteOrdersRangeForm);
+    const from = String(formData.get('from') || '').trim();
+    const to = String(formData.get('to') || '').trim();
+
+    if (!from || !to) {
+      alert('Elegí fecha desde y hasta antes de eliminar.');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    try {
+      const previewBody = new URLSearchParams();
+      previewBody.set('from', from);
+      previewBody.set('to', to);
+      previewBody.set('dry_run', '1');
+
+      const previewRes = await fetch('/admin/orders/delete-range', {
+        method: 'POST',
+        body: previewBody
+      });
+      const previewData = await previewRes.json().catch(() => ({}));
+      if (!previewRes.ok) {
+        alert(previewData.error || 'No pude validar el período.');
+        return;
+      }
+
+      const count = Number(previewData.count || 0);
+      if (count <= 0) {
+        alert('No hay órdenes cargadas en ese período.');
+        return;
+      }
+
+      if (!confirm(`Se van a eliminar ${count} órdenes entre ${from} y ${to}.\n\nTambién se eliminarán sus items. Esta acción no se puede deshacer.`)) {
+        return;
+      }
+
+      const confirmText = prompt(`Escribí ELIMINAR para confirmar el borrado permanente de ${count} órdenes.`);
+      if (confirmText !== 'ELIMINAR') {
+        alert('Borrado cancelado.');
+        return;
+      }
+
+      const deleteBody = new URLSearchParams();
+      deleteBody.set('from', from);
+      deleteBody.set('to', to);
+
+      const deleteRes = await fetch('/admin/orders/delete-range', {
+        method: 'POST',
+        body: deleteBody
+      });
+      const deleteData = await deleteRes.json().catch(() => ({}));
+      if (!deleteRes.ok) {
+        alert(deleteData.error || 'No pude eliminar las órdenes.');
+        return;
+      }
+
+      alert(`Se eliminaron ${deleteData.deleted || 0} órdenes.`);
+      location.reload();
+    } catch (err) {
+      console.error(err);
+      alert('Error al eliminar órdenes: ' + err);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+}
+
+document.querySelectorAll('.admin-date-input').forEach(input => {
+  input.addEventListener('click', () => {
+    if (typeof input.showPicker === 'function') input.showPicker();
+  });
+});
 
 document.querySelectorAll('dialog').forEach(dialog => {
   dialog.addEventListener('click', (event) => {

@@ -1,49 +1,63 @@
 {{define "admin_sales.html"}}
 {{template "layout_start" .}}
-<h1>Reporte de Ventas</h1>
-<nav class="admin-nav"><a href="/admin/products">Productos</a> | <a href="/admin/orders">Órdenes</a> | <a href="/admin/pedidos">Pedidos</a> | <a href="/admin/sales" class="active">Ventas</a> | <a href="/admin/analytics">Analytics</a> | <a href="/admin/destacada">Destacada</a> | <a href="/admin/costs">Calculadora</a> | <a href="/admin/categorias">Categorías</a> | <a href="/admin/cupones">Cupones</a> | <a href="/admin/logout">Salir</a></nav>
-<p style="margin:10px 0 0;color:var(--muted);font-size:13px">Vista consolidada de órdenes web, pedidos de taller, gastos y consumo de filamento para el período seleccionado.</p>
-<form method="GET" class="date-range">
-  <div class="dr-field">
-    <span class="dr-label">Desde</span>
-    <input class="date-input" type="date" name="from" value="{{.From}}" />
-  </div>
-  <div class="dr-field">
-    <span class="dr-label">Hasta</span>
-    <input class="date-input" type="date" name="to" value="{{.To}}" />
-  </div>
+<div class="admin-header">
+  <h1>Reporte de Ventas</h1>
+  <nav class="admin-nav">
+    <a href="/admin/products">Productos</a>
+    <a href="/admin/orders">Órdenes</a>
+    <a href="/admin/pedidos">Pedidos</a>
+    <a href="/admin/sales" class="active">Ventas</a>
+    <a href="/admin/analytics">Analytics</a>
+    <a href="/admin/destacada">Destacada</a>
+    <a href="/admin/costs">Calculadora</a>
+    <a href="/admin/categorias">Categorías</a>
+    <a href="/admin/cupones">Cupones</a>
+    <a href="/admin/logout" class="admin-nav-logout">Salir</a>
+  </nav>
+</div>
+<section class="admin-shell">
+<p class="admin-lead">Vista consolidada de órdenes web, pedidos de taller, gastos y consumo de filamento para el período seleccionado.</p>
+<form method="GET" class="admin-date-range">
+  <label class="admin-date-field">
+    <span>Desde</span>
+    <input class="admin-date-input" type="date" name="from" value="{{.From}}" />
+  </label>
+  <label class="admin-date-field">
+    <span>Hasta</span>
+    <input class="admin-date-input" type="date" name="to" value="{{.To}}" />
+  </label>
   <div class="dr-actions">
     <button class="btn-primary" type="submit">Filtrar</button>
     <a class="btn-secondary" href="/admin/sales?from={{.From}}&to={{.To}}&format=csv">CSV</a>
   </div>
 </form>
 <section class="grid" style="margin-top:1.2rem;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px">
-  <div class="kpi"><h3>Órdenes</h3><strong>{{.OrdersCount}}</strong></div>
-  <div class="kpi"><h3>Ingresos Totales</h3><strong>${{formatPrice .TotalRevenue}}</strong></div>
-  <div class="kpi"><h3>Ingresos Items</h3><strong>${{formatPrice .ItemsRevenue}}</strong></div>
-  <div class="kpi"><h3>Ingresos Envíos</h3><strong>${{formatPrice .ShippingRevenue}}</strong></div>
-  <div class="kpi"><h3>Ticket Prom.</h3><strong>${{formatPrice .AvgOrderValue}}</strong></div>
+  <div class="admin-kpi"><h3>Órdenes</h3><strong>{{.OrdersCount}}</strong></div>
+  <div class="admin-kpi"><h3>Ingresos Totales</h3><strong>${{formatPrice .TotalRevenue}}</strong></div>
+  <div class="admin-kpi"><h3>Ingresos Items</h3><strong>${{formatPrice .ItemsRevenue}}</strong></div>
+  <div class="admin-kpi"><h3>Ingresos Envíos</h3><strong>${{formatPrice .ShippingRevenue}}</strong></div>
+  <div class="admin-kpi"><h3>Ticket Prom.</h3><strong>${{formatPrice .AvgOrderValue}}</strong></div>
 </section>
 {{if .WorkshopModule}}
 <section style="margin-top:1.2rem">
   <h2 style="font-size:17px;margin:0 0 12px">Taller + filamento (período)</h2>
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
-    <div class="kpi"><h3>Ingresos tienda (MP)</h3><strong>${{formatPrice .StoreRevenue}}</strong></div>
-    <div class="kpi"><h3>Pedidos taller entregados</h3><strong>{{.WorkshopDeliveredCount}}</strong></div>
-    <div class="kpi"><h3>Ingresos taller</h3><strong>${{formatPrice .WorkshopRevenue}}</strong></div>
-    <div class="kpi"><h3>Total ingresos</h3><strong>${{formatPrice .TotalIngresos}}</strong></div>
-    <div class="kpi"><h3>COGS filamento (consumo)</h3><strong>${{formatPrice .FilamentCOGS}}</strong></div>
-    <div class="kpi"><h3>Compras filamento ($)</h3><strong>${{formatPrice .FilamentPurchasesPeriod}}</strong></div>
-    <div class="kpi"><h3>Gastos insumos</h3><strong>${{formatPrice .BusinessExpensesSum}}</strong></div>
-    <div class="kpi"><h3>Margen bruto</h3><strong>${{formatPrice .GrossProfit}}</strong></div>
-    <div class="kpi"><h3>Margen neto</h3><strong>${{formatPrice .NetProfit}}</strong></div>
+    <div class="admin-kpi"><h3>Ingresos tienda (MP)</h3><strong>${{formatPrice .StoreRevenue}}</strong></div>
+    <div class="admin-kpi"><h3>Pedidos taller entregados</h3><strong>{{.WorkshopDeliveredCount}}</strong></div>
+    <div class="admin-kpi"><h3>Ingresos taller</h3><strong>${{formatPrice .WorkshopRevenue}}</strong></div>
+    <div class="admin-kpi"><h3>Total ingresos</h3><strong>${{formatPrice .TotalIngresos}}</strong></div>
+    <div class="admin-kpi"><h3>COGS filamento (consumo)</h3><strong>${{formatPrice .FilamentCOGS}}</strong></div>
+    <div class="admin-kpi"><h3>Compras filamento ($)</h3><strong>${{formatPrice .FilamentPurchasesPeriod}}</strong></div>
+    <div class="admin-kpi"><h3>Gastos insumos</h3><strong>${{formatPrice .BusinessExpensesSum}}</strong></div>
+    <div class="admin-kpi"><h3>Margen bruto</h3><strong>${{formatPrice .GrossProfit}}</strong></div>
+    <div class="admin-kpi"><h3>Margen neto</h3><strong>${{formatPrice .NetProfit}}</strong></div>
   </div>
   {{if .FilamentStock}}
   <div style="margin-top:12px">
-    <strong style="font-size:13px;color:var(--muted)">Stock filamento:</strong>
+    <strong class="admin-note" style="font-size:13px">Stock filamento:</strong>
     <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">
       {{range $k,$v := .FilamentStock}}
-      <span class="stock-chip">{{$k}} · {{$v}}g</span>
+      <span class="admin-stock-chip">{{$k}} · {{$v}}g</span>
       {{end}}
     </div>
   </div>
@@ -52,26 +66,26 @@
 <div class="grid" style="margin-top:1rem;grid-template-columns:1fr 1fr;gap:1rem;align-items:start">
   <div class="admin-card" style="padding:16px">
     <h3 style="margin:0 0 10px;font-size:15px">Registrar compra de filamento</h3>
-    <p style="font-size:12px;color:var(--muted);margin:0 0 10px">Suma gramos al inventario (por defecto 1000g) y registra el costo del rollo.</p>
-    <form method="POST" action="/admin/sales/filamento" style="display:flex;flex-direction:column;gap:8px">
+    <p class="admin-note" style="font-size:12px;margin:0 0 10px">Suma gramos al inventario (por defecto 1000g) y registra el costo del rollo.</p>
+    <form method="POST" action="/admin/sales/filamento" class="admin-form-stack">
       <input type="hidden" name="from" value="{{.From}}" />
       <input type="hidden" name="to" value="{{.To}}" />
-      <input name="color_slug" placeholder="color snake_case" required style="padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" />
-      <input name="cost" placeholder="Costo total $" required style="padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" />
-      <input name="grams" type="number" min="1" placeholder="Gramos (default 1000)" style="padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" />
-      <input name="note" placeholder="Nota opcional" style="padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" />
+      <input name="color_slug" placeholder="color snake_case" required class="admin-form-control" />
+      <input name="cost" placeholder="Costo total $" required class="admin-form-control" />
+      <input name="grams" type="number" min="1" placeholder="Gramos (default 1000)" class="admin-form-control" />
+      <input name="note" placeholder="Nota opcional" class="admin-form-control" />
       <button class="btn-primary" type="submit">Agregar</button>
     </form>
   </div>
   <div class="admin-card" style="padding:16px">
     <h3 style="margin:0 0 10px;font-size:15px">Registrar gasto (insumos, etc.)</h3>
-    <form method="POST" action="/admin/sales/gasto" style="display:flex;flex-direction:column;gap:8px">
+    <form method="POST" action="/admin/sales/gasto" class="admin-form-stack">
       <input type="hidden" name="from" value="{{.From}}" />
       <input type="hidden" name="to" value="{{.To}}" />
-      <input name="amount" placeholder="Monto $" required style="padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" />
-      <input type="date" name="spent_at" required style="padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" />
-      <input name="category" placeholder="Categoría" style="padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" />
-      <input name="description" placeholder="Descripción" style="padding:8px;border-radius:8px;background:#0f1924;border:1px solid #223140;color:#fff" />
+      <input name="amount" placeholder="Monto $" required class="admin-form-control" />
+      <input type="date" name="spent_at" required class="admin-form-control admin-date-input" />
+      <input name="category" placeholder="Categoría" class="admin-form-control" />
+      <input name="description" placeholder="Descripción" class="admin-form-control" />
       <button class="btn-primary" type="submit">Agregar gasto</button>
     </form>
   </div>
@@ -86,19 +100,19 @@
         <td>{{.CreatedAt.Format "2006-01-02"}}</td>
         <td>
           {{if eq .EntryType "purchase"}}
-          <span class="tag tag-ok">compra</span>
+          <span class="admin-tag admin-tag--ok">compra</span>
           {{else if eq .EntryType "consumption"}}
-          <span class="tag tag-warn">consumo</span>
+          <span class="admin-tag admin-tag--warn">consumo</span>
           {{else}}
-          <span class="tag">{{.EntryType}}</span>
+          <span class="admin-tag">{{.EntryType}}</span>
           {{end}}
         </td>
         <td>{{.ColorSlug}}</td>
-        <td>{{if lt .DeltaGrams 0}}<span style="color:#fca5a5">{{.DeltaGrams}}g</span>{{else}}<span style="color:#86efac">+{{.DeltaGrams}}g</span>{{end}}</td>
+        <td>{{if lt .DeltaGrams 0}}<span class="admin-text-danger">{{.DeltaGrams}}g</span>{{else}}<span class="admin-text-ok">+{{.DeltaGrams}}g</span>{{end}}</td>
         <td>{{if .UnitCost}}${{formatPrice (deref .UnitCost)}}{{else}}-{{end}}</td>
         <td>{{.Note}}</td>
       </tr>
-      {{else}}<tr><td colspan="6" style="color:var(--muted)">Sin movimientos</td></tr>{{end}}
+      {{else}}<tr><td colspan="6" class="admin-note">Sin movimientos</td></tr>{{end}}
     </tbody>
   </table>
 </div>
@@ -114,7 +128,7 @@
         <td>${{formatPrice .Amount}}</td>
         <td>{{.Description}}</td>
       </tr>
-      {{else}}<tr><td colspan="4" style="color:var(--muted)">Ninguno</td></tr>{{end}}
+      {{else}}<tr><td colspan="4" class="admin-note">Ninguno</td></tr>{{end}}
     </tbody>
   </table>
 </div>
@@ -149,36 +163,13 @@
     </table>
   </div>
 </div>
-<style>
-.kpi{background:#13202f;border:1px solid #223140;padding:12px 14px;border-radius:10px;display:flex;flex-direction:column;gap:4px}
-.kpi h3{margin:0;font-size:11px;letter-spacing:.5px;color:var(--muted);text-transform:uppercase}
-.kpi strong{font-size:18px;font-weight:600;color:#fff}
-.report-card{background:linear-gradient(180deg,#121e2a,#101923)}
-.stock-chip{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#0f1924;border:1px solid #223140;font-size:12px;color:#cbd5e1}
-.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;border:1px solid #334155;color:#cbd5e1;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
-.tag-ok{border-color:#166534;color:#86efac;background:rgba(22,101,52,.18)}
-.tag-warn{border-color:#7c2d12;color:#fdba74;background:rgba(124,45,18,.18)}
-.table tbody tr:nth-child(even){background:rgba(255,255,255,.015)}
-.table tbody tr:hover{background:rgba(99,102,241,.08)}
-/* Aumentado font-size de .mini */
-.admin-card table.mini{width:100%;font-size:.85rem;border-collapse:collapse}
-.admin-card table.mini td{padding:4px 6px;border-bottom:1px solid #1c2b3a}
-/* Date range custom styling */
-.date-range{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-top:16px;background:linear-gradient(140deg,#14212c,#111a23 55%);border:1px solid #1f2c39;padding:14px 18px 18px;border-radius:22px;box-shadow:0 4px 16px -6px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.03)}
-.date-range .dr-field{display:flex;flex-direction:column;gap:6px;min-width:170px}
-.date-range .dr-label{font-size:11px;font-weight:600;letter-spacing:.6px;color:var(--muted);text-transform:uppercase}
-.date-range .date-input{background:#0f1924;border:1px solid #223140;color:#fff;font:inherit;font-size:14px;padding:11px 14px 11px 42px;border-radius:16px;min-height:46px;line-height:1.3;position:relative;transition:border-color .18s,background .18s,box-shadow .18s,filter .18s;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02)}
-.date-range .date-input:hover{background:#132232}
-.date-range .date-input:focus{outline:none;border-color:var(--accent);background:#162a3b;box-shadow:0 0 0 2px rgba(99,102,241,.32),0 4px 14px -6px rgba(0,0,0,.6)}
-/* Calendar icon (inline SVG) */
-.date-range .date-input{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' stroke='%2394a3b8' fill='none' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='5.2' width='14' height='12.5' rx='2' ry='2' stroke='%2394a3b8'/><line x1='3' y1='9' x2='17' y2='9' stroke='%2394a3b8'/><line x1='7' y1='3.2' x2='7' y2='6' stroke='%2394a3b8'/><line x1='13' y1='3.2' x2='13' y2='6' stroke='%2394a3b8'/></svg>");background-repeat:no-repeat;background-position:14px 50%;background-size:20px auto}
-/* Hide native picker icon (webkit) */
-.date-range .date-input::-webkit-calendar-picker-indicator{opacity:0;width:100%;height:100%;cursor:pointer}
-.date-range .dr-actions{display:flex;gap:10px;align-items:center;padding-top:4px}
-@media (max-width:560px){
-  .date-range{padding:12px 14px 16px;border-radius:18px}
-  .date-range .dr-field{min-width:130px}
-}
-</style>
+<script>
+document.querySelectorAll('.admin-date-input').forEach(function(input){
+  input.addEventListener('click', function(){
+    if (typeof input.showPicker === 'function') input.showPicker();
+  });
+});
+</script>
+</section>
 {{template "layout_end" .}}
 {{end}}

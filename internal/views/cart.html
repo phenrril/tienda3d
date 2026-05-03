@@ -6,8 +6,8 @@
   <!-- Carrito Vacío -->
   <div class="cart-empty">
     <div class="cart-empty-icon">🛒</div>
-    <h2 class="cart-empty-title">Tu carrito está vacío</h2>
-    <p class="cart-empty-text">Agrega productos para comenzar tu pedido</p>
+    <h2 class="cart-empty-title">Tu selección está vacía.</h2>
+    <p class="cart-empty-text">Elegí piezas del catálogo o volvé a explorar productos para empezar el pedido.</p>
     <a class="btn-primary cart-empty-cta" href="/products">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
@@ -34,7 +34,7 @@
       </svg>
     </a>
     <div class="cart-header-info">
-      <h1>Mi Carrito</h1>
+      <h1>Tu pedido</h1>
       <span class="cart-items-count">{{len .Lines}} {{if eq (len .Lines) 1}}producto{{else}}productos{{end}}</span>
     </div>
     <div class="cart-header-spacer"></div>
@@ -56,10 +56,14 @@
         
         <div class="cart-product-info">
           <h3 class="cart-product-name">{{$line.Name}}</h3>
+          {{if $line.Observation}}
+          <div class="cart-product-note">Observaciones: {{$line.Observation}}</div>
+          {{else if $line.Color}}
           <div class="cart-product-color">
             <span class="color-dot" style="background:{{colorhex $line.Color}}"></span>
             <span>{{$line.Color}}</span>
           </div>
+          {{end}}
           <div class="cart-product-price">${{formatPrice $line.Subtotal}}</div>
         </div>
       </div>
@@ -68,6 +72,7 @@
         <form method="post" action="/cart/update" class="cart-qty-form">
           <input type="hidden" name="slug" value="{{$line.Slug}}" />
           <input type="hidden" name="color" value="{{$line.Color}}" />
+          <input type="hidden" name="observation" value="{{$line.Observation}}" />
           <button type="submit" name="op" value="dec" class="cart-qty-btn cart-qty-minus" aria-label="Disminuir cantidad">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3">
               <path d="M5 12h14"/>
@@ -84,6 +89,7 @@
         <form method="post" action="/cart/remove" class="cart-remove-form">
           <input type="hidden" name="slug" value="{{$line.Slug}}" />
           <input type="hidden" name="color" value="{{$line.Color}}" />
+          <input type="hidden" name="observation" value="{{$line.Observation}}" />
           <button type="submit" class="cart-remove-btn" aria-label="Eliminar producto">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
@@ -289,7 +295,7 @@
 
   <!-- Resumen Desktop (oculto en mobile, se muestra en sticky bar) -->
   <div class="cart-summary-desktop">
-    <div class="cart-summary-header">Resumen de tu pedido</div>
+    <div class="cart-summary-header">Resumen</div>
     <div class="cart-summary-row">
       <span>Subtotal</span>
       <span id="subtotalVal" class="summary-value">${{formatPrice .Total}}</span>

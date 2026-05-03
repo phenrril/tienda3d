@@ -357,12 +357,14 @@ function formatPrice(num) {
 
 // Home carousel + modal
 (function(){
-  // Buscar slides dentro de links o directamente
-  const links=[...document.querySelectorAll('#heroCarousel .hc-slide-link')];
-  const directSlides=[...document.querySelectorAll('#heroCarousel .hc-slide:not(.hc-slide-link .hc-slide)')];
-  const slides = links.map(l => l.querySelector('.hc-slide')).filter(s => s != null).concat(directSlides);
+  const carousel=document.getElementById('heroCarousel');
+  if(!carousel) return;
+  const links=[...carousel.querySelectorAll('.hc-slide-link')];
+  const directSlides=[...carousel.querySelectorAll(':scope > .hc-slide')];
+  const slides = links.map(l => l.querySelector('.hc-slide')).filter(Boolean).concat(directSlides);
   const dotsC=document.getElementById('hcDots');
   if(slides.length && dotsC){
+    dotsC.innerHTML='';
     slides.forEach((_,i)=>{const d=document.createElement('div');d.className='dot'+(i===0?' active':'');d.dataset.i=i;d.onclick=()=>go(i,true);dotsC.appendChild(d);});
     let idx=0,timer=null;
     function go(n,manual){
@@ -382,8 +384,11 @@ function formatPrice(num) {
       dotsC.children[idx].classList.add('active');
       if(manual){restart();}
     }
-    function next(){go(idx+1);}function start(){timer=setInterval(next,3000);}function restart(){clearInterval(timer);start();}start();
-    let startX=0,isSwiping=false;const carousel=document.getElementById('heroCarousel');
+    function next(){go(idx+1);}
+    function start(){clearInterval(timer);timer=setInterval(next,3000);}
+    function restart(){start();}
+    start();
+    let startX=0,isSwiping=false;
     if(carousel){
       carousel.addEventListener('touchstart',e=>{startX=e.touches[0].clientX;isSwiping=true;},{passive:true});
       carousel.addEventListener('touchmove',e=>{if(!isSwiping)return;const dx=e.touches[0].clientX-startX;if(Math.abs(dx)>10){e.preventDefault();}},{passive:false});
@@ -412,28 +417,48 @@ function formatPrice(num) {
   const filterSheetClose=filterSheet?filterSheet.querySelector('.sheet-close'):null;
   const sortSheet=document.getElementById('sortSheet');
   const sortSheetClose=sortSheet?sortSheet.querySelector('.sheet-close'):null;
+  const sheetBackdrop=document.getElementById('sheetBackdrop');
   const form=document.getElementById('filtersForm');
   const sortInput=document.getElementById('sortInput');
 
+  function syncSheetBackdrop(){
+    const hasOpenSheet = (filterSheet && !filterSheet.hidden) || (sortSheet && !sortSheet.hidden);
+    if(sheetBackdrop){
+      sheetBackdrop.hidden = !hasOpenSheet;
+      sheetBackdrop.setAttribute('aria-hidden', hasOpenSheet ? 'false' : 'true');
+    }
+    document.body.style.overflow = hasOpenSheet ? 'hidden' : '';
+  }
+
   function openFilterSheet(){
     if(!filterSheet) return;
+    closeSortSheet();
     filterSheet.hidden=false;
+    filterSheet.setAttribute('aria-hidden','false');
     filterBtn&&filterBtn.setAttribute('aria-expanded','true');
+    syncSheetBackdrop();
   }
   function closeFilterSheet(){
     if(!filterSheet) return;
     filterSheet.hidden=true;
+    filterSheet.setAttribute('aria-hidden','true');
     filterBtn&&filterBtn.setAttribute('aria-expanded','false');
+    syncSheetBackdrop();
   }
   function openSortSheet(){
     if(!sortSheet) return;
+    closeFilterSheet();
     sortSheet.hidden=false;
+    sortSheet.setAttribute('aria-hidden','false');
     sortBtn&&sortBtn.setAttribute('aria-expanded','true');
+    syncSheetBackdrop();
   }
   function closeSortSheet(){
     if(!sortSheet) return;
     sortSheet.hidden=true;
+    sortSheet.setAttribute('aria-hidden','true');
     sortBtn&&sortBtn.setAttribute('aria-expanded','false');
+    syncSheetBackdrop();
   }
 
   filterBtn&&filterBtn.addEventListener('click',()=>{
@@ -452,10 +477,24 @@ function formatPrice(num) {
     }
   });
   sortSheetClose&&sortSheetClose.addEventListener('click',closeSortSheet);
+  sheetBackdrop&&sheetBackdrop.addEventListener('click',()=>{
+    closeFilterSheet();
+    closeSortSheet();
+  });
   window.addEventListener('keydown',(e)=>{
     if(e.key==='Escape'){
       if(filterSheet&&!filterSheet.hidden) closeFilterSheet();
       if(sortSheet&&!sortSheet.hidden) closeSortSheet();
+    }
+  });
+  document.addEventListener('mousedown',(e)=>{
+    const target=e.target;
+    if(!(target instanceof Element)) return;
+    if(filterSheet && !filterSheet.hidden && !filterSheet.contains(target) && !filterBtn?.contains(target)){
+      closeFilterSheet();
+    }
+    if(sortSheet && !sortSheet.hidden && !sortSheet.contains(target) && !sortBtn?.contains(target)){
+      closeSortSheet();
     }
   });
 
@@ -1429,25 +1468,24 @@ if ('serviceWorker' in navigator) {
     suggestions.forEach(item=>{
       const div=document.createElement('div');
       div.className='search-result-item';
-      div.style.cssText='display:flex;align-items:center;gap:10px;padding:10px;cursor:pointer;background:#12202c;border-bottom:1px solid #223140;transition:background .15s';
-      div.onmouseenter=()=>{div.style.background='#1b2a38'};
-      div.onmouseleave=()=>{div.style.background='#12202c'};
       div.onclick=()=>{window.location.href='/product/'+item.slug};
       if(item.image){
+        const thumb=document.createElement('div');
+        thumb.className='search-result-thumb';
         const img=document.createElement('img');
         img.src=item.image;
         img.alt='';
-        img.style.cssText='width:48px;height:48px;object-fit:contain;border-radius:8px;border:1px solid #223140';
-        div.appendChild(img);
+        thumb.appendChild(img);
+        div.appendChild(thumb);
       }
       const info=document.createElement('div');
-      info.style.cssText='flex:1';
+      info.className='search-result-info';
       const name=document.createElement('div');
+      name.className='search-result-name';
       name.textContent=item.name;
-      name.style.cssText='font-weight:600;margin-bottom:2px';
       const meta=document.createElement('div');
+      meta.className='search-result-meta';
       meta.textContent=item.category+' • $'+formatPrice(item.price);
-      meta.style.cssText='font-size:12px;color:#94a3b8';
       info.appendChild(name);
       info.appendChild(meta);
       div.appendChild(info);
@@ -1884,7 +1922,7 @@ if ('serviceWorker' in navigator) {
     const percent = percentages[step] || 0;
     
     if(progressFill) progressFill.style.width = percent + '%';
-    if(currentStepEl) currentStepEl.textContent = step;
+    if(currentStepEl) currentStepEl.textContent = Math.min(step, 3);
     if(progressPercentEl) progressPercentEl.textContent = percent;
   }
   

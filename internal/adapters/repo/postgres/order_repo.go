@@ -134,6 +134,39 @@ func (r *OrderRepo) ListInRange(ctx context.Context, from, to time.Time) ([]doma
 	return list, nil
 }
 
+func (r *OrderRepo) DeleteRange(ctx context.Context, from, to time.Time) (int64, error) {
+	if to.Before(from) {
+		from, to = to, from
+	}
+
+	from = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location())
+	to = time.Date(to.Year(), to.Month(), to.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), to.Location())
+
+	var deleted int64
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		orderScope := tx.Model(&domain.Order{}).Where("created_at BETWEEN ? AND ?", from, to)
+		if err := orderScope.Count(&deleted).Error; err != nil {
+			return err
+		}
+		if deleted == 0 {
+			return nil
+		}
+
+		subquery := tx.Model(&domain.Order{}).Select("id").Where("created_at BETWEEN ? AND ?", from, to)
+		if err := tx.Where("order_id IN (?)", subquery).Delete(&domain.OrderItem{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("created_at BETWEEN ? AND ?", from, to).Delete(&domain.Order{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return deleted, nil
+}
+
 // FindPendingByEmailAndCoupon busca órdenes pendientes de un usuario con un cupón específico
 func (r *OrderRepo) FindPendingByEmailAndCoupon(ctx context.Context, email, couponCode string) ([]domain.Order, error) {
 	var list []domain.Order
@@ -142,9 +175,9 @@ func (r *OrderRepo) FindPendingByEmailAndCoupon(ctx context.Context, email, coup
 	// 2. Tengan el código de cupón (case-insensitive)
 	// 3. NO estén finalizadas ni canceladas (solo pendientes de pago)
 	if err := r.db.WithContext(ctx).
-		Where("LOWER(email) = LOWER(?) AND UPPER(coupon_code) = UPPER(?) AND status IN (?)", 
-			email, 
-			couponCode, 
+		Where("LOWER(email) = LOWER(?) AND UPPER(coupon_code) = UPPER(?) AND status IN (?)",
+			email,
+			couponCode,
 			[]domain.OrderStatus{domain.OrderStatusAwaitingPay}).
 		Find(&list).Error; err != nil {
 		return nil, err

@@ -1,9 +1,23 @@
 {{define "admin_costs.html"}}
 {{template "layout_start" .}}
-<h1>Calculadora de costos</h1>
-<nav class="admin-nav"><a href="/admin/products">Productos</a> | <a href="/admin/orders">Órdenes</a> | <a href="/admin/pedidos">Pedidos</a> | <a href="/admin/sales">Ventas</a> | <a href="/admin/analytics">Analytics</a> | <a href="/admin/destacada">Destacada</a> | <a href="/admin/costs" class="active">Calculadora</a> | <a href="/admin/categorias">Categorías</a> | <a href="/admin/cupones">Cupones</a> | <a href="/admin/logout">Salir</a></nav>
+<div class="admin-header">
+  <h1>Calculadora de costos</h1>
+  <nav class="admin-nav">
+    <a href="/admin/products">Productos</a>
+    <a href="/admin/orders">Órdenes</a>
+    <a href="/admin/pedidos">Pedidos</a>
+    <a href="/admin/sales">Ventas</a>
+    <a href="/admin/analytics">Analytics</a>
+    <a href="/admin/destacada">Destacada</a>
+    <a href="/admin/costs" class="active">Calculadora</a>
+    <a href="/admin/categorias">Categorías</a>
+    <a href="/admin/cupones">Cupones</a>
+    <a href="/admin/logout" class="admin-nav-logout">Salir</a>
+  </nav>
+</div>
 
-<section class="grid" style="margin-top:1rem;grid-template-columns:420px 1fr;gap:2rem;align-items:start">
+<section class="admin-shell">
+<section class="grid" style="margin-top:0;grid-template-columns:420px 1fr;gap:2rem;align-items:start">
   <div class="admin-card" style="padding:18px 20px 24px">
     <h2 style="margin:0 0 10px;font-size:18px">Parámetros</h2>
     <form id="costCalcForm" class="form-card" autocomplete="off">
@@ -48,10 +62,11 @@
 
   <div class="admin-card" style="padding:18px 20px 24px">
     <h2 style="margin:0 0 10px;font-size:18px">Resultados</h2>
-    <div id="costCalcResult" class="result" style="font-family:system-ui,Segoe UI,Roboto,Arial">
+    <div id="costCalcResult" class="result">
       <p style="color:var(--muted);margin:0">Completá el formulario y presioná Calcular.</p>
     </div>
   </div>
+</section>
 </section>
 
 {{template "layout_end" .}}

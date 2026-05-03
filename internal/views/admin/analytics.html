@@ -1,17 +1,30 @@
 {{define "admin_analytics.html"}}
 {{template "layout_start" .}}
-<h1>Analytics</h1>
-<nav class="admin-nav"><a href="/admin/products">Productos</a> | <a href="/admin/orders">Órdenes</a> | <a href="/admin/pedidos">Pedidos</a> | <a href="/admin/sales">Ventas</a> | <a href="/admin/analytics" class="active">Analytics</a> | <a href="/admin/destacada">Destacada</a> | <a href="/admin/costs">Calculadora</a> | <a href="/admin/categorias">Categorías</a> | <a href="/admin/cupones">Cupones</a> | <a href="/admin/logout">Salir</a></nav>
-
-<form method="GET" class="date-range">
-  <div class="dr-field">
-    <span class="dr-label">Desde</span>
-    <input class="date-input" type="date" name="from" value="{{.From}}" />
-  </div>
-  <div class="dr-field">
-    <span class="dr-label">Hasta</span>
-    <input class="date-input" type="date" name="to" value="{{.To}}" />
-  </div>
+<div class="admin-header">
+  <h1>Analytics</h1>
+  <nav class="admin-nav">
+    <a href="/admin/products">Productos</a>
+    <a href="/admin/orders">Órdenes</a>
+    <a href="/admin/pedidos">Pedidos</a>
+    <a href="/admin/sales">Ventas</a>
+    <a href="/admin/analytics" class="active">Analytics</a>
+    <a href="/admin/destacada">Destacada</a>
+    <a href="/admin/costs">Calculadora</a>
+    <a href="/admin/categorias">Categorías</a>
+    <a href="/admin/cupones">Cupones</a>
+    <a href="/admin/logout" class="admin-nav-logout">Salir</a>
+  </nav>
+</div>
+<section class="admin-shell">
+<form method="GET" class="admin-date-range">
+  <label class="admin-date-field">
+    <span>Desde</span>
+    <input class="admin-date-input" type="date" name="from" value="{{.From}}" />
+  </label>
+  <label class="admin-date-field">
+    <span>Hasta</span>
+    <input class="admin-date-input" type="date" name="to" value="{{.To}}" />
+  </label>
   <div class="dr-actions">
     <button class="btn-primary" type="submit">Filtrar</button>
   </div>
@@ -19,19 +32,19 @@
 
 {{with .Dashboard}}
 {{if .Error}}
-<div class="an-alert">{{.Error}}</div>
+<div class="admin-alert">{{.Error}}</div>
 {{end}}
 {{if .Warnings}}
 <div style="margin-top:.8rem;display:flex;flex-direction:column;gap:6px">
-  {{range .Warnings}}<div class="an-warn">⚠ {{.}}</div>{{end}}
+  {{range .Warnings}}<div class="admin-warning">⚠ {{.}}</div>{{end}}
 </div>
 {{end}}
 
 <section class="grid" style="margin-top:1.2rem;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px">
-  <div class="kpi"><h3>Usuarios totales</h3><strong>{{.TotalUsers}}</strong></div>
-  <div class="kpi"><h3>Tiempo prom. en sitio</h3><strong id="kpiAvgDuration" data-seconds="{{printf "%.0f" .AvgSessionDuration}}">—</strong></div>
-  <div class="kpi"><h3>Clicks en WhatsApp</h3><strong>{{.TotalWhatsAppClicks}}</strong></div>
-  <div class="kpi"><h3>Tasa WhatsApp</h3><strong id="kpiWaRate">—</strong></div>
+  <div class="admin-kpi"><h3>Usuarios totales</h3><strong>{{.TotalUsers}}</strong></div>
+  <div class="admin-kpi"><h3>Tiempo prom. en sitio</h3><strong id="kpiAvgDuration" data-seconds="{{printf "%.0f" .AvgSessionDuration}}">—</strong></div>
+  <div class="admin-kpi"><h3>Clicks en WhatsApp</h3><strong>{{.TotalWhatsAppClicks}}</strong></div>
+  <div class="admin-kpi"><h3>Tasa WhatsApp</h3><strong id="kpiWaRate">—</strong></div>
 </section>
 
 <div class="grid" style="margin-top:1.5rem;grid-template-columns:1fr;gap:1.5rem;align-items:start">
@@ -92,21 +105,21 @@
   }
 
   var palette = {
-    accent: '#6366f1',
-    green: '#10b981',
-    orange: '#f59e0b',
-    pink: '#ec4899',
-    cyan: '#06b6d4',
-    red: '#ef4444',
-    lime: '#84cc16',
-    blue: '#3b82f6',
-    purple: '#8b5cf6'
+    accent: '#c8502a',
+    accentDark: '#7a3520',
+    sand: '#caa982',
+    moss: '#748564',
+    gold: '#b98a3a',
+    plum: '#8b5a5a',
+    clay: '#a46d56',
+    mist: '#8f857b',
+    ink: '#f4ede4'
   };
-  var colors = [palette.accent,palette.green,palette.orange,palette.pink,palette.cyan,palette.red,palette.lime,palette.blue,palette.purple];
+  var colors = [palette.accent,palette.accentDark,palette.sand,palette.moss,palette.gold,palette.plum,palette.clay,palette.mist];
   var defaults = Chart.defaults;
-  defaults.color = '#94a3b8';
-  defaults.borderColor = 'rgba(255,255,255,.06)';
-  defaults.font.family = 'Poppins,system-ui,sans-serif';
+  defaults.color = '#b9aa98';
+  defaults.borderColor = 'rgba(92,73,59,.35)';
+  defaults.font.family = 'Inter Tight,system-ui,sans-serif';
 
   // Daily chart
   var dailyLabels = [{{range .Daily}}"{{.Date}}",{{end}}];
@@ -123,8 +136,8 @@
           return d.length===8 ? d.substring(6)+'/'+d.substring(4,6) : d;
         }),
         datasets:[
-          {label:'Usuarios',data:dailyUsers,borderColor:palette.accent,backgroundColor:'rgba(99,102,241,.12)',fill:true,tension:.3,pointRadius:2},
-          {label:'WhatsApp clicks',data:dailyWA,borderColor:palette.green,backgroundColor:'rgba(16,185,129,.12)',fill:true,tension:.3,pointRadius:2}
+          {label:'Usuarios',data:dailyUsers,borderColor:palette.accent,backgroundColor:'rgba(200,80,42,.14)',fill:true,tension:.3,pointRadius:2},
+          {label:'WhatsApp clicks',data:dailyWA,borderColor:palette.moss,backgroundColor:'rgba(116,133,100,.14)',fill:true,tension:.3,pointRadius:2}
         ]
       },
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}
@@ -163,28 +176,13 @@
 })();
 </script>
 {{end}}
-
-<style>
-.kpi{background:#13202f;border:1px solid #223140;padding:12px 14px;border-radius:10px;display:flex;flex-direction:column;gap:4px}
-.kpi h3{margin:0;font-size:11px;letter-spacing:.5px;color:var(--muted);text-transform:uppercase}
-.kpi strong{font-size:18px;font-weight:600;color:#fff}
-.an-alert{margin-top:1rem;padding:12px 16px;background:#1e1a0e;border:1px solid #5c4b1f;border-radius:10px;color:#fbbf24;font-size:.85rem}
-.an-warn{padding:10px 14px;background:#111c2a;border:1px solid #1e3a5f;border-radius:8px;color:#7dd3fc;font-size:.8rem;line-height:1.5}
-.date-range{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-top:16px;background:linear-gradient(140deg,#14212c,#111a23 55%);border:1px solid #1f2c39;padding:14px 18px 18px;border-radius:22px;box-shadow:0 4px 16px -6px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.03)}
-.date-range .dr-field{display:flex;flex-direction:column;gap:6px;min-width:170px}
-.date-range .dr-label{font-size:11px;font-weight:600;letter-spacing:.6px;color:var(--muted);text-transform:uppercase}
-.date-range .date-input{background:#0f1924;border:1px solid #223140;color:#fff;font:inherit;font-size:14px;padding:11px 42px 11px 14px;border-radius:16px;min-height:46px;line-height:1.3;transition:border-color .18s,background .18s,box-shadow .18s;box-shadow:inset 0 0 0 1px rgba(255,255,255,.02);background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' stroke='%2394a3b8' fill='none' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='5.2' width='14' height='12.5' rx='2' ry='2' stroke='%2394a3b8'/><line x1='3' y1='9' x2='17' y2='9' stroke='%2394a3b8'/><line x1='7' y1='3.2' x2='7' y2='6' stroke='%2394a3b8'/><line x1='13' y1='3.2' x2='13' y2='6' stroke='%2394a3b8'/></svg>");background-repeat:no-repeat;background-position:right 12px center;background-size:20px auto}
-.date-range .date-input:hover{background-color:#132232}
-.date-range .date-input:focus{outline:none;border-color:var(--accent);background-color:#162a3b;box-shadow:0 0 0 2px rgba(99,102,241,.32),0 4px 14px -6px rgba(0,0,0,.6)}
-.date-range .date-input::-webkit-calendar-picker-indicator{opacity:0;cursor:pointer}
-.date-range .dr-actions{display:flex;gap:10px;align-items:center;padding-top:4px}
-@media (max-width:768px){
-  .grid[style*="1fr 1fr"]{grid-template-columns:1fr !important}
-}
-@media (max-width:560px){
-  .date-range{padding:12px 14px 16px;border-radius:18px}
-  .date-range .dr-field{min-width:130px}
-}
-</style>
+<script>
+document.querySelectorAll('.admin-date-input').forEach(function(input){
+  input.addEventListener('click', function(){
+    if (typeof input.showPicker === 'function') input.showPicker();
+  });
+});
+</script>
+</section>
 {{template "layout_end" .}}
 {{end}}
